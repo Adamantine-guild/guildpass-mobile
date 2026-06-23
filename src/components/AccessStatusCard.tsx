@@ -1,38 +1,27 @@
-// GuildPass Mobile: Import package module dependencies.
 import { View, Text } from "react-native";
-// GuildPass Mobile: Pull in react-native, expo, or external state libraries.
 import React from "react";
-// GuildPass Mobile: Import package module dependencies.
 import { Card } from "./Card";
-// GuildPass Mobile: Pull in react-native, expo, or external state libraries.
 import { RoleBadge } from "./RoleBadge";
 
-// GuildPass Mobile: Enter functional execution container scope block.
 type AccessStatusCardProps = {
   hasAccess: boolean;
   reason?: string;
   matchedRoles: string[];
   requiredRoles: string[];
-  // GuildPass Mobile: Exit functional execution container scope block.
 };
 
-// GuildPass Mobile: Exported screen, component definition, or state hooks.
 export const AccessStatusCard = ({
   hasAccess,
   reason,
   matchedRoles,
   requiredRoles,
-  // GuildPass Mobile: Enter functional execution container scope block.
 }: AccessStatusCardProps) => {
-  // GuildPass Mobile: Return evaluated JSX layout or callback response.
   return (
     <Card className={`border-2 ${hasAccess ? "border-success" : "border-error"}`}>
       <View className="items-center mb-6">
         <View
-          // GuildPass Mobile: Enter functional execution container scope block.
           className={`w-16 h-16 rounded-full items-center justify-center mb-4 ${
             hasAccess ? "bg-success" : "bg-error"
-            // GuildPass Mobile: Exit functional execution container scope block.
           }`}
         >
           <Text className="text-white text-3xl">{hasAccess ? "✓" : "✕"}</Text>
@@ -66,5 +55,4 @@ export const AccessStatusCard = ({
       </View>
     </Card>
   );
-  // GuildPass Mobile: Exit functional execution container scope block.
 };

@@ -117,6 +117,7 @@ pnpm test:run    # All tests must pass
 - New screens must handle loading, empty, and error states.
 - New business logic must have at least one Vitest unit test.
 - Do not introduce native modules that break Expo Go compatibility without prior discussion.
+- Do not add boilerplate generated comments (e.g. "Import package module dependencies"). Comments should explain non-obvious domain logic, edge cases, or implementation choices.
 
 ---
 

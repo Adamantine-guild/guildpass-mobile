@@ -1,62 +1,38 @@
-// GuildPass Mobile: Pull in react-native, expo, or external state libraries.
 import { View, Text, ScrollView, TextInput } from "react-native";
-// GuildPass Mobile: Import package module dependencies.
 import React, { useState } from "react";
-// GuildPass Mobile: Pull in react-native, expo, or external state libraries.
 import { useWallet } from "../src/features/wallet/useWallet";
-// GuildPass Mobile: Import package module dependencies.
 import { useAccessCheck } from "../src/features/access/useAccessCheck";
-// GuildPass Mobile: Pull in react-native, expo, or external state libraries.
 import { AppHeader } from "../src/components/AppHeader";
-// GuildPass Mobile: Import package module dependencies.
 import { Card } from "../src/components/Card";
-// GuildPass Mobile: Pull in react-native, expo, or external state libraries.
 import { Button } from "../src/components/Button";
-// GuildPass Mobile: Import package module dependencies.
 import { WalletInput } from "../src/components/WalletInput";
-// GuildPass Mobile: Pull in react-native, expo, or external state libraries.
 import { AccessStatusCard } from "../src/components/AccessStatusCard";
-// GuildPass Mobile: Import package module dependencies.
 import { LoadingState } from "../src/components/LoadingState";
 
-// GuildPass Mobile: Exposed interface structure for local navigation layouts.
 export default function AccessCheck() {
-  // GuildPass Mobile: Variable binding and property initialization.
   const { walletAddress: currentWallet } = useWallet();
-  // GuildPass Mobile: Local UI-scoped constant or state representation.
   const [address, setAddress] = useState(currentWallet || "");
-  // GuildPass Mobile: Variable binding and property initialization.
   const [guildId, setGuildId] = useState("");
-  // GuildPass Mobile: Local UI-scoped constant or state representation.
   const [resourceId, setResourceId] = useState("");
-  // GuildPass Mobile: Variable binding and property initialization.
   const [checkParams, setCheckParams] = useState<{
     walletAddress: string;
     guildId: string;
     resourceId: string;
-    // GuildPass Mobile: Exit functional execution container scope block.
   } | null>(null);
 
-  // GuildPass Mobile: Local UI-scoped constant or state representation.
   const { checkAccess } = useAccessCheck();
-  // GuildPass Mobile: Variable binding and property initialization.
   const {
     data: result,
     isLoading,
     error,
   } = checkAccess(checkParams || { walletAddress: "", guildId: "", resourceId: "" });
 
-  // GuildPass Mobile: Local UI-scoped constant or state representation.
   const handleCheck = () => {
-    // GuildPass Mobile: Evaluate branch condition check for UI guards.
     if (address && guildId && resourceId) {
       setCheckParams({ walletAddress: address, guildId, resourceId });
-      // GuildPass Mobile: Exit functional execution container scope block.
     }
-    // GuildPass Mobile: Exit functional execution container scope block.
   };
 
-  // GuildPass Mobile: Terminate block execution context and send back value.
   return (
     <View className="flex-1 bg-background">
       <AppHeader title="Access Check" showBack />
@@ -65,7 +41,6 @@ export default function AccessCheck() {
           <WalletInput
             value={address}
             onChangeText={setAddress}
-            // GuildPass Mobile: Variable binding and property initialization.
             placeholder="Wallet address (0x...)"
           />
 
@@ -122,5 +97,4 @@ export default function AccessCheck() {
       </ScrollView>
     </View>
   );
-  // GuildPass Mobile: Exit functional execution container scope block.
 }

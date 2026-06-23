@@ -1,16 +1,10 @@
-// GuildPass Mobile: Import package module dependencies.
 import { View, Text, SafeAreaView, Image } from "react-native";
-// GuildPass Mobile: Pull in react-native, expo, or external state libraries.
 import { useRouter } from "expo-router";
-// GuildPass Mobile: Import package module dependencies.
 import { Button } from "../src/components/Button";
 
-// GuildPass Mobile: Core mobile screen or hook export definition.
 export default function Onboarding() {
-  // GuildPass Mobile: Variable binding and property initialization.
   const router = useRouter();
 
-  // GuildPass Mobile: Return evaluated JSX layout or callback response.
   return (
     <SafeAreaView className="flex-1 bg-white">
       <View className="flex-1 px-6 justify-between py-12">
@@ -30,8 +24,7 @@ export default function Onboarding() {
           <View className="bg-background p-4 rounded-2xl mb-8">
             <Text className="text-text font-semibold mb-2 text-center">MVP Preview Mode</Text>
             <Text className="text-text-muted text-sm text-center">
-              // GuildPass Mobile: Local UI-scoped constant or state representation. For this MVP,
-              you can manually enter any wallet address to explore guild memberships.
+              For this MVP, you can manually enter any wallet address to explore guild memberships.
             </Text>
           </View>
 
@@ -40,5 +33,4 @@ export default function Onboarding() {
       </View>
     </SafeAreaView>
   );
-  // GuildPass Mobile: Exit functional execution container scope block.
 }
