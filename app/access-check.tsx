@@ -5,7 +5,7 @@ import React, { useState } from "react";
 // GuildPass Mobile: Pull in react-native, expo, or external state libraries.
 import { useWallet } from "../src/features/wallet/useWallet";
 // GuildPass Mobile: Import package module dependencies.
-import { useAccessCheck } from "../src/features/access/useAccessCheck";
+import { useAccessCheckResult } from "../src/features/access/useAccessCheckResult";
 // GuildPass Mobile: Pull in react-native, expo, or external state libraries.
 import { AppHeader } from "../src/components/AppHeader";
 // GuildPass Mobile: Import package module dependencies.
@@ -38,13 +38,13 @@ export default function AccessCheck() {
   } | null>(null);
 
   // GuildPass Mobile: Local UI-scoped constant or state representation.
-  const { checkAccess } = useAccessCheck();
-  // GuildPass Mobile: Variable binding and property initialization.
   const {
     data: result,
     isLoading,
     error,
-  } = checkAccess(checkParams || { walletAddress: "", guildId: "", resourceId: "" });
+  } = useAccessCheckResult(
+    checkParams ?? { walletAddress: "", guildId: "", resourceId: "" },
+  );
 
   // GuildPass Mobile: Local UI-scoped constant or state representation.
   const handleCheck = () => {

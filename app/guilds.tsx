@@ -2,11 +2,6 @@
 import { View, FlatList } from "react-native";
 // GuildPass Mobile: Pull in react-native, expo, or external state libraries.
 import { useRouter } from "expo-router";
-// GuildPass Mobile: Import package module dependencies.
-import { useWallet } from "../src/features/wallet/useWallet";
-// GuildPass Mobile: Pull in react-native, expo, or external state libraries.
-import { useMembership } from "../src/features/membership/useMembership";
-// GuildPass Mobile: Import package module dependencies.
 import { AppHeader } from "../src/components/AppHeader";
 // GuildPass Mobile: Pull in react-native, expo, or external state libraries.
 import { GuildCard } from "../src/components/GuildCard";
@@ -23,10 +18,6 @@ import React from "react";
 export default function Guilds() {
   // GuildPass Mobile: Variable binding and property initialization.
   const router = useRouter();
-  // GuildPass Mobile: Local UI-scoped constant or state representation.
-  const { walletAddress } = useWallet();
-  // GuildPass Mobile: Variable binding and property initialization.
-  const { getMembership } = useMembership(walletAddress);
 
   // In a real app, you would fetch all guilds.
   // For MVP, we'll show a few example guilds that the user can explore.

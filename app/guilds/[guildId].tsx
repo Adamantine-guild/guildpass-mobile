@@ -5,8 +5,10 @@ import { useLocalSearchParams } from "expo-router";
 // GuildPass Mobile: Pull in react-native, expo, or external state libraries.
 import { useWallet } from "../../src/features/wallet/useWallet";
 // GuildPass Mobile: Import package module dependencies.
-import { useGuilds } from "../../src/features/guilds/useGuilds";
+import { useGuild } from "../../src/features/guilds/useGuild";
 // GuildPass Mobile: Pull in react-native, expo, or external state libraries.
+import { useGuildRoles } from "../../src/features/guilds/useGuildRoles";
+// GuildPass Mobile: Import package module dependencies.
 import { useMembership } from "../../src/features/membership/useMembership";
 // GuildPass Mobile: Import package module dependencies.
 import { AppHeader } from "../../src/components/AppHeader";
@@ -23,37 +25,28 @@ import React from "react";
 
 // GuildPass Mobile: Core mobile screen or hook export definition.
 export default function GuildDetail() {
-  // GuildPass Mobile: Local UI-scoped constant or state representation.
   const { guildId } = useLocalSearchParams<{ guildId: string }>();
-  // GuildPass Mobile: Variable binding and property initialization.
   const { walletAddress } = useWallet();
-  // GuildPass Mobile: Local UI-scoped constant or state representation.
-  const { getGuild, getRoles } = useGuilds();
-  // GuildPass Mobile: Variable binding and property initialization.
-  const { getMembership } = useMembership(walletAddress);
 
-  // GuildPass Mobile: Local UI-scoped constant or state representation.
-  const { data: guild, isLoading: guildLoading, error: guildError } = getGuild(guildId);
-  // GuildPass Mobile: Variable binding and property initialization.
-  const { data: membership, isLoading: memLoading } = getMembership(guildId);
-  // GuildPass Mobile: Local UI-scoped constant or state representation.
-  const { data: roles, isLoading: rolesLoading } = getRoles(guildId);
+  const {
+    data: guild,
+    isLoading: guildLoading,
+    error: guildError,
+  } = useGuild(guildId ?? "");
+  const { data: membership, isLoading: memLoading } = useMembership(
+    walletAddress,
+    guildId ?? "",
+  );
+  const { data: roles, isLoading: rolesLoading } = useGuildRoles(guildId ?? "");
 
-  // GuildPass Mobile: Validate screen variables or params before routing.
   if (guildLoading || memLoading || rolesLoading) {
-    // GuildPass Mobile: Return evaluated JSX layout or callback response.
     return <LoadingState message="Fetching guild details..." />;
-    // GuildPass Mobile: Exit functional execution container scope block.
   }
 
-  // GuildPass Mobile: Evaluate branch condition check for UI guards.
   if (guildError || !guild) {
-    // GuildPass Mobile: Terminate block execution context and send back value.
     return <ErrorState message="Failed to load guild details" />;
-    // GuildPass Mobile: Exit functional execution container scope block.
   }
 
-  // GuildPass Mobile: Return evaluated JSX layout or callback response.
   return (
     <View className="flex-1 bg-background">
       <AppHeader title={guild.name} showBack />
@@ -80,7 +73,10 @@ export default function GuildDetail() {
 
         <View className="mb-6">
           <Text className="text-lg font-bold text-text mb-3">Your Membership</Text>
-          <Card className={membership?.isActive ? "border-success/30" : ""} accessibilityLabel={`Membership status: ${membership?.isActive ? "Active Member" : "Not a Member"}`}>
+          <Card
+            className={membership?.isActive ? "border-success/30" : ""}
+            accessibilityLabel={`Membership status: ${membership?.isActive ? "Active Member" : "Not a Member"}`}
+          >
             <View className="flex-row justify-between items-center">
               <Text className="text-text font-medium">Status</Text>
               <Text
@@ -105,5 +101,4 @@ export default function GuildDetail() {
       </ScrollView>
     </View>
   );
-  // GuildPass Mobile: Exit functional execution container scope block.
 }
