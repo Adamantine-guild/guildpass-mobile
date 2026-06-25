@@ -1,62 +1,67 @@
-// GuildPass Mobile: Pull in react-native, expo, or external state libraries.
 import { View, Text, ScrollView, TextInput } from "react-native";
-// GuildPass Mobile: Import package module dependencies.
-import React, { useState } from "react";
-// GuildPass Mobile: Pull in react-native, expo, or external state libraries.
+import React, { useEffect, useState } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useWallet } from "../src/features/wallet/useWallet";
-// GuildPass Mobile: Import package module dependencies.
 import { useAccessCheckResult } from "../src/features/access/useAccessCheckResult";
-// GuildPass Mobile: Pull in react-native, expo, or external state libraries.
+import type { ParsedAccessQrPayload } from "../src/features/access/qrPayload";
+import { parseAccessQrPayload } from "../src/features/access/qrPayload";
 import { AppHeader } from "../src/components/AppHeader";
-// GuildPass Mobile: Import package module dependencies.
 import { Card } from "../src/components/Card";
-// GuildPass Mobile: Pull in react-native, expo, or external state libraries.
 import { Button } from "../src/components/Button";
-// GuildPass Mobile: Import package module dependencies.
 import { WalletInput } from "../src/components/WalletInput";
-// GuildPass Mobile: Pull in react-native, expo, or external state libraries.
 import { AccessStatusCard } from "../src/components/AccessStatusCard";
-// GuildPass Mobile: Import package module dependencies.
 import { LoadingState } from "../src/components/LoadingState";
 
-// GuildPass Mobile: Exposed interface structure for local navigation layouts.
 export default function AccessCheck() {
-  // GuildPass Mobile: Variable binding and property initialization.
+  const router = useRouter();
+  const { qrPayload } = useLocalSearchParams<{ qrPayload?: string | string[] }>();
   const { walletAddress: currentWallet } = useWallet();
-  // GuildPass Mobile: Local UI-scoped constant or state representation.
   const [address, setAddress] = useState(currentWallet || "");
-  // GuildPass Mobile: Variable binding and property initialization.
   const [guildId, setGuildId] = useState("");
-  // GuildPass Mobile: Local UI-scoped constant or state representation.
   const [resourceId, setResourceId] = useState("");
-  // GuildPass Mobile: Variable binding and property initialization.
+  const [scanError, setScanError] = useState<string | null>(null);
+  const [scannedPayload, setScannedPayload] = useState<ParsedAccessQrPayload | null>(null);
   const [checkParams, setCheckParams] = useState<{
     walletAddress: string;
     guildId: string;
     resourceId: string;
-    // GuildPass Mobile: Exit functional execution container scope block.
   } | null>(null);
 
-  // GuildPass Mobile: Local UI-scoped constant or state representation.
+  const checkParamsNonNull = checkParams ?? { walletAddress: "", guildId: "", resourceId: "" };
   const {
     data: result,
     isLoading,
     error,
-  } = useAccessCheckResult(
-    checkParams ?? { walletAddress: "", guildId: "", resourceId: "" },
-  );
+  } = useAccessCheckResult(checkParamsNonNull);
 
-  // GuildPass Mobile: Local UI-scoped constant or state representation.
+  useEffect(() => {
+    const rawPayload = Array.isArray(qrPayload) ? qrPayload[0] : qrPayload;
+
+    if (!rawPayload) {
+      return;
+    }
+
+    try {
+      const parsedPayload = parseAccessQrPayload(rawPayload);
+
+      setGuildId(parsedPayload.guildId);
+      setResourceId(parsedPayload.resourceId);
+      setAddress(parsedPayload.walletAddress ?? currentWallet ?? "");
+      setScannedPayload(parsedPayload);
+      setScanError(null);
+      setCheckParams(null);
+    } catch (error) {
+      setScanError(error instanceof Error ? error.message : "Unable to read QR payload.");
+      setScannedPayload(null);
+    }
+  }, [currentWallet, qrPayload]);
+
   const handleCheck = () => {
-    // GuildPass Mobile: Evaluate branch condition check for UI guards.
     if (address && guildId && resourceId) {
       setCheckParams({ walletAddress: address, guildId, resourceId });
-      // GuildPass Mobile: Exit functional execution container scope block.
     }
-    // GuildPass Mobile: Exit functional execution container scope block.
   };
 
-  // GuildPass Mobile: Terminate block execution context and send back value.
   return (
     <View className="flex-1 bg-background">
       <AppHeader title="Access Check" showBack />
@@ -65,8 +70,14 @@ export default function AccessCheck() {
           <WalletInput
             value={address}
             onChangeText={setAddress}
-            // GuildPass Mobile: Variable binding and property initialization.
             placeholder="Wallet address (0x...)"
+          />
+
+          <Button
+            title="Scan QR Code"
+            onPress={() => router.push("/access-scanner")}
+            variant="outline"
+            className="mt-4"
           />
 
           <View className="mt-4">
@@ -102,6 +113,33 @@ export default function AccessCheck() {
           />
         </Card>
 
+        {scanError && (
+          <Card className="mb-6 border-error bg-error/5">
+            <Text className="text-error font-bold">QR code rejected</Text>
+            <Text className="text-error/80 text-sm mt-1">{scanError}</Text>
+          </Card>
+        )}
+
+        {scannedPayload && !scanError && (
+          <Card className="mb-6 border-success/30">
+            <Text className="text-success font-bold mb-3">Scanned access details</Text>
+            <View className="flex-row justify-between py-1">
+              <Text className="text-text-muted">Guild ID</Text>
+              <Text className="text-text font-medium">{scannedPayload.guildId}</Text>
+            </View>
+            <View className="flex-row justify-between py-1">
+              <Text className="text-text-muted">Resource ID</Text>
+              <Text className="text-text font-medium">{scannedPayload.resourceId}</Text>
+            </View>
+            {scannedPayload.expiresAt && (
+              <View className="flex-row justify-between py-1">
+                <Text className="text-text-muted">Expires</Text>
+                <Text className="text-text font-medium">{scannedPayload.expiresAt}</Text>
+              </View>
+            )}
+          </Card>
+        )}
+
         {isLoading && <LoadingState message="Checking protocol permissions..." />}
 
         {result && (
@@ -116,7 +154,11 @@ export default function AccessCheck() {
         )}
 
         {error && (
-          <Card className="border-error bg-error/5" accessibilityRole="alert" accessibilityLabel="Error checking access. Please verify your inputs and try again.">
+          <Card
+            className="border-error bg-error/5"
+            accessibilityRole="alert"
+            accessibilityLabel="Error checking access. Please verify your inputs and try again."
+          >
             <Text className="text-error font-bold">Error checking access</Text>
             <Text className="text-error/80 text-sm mt-1">
               Please verify your inputs and try again.
@@ -126,5 +168,4 @@ export default function AccessCheck() {
       </ScrollView>
     </View>
   );
-  // GuildPass Mobile: Exit functional execution container scope block.
 }

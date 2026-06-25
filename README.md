@@ -31,6 +31,7 @@ GuildPass Mobile is the official gateway to the GuildPass ecosystem for iOS and 
 ## ✨ Key Features
 
 - **🛡️ Universal Membership**: View all your active guild memberships and assigned roles in a unified dashboard.
+- **📷 QR Access Check**: Scan GuildPass access QR codes to instantly verify token-gated resource permissions.
 - **🔍 Instant Verification**: Execute real-time protocol checks for token-gated resources with zero friction.
 - **🌐 Cross-Chain Support**: Explore guild configurations and role requirements across supported EVM networks.
 - **⚡ High Performance**: Native-speed interactions powered by React Native and efficient server-state management.
@@ -81,12 +82,14 @@ The application is built on a robust, feature-driven foundation designed for lon
 
 ### Project structure
 
-| Path     | Purpose                                      |
-| -------- | -------------------------------------------- |
-| `app/`   | Expo Router file-based pages and layouts     |
-| `src/`   | Feature modules, hooks, stores, and services |
-| `docs/`  | Architecture and integration guides          |
-| `tests/` | Vitest unit tests                            |
+| Path                   | Purpose                                      |
+| ---------------------- | -------------------------------------------- |
+| `app/`                 | Expo Router file-based pages and layouts     |
+| `app/access-scanner.tsx` | QR code scanner screen using expo-camera   |
+| `src/features/access/` | Access check hooks and QR payload validation |
+| `src/`                 | Feature modules, hooks, stores, and services |
+| `docs/`                | Architecture and integration guides          |
+| `tests/`               | Vitest unit tests                            |
 
 ## 🧪 Testing
 
@@ -138,12 +141,31 @@ See [docs/release.md](./docs/release.md) for the full release guide, environment
 
 Copy `.env.example` to `.env` and fill in your values. Environment variables prefixed with `EXPO_PUBLIC_` are available at runtime. Sensitive values must be stored as EAS Secrets.
 
+## QR access check payload
+
+QR access checks use a JSON payload encoded directly in the QR code:
+
+```json
+{
+  "type": "guildpass.access-check",
+  "version": 1,
+  "guildId": "guild_abc",
+  "resourceId": "vip-door",
+  "walletAddress": "0x1234567890123456789012345678901234567890",
+  "expiresAt": "2026-06-23T12:05:00.000Z"
+}
+```
+
+`type`, `version`, `guildId`, and `resourceId` are required. `walletAddress` and `expiresAt`
+are optional. Unsupported types or versions, malformed JSON, missing required fields, invalid
+wallet addresses, and expired payloads are rejected before the access check is submitted.
+
 ## 🗺️ Roadmap
 
 - [ ] **Native Wallet Integration**: Support for WalletConnect, MetaMask, and Coinbase Wallet.
 - [ ] **Smart Onboarding**: Social login and embedded wallets for non-crypto native users.
 - [ ] **Push Notifications**: Real-time alerts for role updates and access grants.
-- [ ] **QR Gating**: Generate dynamic QR codes for physical event access.
+- [x] **QR Access Verification**: Scan GuildPass QR codes to verify token-gated resource access from the mobile app.
 - [ ] **Offline Resilience**: Advanced caching layer for viewing memberships without connectivity.
 
 ## 🤝 Contributing

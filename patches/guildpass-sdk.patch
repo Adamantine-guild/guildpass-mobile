@@ -1,0 +1,143 @@
+diff --git a/package.json b/package.json
+index ae62787..5d2401e 100644
+--- a/package.json
++++ b/package.json
+@@ -2,36 +2,8 @@
+   "name": "@guildpass/sdk",
+   "version": "0.1.0",
+   "description": "The official TypeScript SDK for GuildPass, a Web3 membership and access-control protocol.",
+-  "main": "./dist/index.js",
+-  "module": "./dist/index.mjs",
+-  "types": "./dist/index.d.ts",
+-  "exports": {
+-    ".": {
+-      "types": "./dist/index.d.ts",
+-      "require": "./dist/index.js",
+-      "import": "./dist/index.mjs"
+-    },
+-    "./client": {
+-      "types": "./dist/client.d.ts",
+-      "require": "./dist/client.js",
+-      "import": "./dist/client.mjs"
+-    },
+-    "./errors": {
+-      "types": "./dist/errors.d.ts",
+-      "require": "./dist/errors.js",
+-      "import": "./dist/errors.mjs"
+-    },
+-    "./utils": {
+-      "types": "./dist/utils.d.ts",
+-      "require": "./dist/utils.js",
+-      "import": "./dist/utils.mjs"
+-    },
+-    "./types": {
+-      "types": "./dist/types.d.ts",
+-      "require": "./dist/types.js",
+-      "import": "./dist/types.mjs"
+-    }
+-  },
++  "main": "./src/index.ts",
++  "types": "./src/index.ts",
+   "files": [
+     "dist",
+     "README.md",
+@@ -85,8 +57,4 @@
+     "typedoc": "^0.25.8",
+     "typescript": "^5.3.3",
+     "vitest": "^1.3.1"
+-  },
+-  "dependencies": {
+-    "js-sha3": "^0.9.3"
+-  }
+ }
+diff --git a/src/http/httpClient.ts b/src/http/httpClient.ts
+index c378a22..c14b499 100644
+--- a/src/http/httpClient.ts
++++ b/src/http/httpClient.ts
+@@ -154,7 +154,7 @@ export class HttpClient {
+ 
+     const requestHeaders: Record<string, string> = {
+       'Content-Type': 'application/json',
+-      ...(this.apiKey ? { 'X-API-Key': this.apiKey } : {}),
++      ...(this.apiKey ? { Authorization: `Bearer ${this.apiKey}` } : {}),
+       ...headers,
+     };
+ 
+@@ -167,12 +167,6 @@ export class HttpClient {
+       throw new GuildPassError('Request aborted', GuildPassErrorCode.ABORTED);
+     }
+ 
+-    const requestHeaders = {
+-      'Content-Type': 'application/json',
+-      ...(this.apiKey ? { Authorization: `Bearer ${this.apiKey}` } : {}),
+-      ...headers,
+-    };
+-
+     // GuildPass SDK: Variable binding initialization.
+     const startTime = Date.now();
+     const hookPayload: RequestHookPayload = { 
+@@ -268,49 +262,12 @@ export class HttpClient {
+             console.error('GuildPass SDK: onResponse hook failed', err);
+           }
+         }
+-      }
+-      // GuildPass SDK: Return evaluated output value.
+-      return {
+-        data,
+-        status: response.status,
+-        headers: response.headers,
+-        // GuildPass SDK: End of logic containment structure block.
+-      };
+-      // GuildPass SDK: Execution block boundary initialization.
+-    } catch (error: any) {
+-      clearTimeout(timeoutId);
+-
+-      const durationMs = Date.now() - startTime;
+-      let finalError = error;
+-
+-      // GuildPass SDK: Verify constraint requirements before proceeding.
+-      if (error.name === 'AbortError') {
+-        if (signal?.aborted) {
+-          finalError = new GuildPassError(
+-            'Request cancelled by caller',
+-            GuildPassErrorCode.REQUEST_CANCELLED,
+-          );
+-        } else {
+-          finalError = new GuildPassError(
+-            `Request timed out after ${timeoutMs}ms`,
+-            GuildPassErrorCode.TIMEOUT,
+-          );
+-        }
+-      } else if (!(error instanceof GuildPassError)) {
+-        finalError = new GuildPassError(
+-          error.message || 'Unknown network error',
+-          GuildPassErrorCode.HTTP_ERROR,
+-          undefined,
+-          error,
+-        );
+-      }
+ 
+         return {
+           data,
+           status: response.status,
+           headers: response.headers,
+         };
+-
+       } catch (error: any) {
+         clearTimeout(timeoutId);
+         if (onAbort) signal!.removeEventListener('abort', onAbort);
+@@ -337,7 +294,6 @@ export class HttpClient {
+             error,
+           );
+         } else if (canRetry && attempt < retryConfig.maxRetries && retryConfig.retryableStatuses.includes(finalError.status)) {
+-          // GuildPassError with retryable status
+           const backoff = Math.min(retryConfig.baseDelayMs * 2 ** attempt, retryConfig.maxDelayMs);
+           await delay(backoff);
+           attempt++;
+@@ -355,6 +311,5 @@ export class HttpClient {
+ 
+         throw finalError;
+       }
+-    }
+   }
+ }

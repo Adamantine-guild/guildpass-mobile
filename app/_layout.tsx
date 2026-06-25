@@ -27,6 +27,7 @@ export default function RootLayout() {
           <Stack.Screen name="guilds" />
           <Stack.Screen name="guilds/[guildId]" />
           <Stack.Screen name="access-check" />
+          <Stack.Screen name="access-scanner" />
           <Stack.Screen name="settings" />
         </Stack>
       </View>

@@ -64,7 +64,13 @@
     },
     "plugins": [
       "expo-router",
-      "expo-updates"
+      "expo-updates",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow GuildPass to scan access check QR codes."
+        }
+      ]
     ]
   }
 }
