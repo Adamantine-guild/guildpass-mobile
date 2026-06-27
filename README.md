@@ -153,6 +153,19 @@ maestro studio
 
 See [`.maestro/README.md`](.maestro/README.md) for detailed E2E testing documentation, troubleshooting, and best practices.
 
+## 🔔 Push Notifications
+
+GuildPass Mobile uses Expo Notifications for real-time updates. Foundation includes:
+
+- **Token Registration**: Device tokens are registered with the backend (mocked in MVP).
+- **Preferences**: Users can opt-in/out of specific notification categories (Role Changes, Access Grants, Membership Status) in Settings.
+- **Permissions**: Automatic permission handling and status reporting.
+
+To test push notifications in development:
+1.  Use a **physical device** (not a simulator).
+2.  Ensure you are logged into your Expo account (`npx expo login`).
+3.  The app will request permissions when first navigating to Settings or performing an action requiring notifications.
+
 ## 🚀 Build & Release
 
 GuildPass Mobile uses **EAS Build** with three distinct profiles:
@@ -237,7 +250,7 @@ Deep links work when the app is cold-started (not already running). The app will
 
 - [ ] **Native Wallet Integration**: Support for WalletConnect, MetaMask, and Coinbase Wallet.
 - [ ] **Smart Onboarding**: Social login and embedded wallets for non-crypto native users.
-- [ ] **Push Notifications**: Real-time alerts for role updates and access grants.
+- [x] **Push Notifications**: Foundation for push notifications with registration and preferences.
 - [x] **QR Access Verification**: Scan GuildPass QR codes to verify token-gated resource access from the mobile app.
 - [ ] **Offline Resilience**: Advanced caching layer for viewing memberships without connectivity.
 

@@ -82,7 +82,8 @@
         {
           "cameraPermission": "Allow GuildPass to scan access check QR codes."
         }
-      ]
+      ],
+      "expo-notifications"
     ]
   }
 }
