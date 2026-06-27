@@ -8,8 +8,14 @@ import { isPersistableQuery, QUERY_GC_TIME_MS } from "../src/lib/offlineCache";
 import "../src/lib/networkManager";
 import { useWalletStore } from "../src/features/wallet/wallet.store";
 import { useSessionStore } from "../src/features/session/session.store";
+import { configureNotifications } from "../src/features/notifications/useNotifications";
 
 export default function RootLayout() {
+  // Configure notification handler and channels once
+  useEffect(() => {
+    configureNotifications();
+  }, []);
+
   // Restore session state from wallet store on cold start
   useEffect(() => {
     const { walletAddress } = useWalletStore.getState();

@@ -6,9 +6,13 @@ import { Button } from "../src/components/Button";
 import { appConfig } from "../src/config/appConfig";
 import { resetAppState } from "../src/lib/resetAppState";
 import React, { useState } from "react";
+import { useNotifications } from "../src/features/notifications/useNotifications";
+import { Toggle } from "../src/components/Toggle";
 
 export default function Settings() {
-  const { isConnected } = useWallet();
+  const { isConnected, address } = useWallet();
+  const { permissionStatus, preferences, requestPermissions, togglePreference, isRegistering } =
+    useNotifications();
   const [isResetting, setIsResetting] = useState(false);
 
   const handleReset = async () => {
@@ -27,6 +31,53 @@ export default function Settings() {
     <View className="flex-1 bg-background" testID="settings-screen">
       <AppHeader title="Settings" showBack />
       <ScrollView className="flex-1 px-4 py-6">
+        <Text className="text-lg font-bold text-text mb-3">Notifications</Text>
+        <Card className="mb-6">
+          <View className="mb-4">
+            <View className="flex-row justify-between items-center mb-2">
+              <Text className="text-text-muted">Push Notifications</Text>
+              <Text
+                className={`font-medium ${
+                  permissionStatus === "granted" ? "text-success" : "text-error"
+                }`}
+                testID="notification-permission-status"
+              >
+                {permissionStatus.charAt(0).toUpperCase() + permissionStatus.slice(1)}
+              </Text>
+            </View>
+            {permissionStatus !== "granted" && (
+              <Button
+                title="Enable Notifications"
+                onPress={requestPermissions}
+                variant="outline"
+                loading={isRegistering}
+                testID="enable-notifications-button"
+              />
+            )}
+          </View>
+
+          <View className="border-t border-border pt-2">
+            <Toggle
+              label="Role Changes"
+              value={preferences.role_changes}
+              onValueChange={() => togglePreference("role_changes", address)}
+              testID="toggle-role-changes"
+            />
+            <Toggle
+              label="Access Grants"
+              value={preferences.access_grants}
+              onValueChange={() => togglePreference("access_grants", address)}
+              testID="toggle-access-grants"
+            />
+            <Toggle
+              label="Membership Status"
+              value={preferences.membership_updates}
+              onValueChange={() => togglePreference("membership_updates", address)}
+              testID="toggle-membership-updates"
+            />
+          </View>
+        </Card>
+
         <Text className="text-lg font-bold text-text mb-3">Protocol Configuration</Text>
         <Card className="mb-6">
           <View className="flex-row justify-between py-2 border-b border-border">
