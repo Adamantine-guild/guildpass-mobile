@@ -1,4 +1,4 @@
-import { View, Text, SafeAreaView, Image } from "react-native";
+import { View, Text, SafeAreaView } from "react-native";
 import { useRouter } from "expo-router";
 import { Button } from "../src/components/Button";
 
@@ -29,10 +29,20 @@ export default function Onboarding() {
           </View>
 
           <Button
-            title="Get Started"
+            title="I have a wallet"
             onPress={() => router.push("/profile")}
             testID="onboarding-get-started-button"
           />
+          <Button
+            title="Get started without one"
+            variant="outline"
+            onPress={() => router.push("/social-onboarding")}
+            className="mt-4"
+            testID="onboarding-social-login-button"
+          />
+          <Text className="text-text-muted text-xs text-center mt-3">
+            No wallet? Sign in with your email and we set one up for you.
+          </Text>
         </View>
       </View>
     </SafeAreaView>

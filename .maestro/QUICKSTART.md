@@ -83,6 +83,7 @@ npm run test:e2e:studio
 | 4️⃣ Access Check ✅ | Successful access verification | `04-access-check-success.yaml` |
 | 5️⃣ Access Check ❌ | Failed access verification | `05-access-check-failure.yaml` |
 | 6️⃣ Reset State | Clear app data | `06-reset-app-state.yaml` |
+| 7️⃣ Social Onboarding | Email login → embedded wallet → profile | `07-social-onboarding.yaml` |
 
 ## Common Issues
 

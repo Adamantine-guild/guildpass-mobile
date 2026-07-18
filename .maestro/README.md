@@ -42,6 +42,12 @@ This directory contains end-to-end tests for GuildPass Mobile using [Maestro](ht
 - ✅ Confirms app returns to disconnected state
 - **File**: `06-reset-app-state.yaml`
 
+### 07. Social Login / Embedded Wallet Onboarding
+- ✅ Tests the "Get started without one" onboarding branch
+- ✅ Validates email entry and embedded wallet provisioning
+- ✅ Confirms the connected profile state with the provisioned address
+- **File**: `07-social-onboarding.yaml`
+
 ## Prerequisites
 
 ### Install Maestro

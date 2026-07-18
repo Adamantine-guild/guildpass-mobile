@@ -1,4 +1,4 @@
-export type WalletConnectorType = "manual" | "walletconnect" | "coinbase" | "metamask";
+export type WalletConnectorType = "manual" | "walletconnect" | "coinbase" | "metamask" | "embedded";
 
 export interface WalletConnector {
   type: WalletConnectorType;

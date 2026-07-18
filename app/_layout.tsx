@@ -32,6 +32,7 @@ export default function RootLayout() {
           >
             <Stack.Screen name="index" />
             <Stack.Screen name="onboarding" />
+            <Stack.Screen name="social-onboarding" />
             <Stack.Screen name="profile" />
             <Stack.Screen name="guilds" />
             <Stack.Screen name="guilds/[guildId]" />

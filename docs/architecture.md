@@ -59,4 +59,11 @@ The current MVP uses a manual address entry. The architecture is designed to eas
 
 1. `WalletConnect`: Using `@web3modal/react-native`.
 2. `Expo-standard wallets`: Using `expo-linking` for deep-linking into wallet apps.
-3. `Embedded Wallets`: Integration with social-login based wallets for non-crypto-native users.
+3. `Embedded Wallets`: **Scaffolded.** Social-login onboarding ("Get started
+   without one") now runs through an `EmbeddedWalletProvider` interface
+   (`src/features/wallet/embeddedWallet.*`) and an `embedded` connector that
+   feeds the shared wallet store. The shipped `local-preview` provider derives
+   a deterministic preview address from a validated email (no key material —
+   see `SECURITY.md`, "Embedded Wallet Key Custody"); a production provider
+   (Web3Auth, Privy, …) implements the same interface behind
+   `getEmbeddedWalletProvider()`.

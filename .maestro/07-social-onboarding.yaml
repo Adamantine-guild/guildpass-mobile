@@ -1,0 +1,27 @@
+appId: xyz.guildpass.mobile
+---
+# E2E Test: Social Login / Embedded Wallet Onboarding
+# Validates: A user without a wallet can onboard via email, get an embedded
+# wallet provisioned behind the scenes, and land on the connected profile.
+
+# clearState so the flow is order-independent: a wallet persisted by an
+# earlier flow would redirect launch straight to /profile.
+- launchApp:
+    clearState: true
+- assertVisible:
+    id: "onboarding-screen"
+- assertVisible:
+    id: "onboarding-social-login-button"
+- tapOn:
+    id: "onboarding-social-login-button"
+- assertVisible:
+    id: "social-onboarding-screen"
+- tapOn:
+    id: "social-email-input"
+- inputText: "newuser@example.com"
+- tapOn:
+    id: "social-continue-button"
+- assertVisible:
+    id: "profile-screen"
+- assertVisible:
+    id: "connected-wallet-address"
