@@ -1,15 +1,20 @@
-export const ACCESS_QR_TYPE = "guildpass.access-check";
-export const ACCESS_QR_VERSION = 1;
+import { ACCESS_QR_TYPE, ACCESS_QR_VERSION } from "./qrConstants";
+
+export { ACCESS_QR_TYPE, ACCESS_QR_VERSION };
 
 export type AccessQrPayload = {
   type: typeof ACCESS_QR_TYPE;
   version: typeof ACCESS_QR_VERSION;
   guildId: string;
-    signature: string;;
   resourceId: string;
   walletAddress?: string;
   expiresAt?: string;
-  signature: string;
+  /**
+   * DER-encoded, hex-secp256k1 signature over the canonical signing message
+   * (see qrSignature.buildSigningMessage). Verified against the guild's
+   * published issuer public key. Optional during the migration window.
+   */
+  signature?: string;
 };
 
 export type ParsedAccessQrPayload = {
@@ -81,6 +86,16 @@ export const parseAccessQrPayload = (
     if (expiresAt.getTime() <= now.getTime()) {
       throw new Error("QR code has expired.");
     }
+  }
+
+  // During the migration window the signature field is optional at the
+  // structural layer; cryptographic verification is enforced separately by
+  // verifyAndParseAccessQrPayload when the feature flag is enabled.
+  if (
+    decodedPayload.signature !== undefined &&
+    !isNonEmptyString(decodedPayload.signature)
+  ) {
+    throw new Error("QR code contains an invalid signature.");
   }
 
   return {

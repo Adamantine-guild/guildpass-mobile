@@ -26,6 +26,10 @@ This repository is a React Native / Expo mobile application.
 - Authentication or access-gate bypass via deep links or URL schemes
 - Insecure storage of sensitive user data on device
 - Man-in-the-middle vulnerabilities in API calls to guildpass-core
+- **Forged access QR codes** — QR payloads are signed by the guild issuer and
+  verified client-side against the guild's published `issuerPublicKey`
+  (secp256k1 + keccak256 ECDSA). A QR without a valid signature must be
+  rejected. See `docs/qr-signature-verification.md`.
 - XSS-equivalent attacks via WebView components (if used)
 
 **Out-of-scope:**
