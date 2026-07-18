@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@guildpass/sdk": "github:Adamantine-Guild/guildpass-sdk",
+    "@noble/hashes": "^1.7.1",
     "@react-native-async-storage/async-storage": "^3.1.1",
     "@react-native-community/netinfo": "^12.0.1",
     "@tanstack/query-async-storage-persister": "^5.101.1",

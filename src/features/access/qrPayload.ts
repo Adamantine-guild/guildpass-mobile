@@ -1,3 +1,11 @@
+import {
+  INVALID_WALLET_CHECKSUM,
+  INVALID_WALLET_CHECKSUM_ERROR,
+  WalletAddressError,
+  hasValidEip55Checksum,
+  isMixedCaseAddress,
+} from "../../lib/walletValidation";
+
 export const ACCESS_QR_TYPE = "guildpass.access-check";
 export const ACCESS_QR_VERSION = 1;
 
@@ -57,12 +65,20 @@ export const parseAccessQrPayload = (
     throw new Error("QR code is missing a valid resource ID.");
   }
 
-  if (
-    decodedPayload.walletAddress !== undefined &&
-    (!isNonEmptyString(decodedPayload.walletAddress) ||
-      !ETHEREUM_ADDRESS_PATTERN.test(decodedPayload.walletAddress))
-  ) {
-    throw new Error("QR code contains an invalid wallet address.");
+  if (decodedPayload.walletAddress !== undefined) {
+    if (
+      !isNonEmptyString(decodedPayload.walletAddress) ||
+      !ETHEREUM_ADDRESS_PATTERN.test(decodedPayload.walletAddress)
+    ) {
+      throw new Error("QR code contains an invalid wallet address.");
+    }
+
+    if (
+      isMixedCaseAddress(decodedPayload.walletAddress) &&
+      !hasValidEip55Checksum(decodedPayload.walletAddress)
+    ) {
+      throw new WalletAddressError(INVALID_WALLET_CHECKSUM_ERROR, INVALID_WALLET_CHECKSUM);
+    }
   }
 
   if (decodedPayload.expiresAt !== undefined) {

@@ -93,17 +93,12 @@ describe("Preservation: Valid Address Behavior", () => {
     expect(useWalletStore.getState().isConnected).toBe(false);
   });
 
-  it("valid mixed-case address is accepted by setWalletAddress (stored as-is on unfixed code — normalisation NOT yet applied)", () => {
-    // EIP-55 mixed-case address: valid chars and length, but uppercase A–F present.
-    const mixedCaseAddress = "0xAbCdEf1234567890AbCdEf1234567890AbCdEf12";
+  it("valid mixed-case EIP-55 address is accepted by setWalletAddress (normalised to lowercase)", () => {
+    const mixedCaseAddress = "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed";
 
     useWalletStore.getState().setWalletAddress(mixedCaseAddress);
 
-    // On UNFIXED code: address is stored exactly as supplied (no lowercasing).
-    // After the fix this will equal mixedCaseAddress.toLowerCase().
-    // The test asserts the address is accepted (not null) and isConnected is true,
-    // which holds on both unfixed and fixed code — making it safe to run at both stages.
-    expect(useWalletStore.getState().walletAddress).not.toBeNull();
+    expect(useWalletStore.getState().walletAddress).toBe(mixedCaseAddress.toLowerCase());
     expect(useWalletStore.getState().isConnected).toBe(true);
   });
 });
@@ -229,10 +224,19 @@ describe("validateAndNormalizeAddress", () => {
   });
 
   it('returns { valid: true, address: lowercased } for a valid mixed-case EIP-55 address', () => {
-    const result = validateAndNormalizeAddress("0xAbCdEf1234567890AbCdEf1234567890AbCdEf12");
+    const result = validateAndNormalizeAddress("0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed");
     expect(result.valid).toBe(true);
     if (result.valid) {
-      expect(result.address).toBe("0xabcdef1234567890abcdef1234567890abcdef12");
+      expect(result.address).toBe("0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed");
+    }
+  });
+
+  it("returns { valid: false, code: INVALID_WALLET_CHECKSUM } for a bad EIP-55 checksum", () => {
+    const result = validateAndNormalizeAddress("0x5aaeb6053F3E94C9b9A09f33669435E7Ef1BeAed");
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.code).toBe("INVALID_WALLET_CHECKSUM");
+      expect(result.error).toMatch(/checksum/i);
     }
   });
 
@@ -297,8 +301,8 @@ describe("setWalletAddress (fixed)", () => {
   });
 
   it('stores the lowercased address and sets isConnected: true for a valid mixed-case address', () => {
-    useWalletStore.getState().setWalletAddress("0xAbCdEf1234567890AbCdEf1234567890AbCdEf12");
-    expect(useWalletStore.getState().walletAddress).toBe("0xabcdef1234567890abcdef1234567890abcdef12");
+    useWalletStore.getState().setWalletAddress("0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed");
+    expect(useWalletStore.getState().walletAddress).toBe("0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed");
     expect(useWalletStore.getState().isConnected).toBe(true);
   });
 
@@ -412,37 +416,32 @@ describe("PBT: Preservation — Valid Address", () => {
  *
  * Validates: Requirements 2.5, 3.5
  *
- * For 10 valid addresses with random casing of A–F hex letters:
- *   - validateAndNormalizeAddress always returns the address lowercased
+ * For 10 valid addresses that are all-lowercase or all-uppercase (no EIP-55
+ * mixed checksum), validateAndNormalizeAddress always returns lowercase.
+ * Mixed-case inputs are covered separately with EIP-55 vectors.
  */
 describe("PBT: Case Normalisation", () => {
   beforeEach(() => {
     useWalletStore.setState({ walletAddress: null, isConnected: false });
   });
 
-  // Generator: 10 valid addresses with random upper/lower casing on hex A-F letters
   const hexCharsLower = "0123456789abcdef";
-  const mixedCaseAddresses: string[] = Array.from({ length: 10 }, () => {
-    // Start with a valid lowercase address body
+  const casedAddresses: string[] = Array.from({ length: 10 }, (_, i) => {
     const body = Array.from(
       { length: 40 },
-      () => hexCharsLower[Math.floor(Math.random() * hexCharsLower.length)]
+      () => hexCharsLower[Math.floor(Math.random() * hexCharsLower.length)],
     ).join("");
-    // Randomly uppercase some hex letters (a-f → A-F)
-    const mixedBody = body
-      .split("")
-      .map((c) => (Math.random() > 0.5 ? c.toUpperCase() : c))
-      .join("");
-    return `0x${mixedBody}`;
+    // Alternate all-lower / all-upper — both are valid without an EIP-55 checksum.
+    return i % 2 === 0 ? `0x${body}` : `0x${body.toUpperCase()}`;
   });
 
   it("validateAndNormalizeAddress returns the address lowercased regardless of input casing", () => {
-    for (const address of mixedCaseAddresses) {
+    for (const address of casedAddresses) {
       const result = validateAndNormalizeAddress(address);
       expect(result.valid, `expected valid: true for "${address}"`).toBe(true);
       if (result.valid) {
         expect(result.address, `expected lowercased result for "${address}"`).toBe(
-          address.toLowerCase()
+          address.toLowerCase(),
         );
       }
     }
@@ -483,7 +482,7 @@ describe("Integration: Profile Flow", () => {
   });
 
   it("valid mixed-case address: connectManually stores lowercased address, isConnected true", () => {
-    const mixedCaseAddress = "0xAbCdEf1234567890AbCdEf1234567890AbCdEf12";
+    const mixedCaseAddress = "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed";
     const result = validateAndNormalizeAddress(mixedCaseAddress);
 
     expect(result.valid).toBe(true);
@@ -526,7 +525,7 @@ describe("Integration: Access-Check Flow", () => {
   });
 
   it("valid address: handleCheck sets checkParams with normalized lowercase address", () => {
-    const address = "0xAbCdEf1234567890AbCdEf1234567890AbCdEf12";
+    const address = "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed";
     const guildId = "alpha-guild";
     const resourceId = "secret-channel";
 
