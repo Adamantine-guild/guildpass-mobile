@@ -155,6 +155,6 @@ export default function AccessScanner() {
           </Card>
         </View>
       </View>
-    </View>
+    </BiometricGate>
   );
 }

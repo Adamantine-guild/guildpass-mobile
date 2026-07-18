@@ -16,6 +16,7 @@ import { areWalletAddressesEqual, validateAndNormalizeAddress } from "../src/lib
 import { useAccessHistoryStore } from "../src/features/access/accessHistory.store";
 import { useNetworkStatus } from "../src/features/offline/useNetworkStatus";
 import { StaleDataBanner } from "../src/components/StaleDataBanner";
+import { BiometricGate } from "../src/features/security/BiometricGate";
 
 export default function AccessCheck() {
   const router = useRouter();
@@ -311,28 +312,37 @@ export default function AccessCheck() {
 
         {isPending && <LoadingState message="Checking protocol permissions..." />}
 
-        {result && (
-          <View className="mb-12">
-            <AccessStatusCard
-              hasAccess={result.hasAccess}
-              reason={result.reason}
-              matchedRoles={result.matchedRoles}
-              requiredRoles={result.requiredRoles}
-            />
-          </View>
-        )}
-
-        {error && !result && (
-          <Card
-            className="border-error bg-error/5"
-            accessibilityRole="alert"
-            accessibilityLabel="Error checking access. Please verify your inputs and try again."
+        {(result || error) && (
+          <BiometricGate
+            promptMessage="Authenticate to view access result"
+            onCancel={() => {
+              resetAccessCheck();
+            }}
           >
-            <Text className="text-error font-bold">Error checking access</Text>
-            <Text className="text-error/80 text-sm mt-1">
-              Please verify your inputs and try again.
-            </Text>
-          </Card>
+            {result && (
+              <View className="mb-12">
+                <AccessStatusCard
+                  hasAccess={result.hasAccess}
+                  reason={result.reason}
+                  matchedRoles={result.matchedRoles}
+                  requiredRoles={result.requiredRoles}
+                />
+              </View>
+            )}
+
+            {error && !result && (
+              <Card
+                className="border-error bg-error/5"
+                accessibilityRole="alert"
+                accessibilityLabel="Error checking access. Please verify your inputs and try again."
+              >
+                <Text className="text-error font-bold">Error checking access</Text>
+                <Text className="text-error/80 text-sm mt-1">
+                  Please verify your inputs and try again.
+                </Text>
+              </Card>
+            )}
+          </BiometricGate>
         )}
 
         <AccessHistoryList
