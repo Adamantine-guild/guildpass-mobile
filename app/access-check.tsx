@@ -12,7 +12,7 @@ import { WalletInput } from "../src/components/WalletInput";
 import { AccessStatusCard } from "../src/components/AccessStatusCard";
 import { LoadingState } from "../src/components/LoadingState";
 import { AccessHistoryList } from "../src/components/AccessHistoryList";
-import { validateAndNormalizeAddress } from "../src/lib/walletValidation";
+import { areWalletAddressesEqual, validateAndNormalizeAddress } from "../src/lib/walletValidation";
 import { useAccessHistoryStore } from "../src/features/access/accessHistory.store";
 import { useNetworkStatus } from "../src/features/offline/useNetworkStatus";
 import { StaleDataBanner } from "../src/components/StaleDataBanner";
@@ -27,6 +27,9 @@ export default function AccessCheck() {
   const [resourceId, setResourceId] = useState("");
   const [scanError, setScanError] = useState<string | null>(null);
   const [scannedPayload, setScannedPayload] = useState<ParsedAccessQrPayload | null>(null);
+  const [walletWarningDecision, setWalletWarningDecision] = useState<
+    "connected" | "scanned" | "dismissed" | null
+  >(null);
   const [addressError, setAddressError] = useState<string | null>(null);
   const [guildIdError, setGuildIdError] = useState<string | null>(null);
   const [resourceIdError, setResourceIdError] = useState<string | null>(null);
@@ -52,6 +55,7 @@ export default function AccessCheck() {
 
   useEffect(() => {
     setAddress(currentWallet || "");
+    setWalletWarningDecision(null);
     setAddressError(null);
     resetAccessCheck();
   }, [currentWallet, resetAccessCheck]);
@@ -76,6 +80,7 @@ export default function AccessCheck() {
       setResourceId(parsedPayload.resourceId);
       setAddress(parsedPayload.walletAddress ?? currentWallet ?? "");
       setScannedPayload(parsedPayload);
+      setWalletWarningDecision(null);
       setScanError(null);
       setAddressError(null);
       resetAccessCheck();
@@ -88,6 +93,7 @@ export default function AccessCheck() {
 
   const handleAddressChange = (nextAddress: string) => {
     setAddress(nextAddress);
+    setWalletWarningDecision(null);
     setAddressError(null);
     resetCompletedCheck();
   };
@@ -103,6 +109,45 @@ export default function AccessCheck() {
     setResourceIdError(null);
     resetCompletedCheck();
   };
+
+  const handleUseConnectedWallet = () => {
+    if (currentWallet) {
+      setAddress(currentWallet);
+    }
+    setWalletWarningDecision("connected");
+    setAddressError(null);
+    resetCompletedCheck();
+  };
+
+  const handleContinueWithScannedWallet = () => {
+    if (scannedPayload?.walletAddress) {
+      setAddress(scannedPayload.walletAddress);
+    }
+    setWalletWarningDecision("scanned");
+    setAddressError(null);
+    resetCompletedCheck();
+  };
+
+  const handleDismissWalletWarning = () => {
+    setWalletWarningDecision("dismissed");
+    resetCompletedCheck();
+  };
+
+  const walletMismatchWarning = (() => {
+    if (!scannedPayload?.walletAddress || !currentWallet) {
+      return null;
+    }
+
+    if (walletWarningDecision !== null) {
+      return null;
+    }
+
+    if (areWalletAddressesEqual(currentWallet, scannedPayload.walletAddress)) {
+      return null;
+    }
+
+    return "This QR payload uses a different wallet address from your connected wallet. Review the wallet before continuing.";
+  })();
 
   const handleCheck = () => {
     const trimmedGuildId = guildId.trim();
@@ -216,6 +261,32 @@ export default function AccessCheck() {
           <Card className="mb-6 border-error bg-error/5">
             <Text className="text-error font-bold">QR code rejected</Text>
             <Text className="text-error/80 text-sm mt-1">{scanError}</Text>
+          </Card>
+        )}
+
+        {walletMismatchWarning && (
+          <Card
+            className="mb-6 border-primary/30 bg-primary/5"
+            accessibilityRole="alert"
+            accessibilityLabel="Wallet address mismatch warning. This QR payload uses a different wallet address from your connected wallet."
+          >
+            <Text className="text-primary font-bold">Wallet address mismatch</Text>
+            <Text className="text-text text-sm mt-2">{walletMismatchWarning}</Text>
+            <View className="mt-4">
+              <Button
+                title="Use connected wallet"
+                onPress={handleUseConnectedWallet}
+                variant="outline"
+                className="mb-2"
+              />
+              <Button
+                title="Continue with scanned wallet"
+                onPress={handleContinueWithScannedWallet}
+                variant="primary"
+                className="mb-2"
+              />
+              <Button title="Cancel" onPress={handleDismissWalletWarning} variant="secondary" />
+            </View>
           </Card>
         )}
 
