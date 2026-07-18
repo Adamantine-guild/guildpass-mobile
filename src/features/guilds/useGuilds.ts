@@ -1,32 +1,21 @@
 import { useQuery } from "@tanstack/react-query";
-import { guildPassClient } from "../../lib/guildpassClient";
+import {
+  buildGuildConfigQueryOptions,
+  buildGuildQueryOptions,
+  buildRolesQueryOptions,
+} from "../../lib/queryPolicies";
 
 export const useGuilds = () => {
   const useGuild = (guildId: string) => {
-    return useQuery({
-      queryKey: ["guild", guildId],
-      queryFn: () => guildPassClient.guilds.getGuild({ guildId }),
-      enabled: !!guildId,
-      networkMode: "offlineFirst",
-    });
+    return useQuery(buildGuildQueryOptions(guildId));
   };
 
   const useGuildConfig = (guildId: string) => {
-    return useQuery({
-      queryKey: ["guild-config", guildId],
-      queryFn: () => guildPassClient.guilds.getGuildConfig({ guildId }),
-      enabled: !!guildId,
-      networkMode: "offlineFirst",
-    });
+    return useQuery(buildGuildConfigQueryOptions(guildId));
   };
 
   const useRoles = (guildId: string) => {
-    return useQuery({
-      queryKey: ["guild-roles", guildId],
-      queryFn: () => guildPassClient.roles.getRoles({ guildId }),
-      enabled: !!guildId,
-      networkMode: "offlineFirst",
-    });
+    return useQuery(buildRolesQueryOptions(guildId));
   };
 
   return {

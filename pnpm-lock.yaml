@@ -4,18 +4,13 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-patchedDependencies:
-  '@guildpass/sdk@0.1.0':
-    hash: e6df6c7dd3aaa5a097fe78295c3edb9a78d6c48641469220e90e0007eb3d2b9a
-    path: patches/@guildpass__sdk@0.1.0.patch
-
 importers:
 
   .:
     dependencies:
       '@guildpass/sdk':
         specifier: github:Adamantine-Guild/guildpass-sdk
-        version: https://codeload.github.com/Adamantine-Guild/guildpass-sdk/tar.gz/a5d4eb95df413c16c3bac55b669fc53188a61bb4(patch_hash=e6df6c7dd3aaa5a097fe78295c3edb9a78d6c48641469220e90e0007eb3d2b9a)
+        version: https://codeload.github.com/Adamantine-Guild/guildpass-sdk/tar.gz/a5d4eb95df413c16c3bac55b669fc53188a61bb4
       '@react-native-async-storage/async-storage':
         specifier: ^3.1.1
         version: 3.1.1(react-native@0.73.6(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.2.0))(react@18.2.0)
@@ -6771,7 +6766,7 @@ snapshots:
     dependencies:
       graphql: 15.8.0
 
-  '@guildpass/sdk@https://codeload.github.com/Adamantine-Guild/guildpass-sdk/tar.gz/a5d4eb95df413c16c3bac55b669fc53188a61bb4(patch_hash=e6df6c7dd3aaa5a097fe78295c3edb9a78d6c48641469220e90e0007eb3d2b9a)':
+  '@guildpass/sdk@https://codeload.github.com/Adamantine-Guild/guildpass-sdk/tar.gz/a5d4eb95df413c16c3bac55b669fc53188a61bb4':
     dependencies:
       js-sha3: 0.9.3
 

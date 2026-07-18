@@ -1,5 +1,7 @@
 import { vi } from "vitest";
 
+vi.mock("@guildpass/sdk", () => import("./fixtures/guildpass-sdk-shim"));
+
 // Mock AsyncStorage
 vi.mock("@react-native-async-storage/async-storage", () => ({
   default: {

@@ -24,6 +24,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "src"),
+      "@guildpass/sdk": path.resolve(__dirname, "tests/fixtures/guildpass-sdk-shim.ts"),
     },
   },
 });
