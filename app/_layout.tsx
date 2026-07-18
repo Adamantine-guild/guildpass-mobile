@@ -5,13 +5,23 @@ import { queryClient } from "../src/lib/queryClient";
 import { asyncStoragePersister } from "../src/lib/queryPersister";
 import { isPersistableQuery, QUERY_GC_TIME_MS } from "../src/lib/offlineCache";
 import { initConnectivityService } from "../src/features/network/connectivityService";
+import { initSyncManager, triggerSync } from "../src/features/sync/syncManager";
 import { ErrorBoundary } from "../src/components/ErrorBoundary";
+import { SyncCorrectionOverlay } from "../src/components/SyncCorrectionOverlay";
+import { useSecurityInit } from "../src/features/security";
 
 initConnectivityService();
+initSyncManager();
+
+function SecurityInit() {
+  useSecurityInit();
+  return null;
+}
 
 export default function RootLayout() {
   return (
     <ErrorBoundary>
+      <SecurityInit />
       <PersistQueryClientProvider
         client={queryClient}
         persistOptions={{
@@ -21,6 +31,12 @@ export default function RootLayout() {
             shouldDehydrateQuery: (query) =>
               query.state.status === "success" && isPersistableQuery(query.queryKey),
           },
+        }}
+        onSuccess={() => {
+          // The persisted cache is only fully restored now; reconcile it so a
+          // device that reopens online (after being offline) still corrects
+          // stale grants instead of waiting for the next reconnect event.
+          void triggerSync();
         }}
       >
         <View className="flex-1 bg-background">
@@ -40,6 +56,7 @@ export default function RootLayout() {
             <Stack.Screen name="settings" />
             <Stack.Screen name="deep-link-error" />
           </Stack>
+          <SyncCorrectionOverlay />
         </View>
       </PersistQueryClientProvider>
     </ErrorBoundary>

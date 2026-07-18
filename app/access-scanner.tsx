@@ -8,6 +8,8 @@ import { Button } from "../src/components/Button";
 import { Card } from "../src/components/Card";
 import { parseAccessQrPayload } from "../src/features/access/qrPayload";
 import { useAccessCheck } from "../src/features/access/useAccessCheck";
+import { verifyAndParseAccessQrPayload } from "../src/features/access/verifyQrPayload";
+import { QrSignatureError } from "../src/features/access/qrSignature";
 
 export default function AccessScanner() {
   const router = useRouter();
@@ -19,6 +21,9 @@ export default function AccessScanner() {
   useEffect(() => {
     if (permission?.granted && state.status === "idle") {
       startScan();
+  const handleBarcodeScanned = async ({ data }: BarcodeScanningResult) => {
+    if (hasScanned) {
+      return;
     }
   }, [permission, state.status, startScan]);
 
@@ -49,6 +54,22 @@ export default function AccessScanner() {
       // (dispatch is not exposed here, but we rely on error handling in useAccessCheck via reset and later UI)
       // Instead, we can simply set a local error state – but to keep pattern, we'll call reset and let UI show generic error.
       reset();
+      // Structural parse first (fast, sync). When the qrSignatureVerification
+      // feature flag is on, this also cryptographically verifies the payload
+      // against the guild's published issuer key and rejects forged QR codes.
+      await verifyAndParseAccessQrPayload(data);
+      router.replace({
+        pathname: "/access-check",
+        params: { qrPayload: data },
+      });
+    } catch (scanError) {
+      const message =
+        scanError instanceof QrSignatureError
+          ? "QR code signature is invalid or missing."
+          : scanError instanceof Error
+            ? scanError.message
+            : "Unable to read QR payload.";
+      setError(message);
     }
   };
 

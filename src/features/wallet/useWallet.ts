@@ -5,6 +5,7 @@ import { WalletConnector } from "./walletConnector.types";
 import { useSessionStore } from "../session/session.store";
 import { queryClient } from "../../lib/queryClient";
 import { clearWalletScopedCache } from "../../lib/walletScopedCache";
+import { useSyncStore } from "../sync/sync.store";
 
 export const useWallet = (): {
   walletAddress: string | null;
@@ -47,6 +48,9 @@ export const useWallet = (): {
 
   const disconnect = () => {
     clearWalletScopedCache(queryClient);
+    // Sync corrections/metadata are wallet-scoped state too — a new wallet
+    // must not see the previous wallet's "your access changed" notices.
+    useSyncStore.getState().clearSyncState();
     storeDisconnect();
     void endSession();
   };

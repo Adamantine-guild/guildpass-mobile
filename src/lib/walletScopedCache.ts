@@ -1,6 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
 
-const walletScopedQueryRoots = new Set(["membership", "user-roles"]);
+export const walletScopedQueryRoots = new Set(["membership", "user-roles"]);
 const walletScopedMutationRoots = new Set(["access-check"]);
 
 function isWalletScopedQuery(queryKey: readonly unknown[]): boolean {
