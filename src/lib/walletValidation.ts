@@ -24,3 +24,13 @@ export function validateAndNormalizeAddress(
 
   return { valid: true, address: address.toLowerCase() };
 }
+
+export function areWalletAddressesEqual(
+  left: string | null | undefined,
+  right: string | null | undefined,
+): boolean {
+  const leftValidation = validateAndNormalizeAddress(left);
+  const rightValidation = validateAndNormalizeAddress(right);
+
+  return leftValidation.valid && rightValidation.valid && leftValidation.address === rightValidation.address;
+}
