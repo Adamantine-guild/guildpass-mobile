@@ -7,6 +7,7 @@ import { AppHeader } from "../src/components/AppHeader";
 import { Button } from "../src/components/Button";
 import { Card } from "../src/components/Card";
 import { parseAccessQrPayload } from "../src/features/access/qrPayload";
+import { BiometricGate } from "../src/features/security/BiometricGate";
 
 export default function AccessScanner() {
   const router = useRouter();
@@ -75,32 +76,37 @@ export default function AccessScanner() {
   }
 
   return (
-    <View className="flex-1 bg-background">
-      <AppHeader title="Scan Access QR" showBack />
-      <View className="flex-1">
-        <CameraView
-          style={{ flex: 1 }}
-          facing="back"
-          onBarcodeScanned={hasScanned ? undefined : handleBarcodeScanned}
-          barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
-        />
+    <BiometricGate
+      promptMessage="Authenticate to open scanner"
+      onCancel={() => router.back()}
+    >
+      <View className="flex-1 bg-background">
+        <AppHeader title="Scan Access QR" showBack />
+        <View className="flex-1">
+          <CameraView
+            style={{ flex: 1 }}
+            facing="back"
+            onBarcodeScanned={hasScanned ? undefined : handleBarcodeScanned}
+            barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+          />
 
-        <View className="absolute left-4 right-4 bottom-8">
-          <Card className={error ? "border-error bg-error/5" : ""}>
-            {error ? (
-              <>
-                <Text className="text-error font-bold">QR code rejected</Text>
-                <Text className="text-error/80 text-sm mt-1 mb-4">{error}</Text>
-                <Button title="Scan Again" onPress={resetScanner} variant="outline" />
-              </>
-            ) : (
-              <Text className="text-text font-medium text-center">
-                Point your camera at a GuildPass access QR code.
-              </Text>
-            )}
-          </Card>
+          <View className="absolute left-4 right-4 bottom-8">
+            <Card className={error ? "border-error bg-error/5" : ""}>
+              {error ? (
+                <>
+                  <Text className="text-error font-bold">QR code rejected</Text>
+                  <Text className="text-error/80 text-sm mt-1 mb-4">{error}</Text>
+                  <Button title="Scan Again" onPress={resetScanner} variant="outline" />
+                </>
+              ) : (
+                <Text className="text-text font-medium text-center">
+                  Point your camera at a GuildPass access QR code.
+                </Text>
+              )}
+            </Card>
+          </View>
         </View>
       </View>
-    </View>
+    </BiometricGate>
   );
 }

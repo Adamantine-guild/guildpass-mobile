@@ -4,18 +4,13 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-patchedDependencies:
-  '@guildpass/sdk@0.1.0':
-    hash: e6df6c7dd3aaa5a097fe78295c3edb9a78d6c48641469220e90e0007eb3d2b9a
-    path: patches/@guildpass__sdk@0.1.0.patch
-
 importers:
 
   .:
     dependencies:
       '@guildpass/sdk':
         specifier: github:Adamantine-Guild/guildpass-sdk
-        version: https://codeload.github.com/Adamantine-Guild/guildpass-sdk/tar.gz/a5d4eb95df413c16c3bac55b669fc53188a61bb4(patch_hash=e6df6c7dd3aaa5a097fe78295c3edb9a78d6c48641469220e90e0007eb3d2b9a)
+        version: https://codeload.github.com/Adamantine-Guild/guildpass-sdk/tar.gz/a5d4eb95df413c16c3bac55b669fc53188a61bb4
       '@react-native-async-storage/async-storage':
         specifier: ^3.1.1
         version: 3.1.1(react-native@0.73.6(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.2.0))(react@18.2.0)
@@ -46,6 +41,9 @@ importers:
       expo-linking:
         specifier: ~6.2.2
         version: 6.2.2(expo@50.0.21(@babel/core@7.29.7)(@react-native/babel-preset@0.73.21(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7)))(react-native@0.73.6(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.2.0))(react@18.2.0))
+      expo-local-authentication:
+        specifier: ^57.0.1
+        version: 57.0.1(expo@50.0.21(@babel/core@7.29.7)(@react-native/babel-preset@0.73.21(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7)))(react-native@0.73.6(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.2.0))(react@18.2.0))
       expo-router:
         specifier: ~3.4.8
         version: 3.4.10(6ffa0f523bf15b20b6d5843b57e53343)
@@ -1007,7 +1005,7 @@ packages:
 
   '@expo/bunyan@4.0.1':
     resolution: {integrity: sha512-+Lla7nYSiHZirgK+U/uYzsLv/X+HaJienbD5AKX1UQZHYfWaP+9uuQluRB4GrEVWF0GZ7vEVp/jzaOT9k/SQlg==}
-    engines: {'0': node >=0.10.0}
+    engines: {node: '>=0.10.0'}
 
   '@expo/cli@0.17.13':
     resolution: {integrity: sha512-n13yxOmI3I0JidzMdFCH68tYKGDtK4XlDFk1vysZX7AIRKeDVRsSbHhma5jCla2bDt25RKmJBHA9KtzielwzAA==}
@@ -1110,7 +1108,7 @@ packages:
       graphql: ^0.8.0 || ^0.9.0 || ^0.10.0 || ^0.11.0 || ^0.12.0 || ^0.13.0 || ^14.0.0 || ^15.0.0 || ^16.0.0 || ^17.0.0
 
   '@guildpass/sdk@https://codeload.github.com/Adamantine-Guild/guildpass-sdk/tar.gz/a5d4eb95df413c16c3bac55b669fc53188a61bb4':
-    resolution: {tarball: https://codeload.github.com/Adamantine-Guild/guildpass-sdk/tar.gz/a5d4eb95df413c16c3bac55b669fc53188a61bb4}
+    resolution: {gitHosted: true, tarball: https://codeload.github.com/Adamantine-Guild/guildpass-sdk/tar.gz/a5d4eb95df413c16c3bac55b669fc53188a61bb4}
     version: 0.1.0
     engines: {node: '>=18'}
 
@@ -2707,6 +2705,11 @@ packages:
 
   expo-linking@6.2.2:
     resolution: {integrity: sha512-FEe6lP4f7xFT/vjoHRG+tt6EPVtkEGaWNK1smpaUevmNdyCJKqW0PDB8o8sfG6y7fly8ULe8qg3HhKh5J7aqUQ==}
+
+  expo-local-authentication@57.0.1:
+    resolution: {integrity: sha512-FrXtuXVBmXmwmvDus0OsFWMdzjYTaLd/ZvvVMKnRjXDKDS+LFG2Sz3r9f3Go0goJdpb/hA09wGwGi8XfW3Aa0w==}
+    peerDependencies:
+      expo: '*'
 
   expo-manifests@0.13.2:
     resolution: {integrity: sha512-l0Sia1WmLULx8V41K8RzGLsFoTe4qqthPRGpHjItsYn8ZB6lRrdTBM9OYp2McIflgqN1HAimUCQMFIwJyH+UmA==}
@@ -6771,7 +6774,7 @@ snapshots:
     dependencies:
       graphql: 15.8.0
 
-  '@guildpass/sdk@https://codeload.github.com/Adamantine-Guild/guildpass-sdk/tar.gz/a5d4eb95df413c16c3bac55b669fc53188a61bb4(patch_hash=e6df6c7dd3aaa5a097fe78295c3edb9a78d6c48641469220e90e0007eb3d2b9a)':
+  '@guildpass/sdk@https://codeload.github.com/Adamantine-Guild/guildpass-sdk/tar.gz/a5d4eb95df413c16c3bac55b669fc53188a61bb4':
     dependencies:
       js-sha3: 0.9.3
 
@@ -8823,6 +8826,11 @@ snapshots:
     transitivePeerDependencies:
       - expo
       - supports-color
+
+  expo-local-authentication@57.0.1(expo@50.0.21(@babel/core@7.29.7)(@react-native/babel-preset@0.73.21(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7)))(react-native@0.73.6(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.2.0))(react@18.2.0)):
+    dependencies:
+      expo: 50.0.21(@babel/core@7.29.7)(@react-native/babel-preset@0.73.21(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7)))(react-native@0.73.6(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.2.0))(react@18.2.0)
+      invariant: 2.2.4
 
   expo-manifests@0.13.2(expo@50.0.21(@babel/core@7.29.7)(@react-native/babel-preset@0.73.21(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7)))(react-native@0.73.6(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.2.0))(react@18.2.0)):
     dependencies:
