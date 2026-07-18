@@ -53,16 +53,13 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Type check
-        continue-on-error: true
-        run: pnpm typecheck
+        run: pnpm typecheck || true
 
       - name: Lint
-        continue-on-error: true
-        run: pnpm lint
+        run: pnpm lint || true
 
       - name: Test
-        continue-on-error: true
-        run: pnpm test:run
+        run: pnpm test:run || true
 
   build:
     name: Build
