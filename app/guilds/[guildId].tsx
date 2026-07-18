@@ -50,6 +50,10 @@ export default function GuildDetail() {
                 ? "You are offline. Please reconnect to load guild details."
                 : "Failed to load guild details"
             }
+            onRetry={() => {
+              void Promise.all([guildQuery.refetch(), membershipQuery.refetch(), rolesQuery.refetch()]);
+            }}
+            isRetrying={guildQuery.isFetching || membershipQuery.isFetching || rolesQuery.isFetching}
           />
         ) : !guild ? (
           <ErrorState
@@ -58,6 +62,10 @@ export default function GuildDetail() {
                 ? "You are offline. Please reconnect to load guild details."
                 : "Failed to load guild details"
             }
+            onRetry={() => {
+              void Promise.all([guildQuery.refetch(), membershipQuery.refetch(), rolesQuery.refetch()]);
+            }}
+            isRetrying={guildQuery.isFetching || membershipQuery.isFetching || rolesQuery.isFetching}
           />
         ) : (
           <>

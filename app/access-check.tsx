@@ -16,6 +16,7 @@ import { areWalletAddressesEqual, validateAndNormalizeAddress } from "../src/lib
 import { useAccessHistoryStore } from "../src/features/access/accessHistory.store";
 import { useNetworkStatus } from "../src/features/offline/useNetworkStatus";
 import { StaleDataBanner } from "../src/components/StaleDataBanner";
+import { ErrorState } from "../src/components/ErrorState";
 
 export default function AccessCheck() {
   const router = useRouter();
@@ -148,30 +149,27 @@ export default function AccessCheck() {
     return "This QR payload uses a different wallet address from your connected wallet. Review the wallet before continuing.";
   })();
 
-  const handleCheck = () => {
-    const trimmedGuildId = guildId.trim();
-    const trimmedResourceId = resourceId.trim();
-    let hasError = false;
+  const submitAccessCheck = (nextAddress: string, nextGuildId: string, nextResourceId: string) => {
+    const trimmedGuildId = nextGuildId.trim();
+    const trimmedResourceId = nextResourceId.trim();
 
     if (!trimmedGuildId) {
       setGuildIdError("Guild ID is required");
-      hasError = true;
     } else {
       setGuildIdError(null);
     }
 
     if (!trimmedResourceId) {
       setResourceIdError("Resource ID is required");
-      hasError = true;
     } else {
       setResourceIdError(null);
     }
 
-    if (!address || !trimmedGuildId || !trimmedResourceId) {
+    if (!nextAddress || !trimmedGuildId || !trimmedResourceId) {
       return;
     }
 
-    const validation = validateAndNormalizeAddress(address);
+    const validation = validateAndNormalizeAddress(nextAddress);
     if (!validation.valid) {
       setAddressError(validation.error);
       resetAccessCheck();
@@ -195,6 +193,14 @@ export default function AccessCheck() {
         void recordCheck({ ...params, error });
       },
     });
+  };
+
+  const handleCheck = () => {
+    submitAccessCheck(address, guildId, resourceId);
+  };
+
+  const handleRetryAccessCheck = () => {
+    submitAccessCheck(address, guildId, resourceId);
   };
 
   return (
@@ -323,16 +329,17 @@ export default function AccessCheck() {
         )}
 
         {error && !result && (
-          <Card
-            className="border-error bg-error/5"
-            accessibilityRole="alert"
-            accessibilityLabel="Error checking access. Please verify your inputs and try again."
-          >
-            <Text className="text-error font-bold">Error checking access</Text>
-            <Text className="text-error/80 text-sm mt-1">
-              Please verify your inputs and try again.
-            </Text>
-          </Card>
+          <View className="mb-6">
+            <ErrorState
+              message={
+                isOffline
+                  ? "We couldn't complete the access check. Please check your connection and try again."
+                  : "Please verify your inputs and try again."
+              }
+              onRetry={handleRetryAccessCheck}
+              isRetrying={isPending}
+            />
+          </View>
         )}
 
         <AccessHistoryList

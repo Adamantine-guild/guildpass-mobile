@@ -1,4 +1,4 @@
-import { useReducer, useCallback } from "react";
+import { useReducer, useCallback, useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { guildPassClient } from "../../lib/guildpassClient";
 
@@ -55,35 +55,62 @@ function reducer(state: AccessCheckState, action: AccessCheckAction): AccessChec
  */
 export const useAccessCheck = () => {
   const [state, dispatch] = useReducer(reducer, { status: "idle" } as AccessCheckState);
+  const lastParamsRef = useRef<AccessCheckParams | null>(null);
 
-  const mutation = useMutation<AccessCheckResult, Error, AccessCheckParams>(
-    (params) => guildPassClient.access.checkAccess(params) as Promise<AccessCheckResult>,
-    {
-      onSuccess: (result) => {
-        dispatch({ type: "SUBMIT_SUCCESS", result });
-      },
-      onError: (error: Error) => {
-        dispatch({ type: "SUBMIT_ERROR", error: error.message });
-      },
-    }
-  );
+  const mutation = useMutation<AccessCheckResult, Error, AccessCheckParams>({
+    mutationFn: (params) => guildPassClient.access.checkAccess(params) as Promise<AccessCheckResult>,
+    onSuccess: (result) => {
+      dispatch({ type: "SUBMIT_SUCCESS", result });
+    },
+    onError: (error: Error) => {
+      dispatch({ type: "SUBMIT_ERROR", error: error.message });
+    },
+  });
 
   const startScan = useCallback(() => {
     dispatch({ type: "START_SCAN" });
   }, []);
 
   const checkAccess = useCallback(
-    (params: AccessCheckParams) => {
+    (params: AccessCheckParams, options?: Parameters<typeof mutation.mutate>[1]) => {
+      lastParamsRef.current = params;
       dispatch({ type: "SCANNED", payload: params });
-      // Trigger the mutation which will transition to success/error
-      mutation.mutate(params);
+      mutation.mutate(params, options);
     },
-    [mutation]
+    [mutation],
+  );
+
+  const retry = useCallback(
+    (options?: Parameters<typeof mutation.mutate>[1]) => {
+      const params = lastParamsRef.current;
+      if (!params) {
+        return;
+      }
+
+      dispatch({ type: "SCANNED", payload: params });
+      mutation.mutate(params, options);
+    },
+    [mutation],
   );
 
   const reset = useCallback(() => {
+    lastParamsRef.current = null;
     dispatch({ type: "RESET" });
-  }, []);
+    mutation.reset();
+  }, [mutation]);
 
-  return { state, dispatch, startScan, checkAccess, reset };
+  return {
+    state,
+    dispatch,
+    startScan,
+    checkAccess,
+    retry,
+    reset,
+    data: mutation.data,
+    error: mutation.error?.message ?? null,
+    isPending: mutation.isPending,
+    isError: mutation.isError,
+    mutate: checkAccess,
+    mutateAsync: mutation.mutateAsync,
+  };
 };
