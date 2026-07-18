@@ -21,30 +21,54 @@ export function createManualConnector(address: string): WalletConnector {
 }
 
 /**
- * WalletConnect stub — wire up the real WC SDK when the package is added.
- * Throws until a real implementation is provided.
+ * WalletConnect connector factory.
+ *
+ * The connector receives a reference to the WC provider (EIP-1193) so
+ * that it can call `eth_requestAccounts` / `eth_accounts` / `disconnect`.
+ * The caller is responsible for opening the WC modal before calling
+ * `connect()`, and for disposing of the WC session on `disconnect()`.
  */
-export function createWalletConnectConnector(): WalletConnector {
-  const notImplemented = (): never => {
-    throw new Error("WalletConnect SDK not yet configured. Add @walletconnect/modal-react-native and a project ID.");
-  };
+export function createWalletConnectConnector(provider: {
+  request(args: { method: string }): Promise<unknown>;
+  disconnect(): Promise<void>;
+}): WalletConnector {
   return {
     type: "walletconnect",
-    connect: notImplemented,
-    disconnect: notImplemented,
-    reconnect: notImplemented,
-    getAccounts: notImplemented,
+    async connect() {
+      const accounts = (await provider.request({
+        method: "eth_requestAccounts",
+      })) as string[];
+      if (!accounts.length) {
+        throw new Error("WalletConnect: no accounts returned");
+      }
+      return accounts;
+    },
+    async disconnect() {
+      await provider.disconnect();
+    },
+    async reconnect() {
+      const accounts = (await provider.request({
+        method: "eth_accounts",
+      })) as string[];
+      return accounts;
+    },
+    async getAccounts() {
+      const accounts = (await provider.request({
+        method: "eth_accounts",
+      })) as string[];
+      return accounts;
+    },
   };
 }
 
 /** Registry of available connector factories */
-const connectorFactories: Record<WalletConnectorType, (() => WalletConnector) | null> = {
-  manual: null, // constructed via createManualConnector(address)
-  walletconnect: createWalletConnectConnector,
-  coinbase: null, // future: createCoinbaseConnector
-  metamask: null, // future: createMetaMaskConnector
+const connectorFactories: Record<WalletConnectorType, boolean> = {
+  manual: true,
+  walletconnect: true,
+  coinbase: false,
+  metamask: false,
 };
 
 export function isConnectorTypeSupported(type: WalletConnectorType): boolean {
-  return connectorFactories[type] !== null;
+  return connectorFactories[type] === true;
 }
