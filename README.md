@@ -78,7 +78,7 @@ The application is built on a robust, feature-driven foundation designed for lon
 - **Routing**: [Expo Router](https://docs.expo.dev/router/introduction/) for type-safe, file-based navigation.
 - **State**: [Zustand](https://github.com/pmndrs/zustand) for client state and [TanStack Query](https://tanstack.com/query) for server synchronization.
 - **Styling**: [NativeWind](https://www.nativewind.dev/) for high-performance Tailwind CSS utility styling.
-- **SDK**: Seamless integration with the core [@guildpass/sdk](../guildpass-sdk).
+- **SDK**: Seamless integration with the core [@guildpass/sdk](https://github.com/Adamantine-Guild/guildpass-sdk).
 
 ### Project structure
 

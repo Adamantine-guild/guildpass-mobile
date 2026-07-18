@@ -131,14 +131,19 @@ describe("WalletConnector — manual", () => {
   });
 });
 
-describe("WalletConnector — walletconnect stub", () => {
-  it("throws with helpful message when connect is called", () => {
-    const connector = createWalletConnectConnector();
-    expect(() => connector.connect()).toThrow("WalletConnect SDK not yet configured");
+describe("WalletConnector — walletconnect", () => {
+  const mockProvider = {
+    request: async () => ["0x1234567890123456789012345678901234567890"],
+    disconnect: async () => {},
+  };
+
+  it("connect returns accounts from provider", async () => {
+    const connector = createWalletConnectConnector(mockProvider);
+    const accounts = await connector.connect();
+    expect(accounts).toEqual(["0x1234567890123456789012345678901234567890"]);
   });
 
-  it("isConnectorTypeSupported returns true for walletconnect (stub registered)", () => {
-    // The stub factory is registered; it throws only when connect() is called without the SDK.
+  it("isConnectorTypeSupported returns true for walletconnect", () => {
     expect(isConnectorTypeSupported("walletconnect")).toBe(true);
   });
 

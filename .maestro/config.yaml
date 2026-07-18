@@ -8,6 +8,7 @@ flows:
   - 04-access-check-success.yaml
   - 05-access-check-failure.yaml
   - 06-reset-app-state.yaml
+  - 07-walletconnect-flow.yaml
 
 env:
   # Default test environment variables

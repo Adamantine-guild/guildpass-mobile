@@ -133,7 +133,25 @@ pnpm test:run    # All tests must pass
 - Mobile PRs with UI changes may require a screen recording.
 - Address requested changes promptly.
 
----
+----
+
+## SDK Development
+
+If you need to make changes to the GuildPass SDK while working on the mobile app:
+
+1. Clone the SDK repository:
+   ```bash
+   git clone https://github.com/Adamantine-Guild/guildpass-sdk.git ../guildpass-sdk
+   ```
+2. Link the SDK to the mobile project:
+   ```bash
+   # In the guildpass-mobile directory
+   pnpm add ../guildpass-sdk
+   ```
+3. When finished, revert to the remote dependency:
+   ```bash
+   pnpm add @guildpass/sdk@github:Adamantine-Guild/guildpass-sdk
+   ```
 
 ## Communication
 
