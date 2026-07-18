@@ -22,7 +22,34 @@
           {
             "CFBundleURLSchemes": ["guildpass"]
           }
-        ]
+        ],
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": false,
+          "NSPinnedDomains": {
+            "api.guildpass.xyz": {
+              "NSIncludesSubdomains": true,
+              "NSPinnedLeafIdentities": [
+                {
+                  "SPKI-SHA256-BASE64": "REPLACE_WITH_ACTUAL_SPKI_SHA256_BASE64"
+                },
+                {
+                  "SPKI-SHA256-BASE64": "REPLACE_WITH_ACTUAL_BACKUP_SPKI_SHA256_BASE64"
+                }
+              ]
+            },
+            "staging.guildpass.xyz": {
+              "NSIncludesSubdomains": true,
+              "NSPinnedLeafIdentities": [
+                {
+                  "SPKI-SHA256-BASE64": "REPLACE_WITH_ACTUAL_SPKI_SHA256_BASE64"
+                },
+                {
+                  "SPKI-SHA256-BASE64": "REPLACE_WITH_ACTUAL_BACKUP_SPKI_SHA256_BASE64"
+                }
+              ]
+            }
+          }
+        }
       },
       "associatedDomains": [
         "applinks:guildpass.xyz"
@@ -34,6 +61,7 @@
         "backgroundColor": "#ffffff"
       },
       "package": "xyz.guildpass.mobile",
+      "networkSecurityConfig": "./android/app/src/main/res/xml/network_security_config.xml",
       "intentFilters": [
         {
           "action": "VIEW",
@@ -67,6 +95,7 @@
       "router": {
         "origin": false
       },
+      "qrSignatureVerification": false,
       "eas": {
         "projectId": "REPLACE_WITH_YOUR_EAS_PROJECT_ID"
       }
@@ -75,6 +104,7 @@
       "typedRoutes": true
     },
     "plugins": [
+      "./plugins/expo-security-config",
       "expo-router",
       "expo-updates",
       [
@@ -86,6 +116,9 @@
       [
         "expo-build-properties",
         {
+          "android": {
+            "extraProguardRules": "-keep class com.guildpass.security.** { *; }"
+          },
           "ios": {
             "deploymentTarget": "14.0"
           }

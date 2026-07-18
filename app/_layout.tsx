@@ -6,12 +6,19 @@ import { asyncStoragePersister } from "../src/lib/queryPersister";
 import { isPersistableQuery, QUERY_GC_TIME_MS } from "../src/lib/offlineCache";
 import { initConnectivityService } from "../src/features/network/connectivityService";
 import { ErrorBoundary } from "../src/components/ErrorBoundary";
+import { useSecurityInit } from "../src/features/security";
 
 initConnectivityService();
+
+function SecurityInit() {
+  useSecurityInit();
+  return null;
+}
 
 export default function RootLayout() {
   return (
     <ErrorBoundary>
+      <SecurityInit />
       <PersistQueryClientProvider
         client={queryClient}
         persistOptions={{

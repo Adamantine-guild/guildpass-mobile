@@ -24,7 +24,21 @@ export type GuildConfigFixture = {
   guildId: string;
   requiredRoles: string[];
   accessPolicy: "any" | "all";
+  /** Hex-encoded secp256k1 public key the guild uses to sign QR payloads. */
+  issuerPublicKey?: string;
 };
+
+// ---------------------------------------------------------------------------
+// Test issuer keypair (secp256k1).
+// ONLY used by the QR signature verification tests to produce real signatures
+// and a matching published public key. Never used outside tests.
+// ---------------------------------------------------------------------------
+
+export const TEST_ISSUER_PRIVATE_KEY =
+  "541e96dcbd902e0d8e6e12a9805fcb0a6563c445e4779f81c8aeadae14197ac4";
+
+export const TEST_ISSUER_PUBLIC_KEY =
+  "043531a2fb8dd43af42b386c706b45aa03191fb518fc309b62bf5ed976806187b4a05f2157cac94457dfb72cc37cff021a544b03b2f99049097c2f45e7e81527de";
 
 export type RoleFixture = {
   id: string;
@@ -73,6 +87,7 @@ export const GUILD_CONFIG_FIXTURE: GuildConfigFixture = {
   guildId: "guild_abc",
   requiredRoles: ["member", "admin"],
   accessPolicy: "any",
+  issuerPublicKey: TEST_ISSUER_PUBLIC_KEY,
 };
 
 // ---------------------------------------------------------------------------

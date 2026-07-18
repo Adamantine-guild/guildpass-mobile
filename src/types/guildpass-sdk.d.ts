@@ -8,7 +8,14 @@ declare module "@guildpass/sdk" {
     constructor(options: GuildPassClientOptions);
     guilds: {
       getGuild(params: { guildId: string }): Promise<any>;
-      getGuildConfig(params: { guildId: string }): Promise<any>;
+      getGuildConfig(params: { guildId: string }): Promise<{
+        guildId: string;
+        requiredRoles?: string[];
+        accessPolicy?: "any" | "all";
+        /** Hex-encoded secp256k1 public key used to sign QR access payloads. */
+        issuerPublicKey?: string;
+        [key: string]: unknown;
+      }>;
     };
     roles: {
       getRoles(params: { guildId: string }): Promise<any>;
