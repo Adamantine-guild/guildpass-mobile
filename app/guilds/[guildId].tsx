@@ -8,6 +8,7 @@ import { LoadingState } from "../../src/components/LoadingState";
 import { ErrorState } from "../../src/components/ErrorState";
 import { Card } from "../../src/components/Card";
 import { RoleBadge } from "../../src/components/RoleBadge";
+import { RequirementCard, getChainDisplayName, isKnownChainId } from "../../src/components/RequirementCard";
 import { StaleDataBanner } from "../../src/components/StaleDataBanner";
 import { WalletRequired } from "../../src/components/WalletRequired";
 import { useCombinedStaleState } from "../../src/features/offline/useStaleQuery";
@@ -85,8 +86,13 @@ export default function GuildDetail() {
                   </View>
                   <View className="flex-row justify-between">
                     <Text className="text-text-muted">Chain ID</Text>
-                    <Text className="text-text font-medium" testID="guild-chain-id">
-                      {guild.chainId}
+                    <Text
+                      className={`font-medium ${isKnownChainId(guild.chainId) ? "text-text" : "text-text-muted italic"}`}
+                      testID="guild-chain-id"
+                    >
+                      {isKnownChainId(guild.chainId)
+                        ? `${getChainDisplayName(guild.chainId)} (${guild.chainId})`
+                        : `Unsupported network (chain: ${guild.chainId})`}
                     </Text>
                   </View>
                 </View>
@@ -115,7 +121,15 @@ export default function GuildDetail() {
                 <Text className="text-lg font-bold text-text mb-3">Available Roles</Text>
                 <View className="flex-row flex-wrap" testID="guild-roles-list">
                   {roles && roles.length > 0 ? (
-                    roles.map((role: { id: string; name: string }) => <RoleBadge key={role.id} name={role.name} />)
+                    roles.map((role: { id: string; name: string; chainId?: number }) => (
+                      <RequirementCard
+                        key={role.id}
+                        chainId={role.chainId ?? guild.chainId}
+                        testID={`role-requirement-${role.id}`}
+                      >
+                        <RoleBadge name={role.name} />
+                      </RequirementCard>
+                    ))
                   ) : (
                     <Text className="text-text-muted italic">No roles defined for this guild.</Text>
                   )}
