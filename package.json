@@ -31,6 +31,7 @@
     "expo-linking": "~6.2.2",
     "expo-router": "~3.4.8",
     "expo-secure-store": "~12.8.1",
+    "expo-sqlite": "^57.0.1",
     "expo-status-bar": "~1.11.1",
     "expo-updates": "~0.24.13",
     "nativewind": "^2.0.11",
