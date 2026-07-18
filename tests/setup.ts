@@ -28,3 +28,18 @@ vi.mock("expo-secure-store", () => ({
   AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY: "AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY",
   ALWAYS_THIS_DEVICE_ONLY: "ALWAYS_THIS_DEVICE_ONLY",
 }));
+
+// Mock expo-sqlite (avoids typeof import issues with Vite/Rollup)
+vi.mock("expo-sqlite", () => {
+  const noop = () => {
+    throw new Error("expo-sqlite is not available in test environment");
+  };
+  return {
+    openDatabase: noop,
+    deleteDatabaseAsync: noop,
+    default: {
+      openDatabase: noop,
+      deleteDatabaseAsync: noop,
+    },
+  };
+});

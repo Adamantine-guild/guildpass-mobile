@@ -6,7 +6,8 @@ import type { BarcodeScanningResult } from "expo-camera";
 import { AppHeader } from "../src/components/AppHeader";
 import { Button } from "../src/components/Button";
 import { Card } from "../src/components/Card";
-import { parseAccessQrPayload } from "../src/features/access/qrPayload";
+import { verifyAndParseAccessQrPayload } from "../src/features/access/verifyQrPayload";
+import { QrSignatureError } from "../src/features/access/qrSignature";
 
 export default function AccessScanner() {
   const router = useRouter();
@@ -14,7 +15,7 @@ export default function AccessScanner() {
   const [hasScanned, setHasScanned] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleBarcodeScanned = ({ data }: BarcodeScanningResult) => {
+  const handleBarcodeScanned = async ({ data }: BarcodeScanningResult) => {
     if (hasScanned) {
       return;
     }
@@ -22,13 +23,22 @@ export default function AccessScanner() {
     setHasScanned(true);
 
     try {
-      parseAccessQrPayload(data);
+      // Structural parse first (fast, sync). When the qrSignatureVerification
+      // feature flag is on, this also cryptographically verifies the payload
+      // against the guild's published issuer key and rejects forged QR codes.
+      await verifyAndParseAccessQrPayload(data);
       router.replace({
         pathname: "/access-check",
         params: { qrPayload: data },
       });
     } catch (scanError) {
-      setError(scanError instanceof Error ? scanError.message : "Unable to read QR payload.");
+      const message =
+        scanError instanceof QrSignatureError
+          ? "QR code signature is invalid or missing."
+          : scanError instanceof Error
+            ? scanError.message
+            : "Unable to read QR payload.";
+      setError(message);
     }
   };
 

@@ -25,6 +25,13 @@ const guildPassClientMock = vi.hoisted(() => ({
 
 const storage = vi.hoisted(() => new Map<string, string>());
 
+const searchParams = vi.hoisted(() => ({ qrPayload: undefined as string | undefined }));
+
+const walletState = vi.hoisted(() => ({
+  walletAddress: "0x1234567890123456789012345678901234567890",
+  isConnected: true,
+}));
+
 vi.mock("react-native", () => ({
   View: "View",
   Text: "Text",
@@ -61,14 +68,11 @@ vi.mock("expo-constants", () => ({
 
 vi.mock("expo-router", () => ({
   useRouter: () => ({ push: routerMocks.push, back: routerMocks.back }),
-  useLocalSearchParams: () => ({}),
+  useLocalSearchParams: () => searchParams,
 }));
 
 vi.mock("../src/features/wallet/useWallet", () => ({
-  useWallet: () => ({
-    walletAddress: "0x1234567890123456789012345678901234567890",
-    isConnected: true,
-  }),
+  useWallet: () => walletState,
 }));
 
 const renderScreen = () => {
@@ -95,6 +99,9 @@ const outputText = (renderer: ReactTestRenderer) => JSON.stringify(renderer.toJS
 describe("AccessCheck screen", () => {
   beforeEach(() => {
     storage.clear();
+    searchParams.qrPayload = undefined;
+    walletState.walletAddress = "0x1234567890123456789012345678901234567890";
+    walletState.isConnected = true;
     vi.clearAllMocks();
     guildPassClientMock.checkAccess.mockReset().mockResolvedValue(ACCESS_GRANTED_FIXTURE);
     useAccessHistoryStore.setState({ historyByWallet: {}, hydrated: true });
@@ -162,6 +169,55 @@ describe("AccessCheck screen", () => {
     expect(outputText(screen!)).toContain("Recent Access Checks");
     expect(outputText(screen!)).toContain("vip-door");
     expect(outputText(screen!)).toContain("Denied");
+  });
+
+  it("does not show a wallet warning when the QR payload matches the connected wallet", async () => {
+    searchParams.qrPayload = JSON.stringify({
+      type: "guildpass.access-check",
+      version: 1,
+      guildId: "guild-alpha",
+      resourceId: "vip-door",
+      walletAddress: walletState.walletAddress,
+      expiresAt: "2099-01-01T00:00:00.000Z",
+    });
+
+    let screen: ReactTestRenderer;
+
+    await act(async () => {
+      screen = renderScreen();
+      await flush();
+    });
+
+    expect(outputText(screen!)).not.toContain("This QR payload uses a different wallet address");
+  });
+
+  it("shows a warning and allows switching back to the connected wallet when the QR wallet differs", async () => {
+    searchParams.qrPayload = JSON.stringify({
+      type: "guildpass.access-check",
+      version: 1,
+      guildId: "guild-alpha",
+      resourceId: "vip-door",
+      walletAddress: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      expiresAt: "2099-01-01T00:00:00.000Z",
+    });
+
+    let screen: ReactTestRenderer;
+
+    await act(async () => {
+      screen = renderScreen();
+      await flush();
+    });
+
+    expect(outputText(screen!)).toContain("This QR payload uses a different wallet address");
+
+    await act(async () => {
+      screen!.root.findByProps({ accessibilityLabel: "Use connected wallet" }).props.onPress();
+    });
+
+    expect(screen!.root.findByProps({ testID: "access-check-wallet-input" }).props.value).toBe(
+      walletState.walletAddress,
+    );
+    expect(outputText(screen!)).not.toContain("This QR payload uses a different wallet address");
   });
 
   it("renders the offline banner and disables the check button when offline", async () => {
