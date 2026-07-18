@@ -6,6 +6,7 @@ import { ACCESS_DENIED_FIXTURE, ACCESS_GRANTED_FIXTURE } from "./fixtures/access
 import AccessCheck from "../app/access-check";
 import { useAccessHistoryStore } from "../src/features/access/accessHistory.store";
 import { useNetworkStore } from "../src/features/network/connectivityService";
+import { useSessionStore } from "../src/features/session/session.store";
 
 vi.mock("@react-native-community/netinfo", () => ({
   default: {
@@ -99,6 +100,12 @@ describe("AccessCheck screen", () => {
     guildPassClientMock.checkAccess.mockReset().mockResolvedValue(ACCESS_GRANTED_FIXTURE);
     useAccessHistoryStore.setState({ historyByWallet: {}, hydrated: true });
     useNetworkStore.setState({ isOnline: true, isOffline: false });
+    // The access check is bound to the proven session address (matches the
+    // mocked useWallet address used by the screen).
+    useSessionStore.setState({
+      walletAddress: "0x1234567890123456789012345678901234567890",
+      status: "authenticated",
+    });
   });
 
   it("clears the previous result when inputs change after a completed check", async () => {

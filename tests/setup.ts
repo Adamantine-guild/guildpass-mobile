@@ -1,5 +1,11 @@
 import { vi } from "vitest";
 
+// React Native exposes __DEV__ as a global in app code. The node test environment
+// lacks it, so define it for component tests (e.g. accessScanner) that reference it.
+if (typeof (globalThis as { __DEV__?: boolean }).__DEV__ === "undefined") {
+  (globalThis as { __DEV__?: boolean }).__DEV__ = true;
+}
+
 // Mock AsyncStorage
 vi.mock("@react-native-async-storage/async-storage", () => ({
   default: {
@@ -15,11 +21,20 @@ vi.mock("@react-native-async-storage/async-storage", () => ({
   },
 }));
 
-// Mock SecureStore
+// Mock SecureStore with an in-memory backing so the refresh-token store (and
+// other secure-storage users) actually persist within a test, while the call
+// assertions (`toHaveBeenCalledWith`) still work.
+const secureStoreMemory = new Map<string, string>();
 vi.mock("expo-secure-store", () => ({
-  getItemAsync: vi.fn(),
-  setItemAsync: vi.fn(),
-  deleteItemAsync: vi.fn(),
+  getItemAsync: vi.fn((key: string) => Promise.resolve(secureStoreMemory.get(key) ?? null)),
+  setItemAsync: vi.fn((key: string, value: string) => {
+    secureStoreMemory.set(key, value);
+    return Promise.resolve();
+  }),
+  deleteItemAsync: vi.fn((key: string) => {
+    secureStoreMemory.delete(key);
+    return Promise.resolve();
+  }),
   WHEN_UNLOCKED: "WHEN_UNLOCKED",
   AFTER_FIRST_UNLOCK: "AFTER_FIRST_UNLOCK",
   ALWAYS: "ALWAYS",

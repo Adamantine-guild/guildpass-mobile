@@ -1,12 +1,14 @@
-import { View, Text, ScrollView } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { useWallet } from "../../src/features/wallet/useWallet";
 import { useGuilds } from "../../src/features/guilds/useGuilds";
 import { useMembership } from "../../src/features/membership/useMembership";
+import { useAuthenticatedSession } from "../../src/features/session/useAuthenticatedSession";
 import { AppHeader } from "../../src/components/AppHeader";
 import { LoadingState } from "../../src/components/LoadingState";
 import { ErrorState } from "../../src/components/ErrorState";
 import { Card } from "../../src/components/Card";
+import { Button } from "../../src/components/Button";
 import { RoleBadge } from "../../src/components/RoleBadge";
 import { StaleDataBanner } from "../../src/components/StaleDataBanner";
 import { WalletRequired } from "../../src/components/WalletRequired";
@@ -17,7 +19,10 @@ export default function GuildDetail() {
   const { guildId } = useLocalSearchParams<{ guildId: string }>();
   const { walletAddress } = useWallet();
   const { useGuild, useRoles } = useGuilds();
-  const { useMembershipQuery } = useMembership(walletAddress);
+  // Membership/roles are bound to the authenticated session address, never a raw
+  // param (see useMembership.assertSessionAddress).
+  const { useMembershipQuery } = useMembership(null);
+  const { reAuthRequired, reauthenticate } = useAuthenticatedSession();
   const validGuildId = typeof guildId === "string" ? guildId : "";
 
   const guildQuery = useGuild(validGuildId);
@@ -38,6 +43,19 @@ export default function GuildDetail() {
   return (
     <WalletRequired>
       <View className="flex-1 bg-background" testID="guild-detail-screen">
+        {reAuthRequired ? (
+          <Card className="mb-6 border-warning/40">
+            <Text className="text-base font-bold text-text mb-1">Session expired</Text>
+            <Text className="text-text-muted mb-4">
+              Your session needs to be renewed. Sign in again to continue viewing your membership.
+            </Text>
+            <Button
+              title="Sign in again"
+              onPress={() => walletAddress && reauthenticate(walletAddress)}
+              testID="reauth-button"
+            />
+          </Card>
+        ) : null}
         {!validGuildId ? (
           <ErrorState message="Invalid guild ID provided" />
         ) : (guildPending && guildLoading) || (memPending && memLoading) || (rolesPending && rolesLoading) ? (

@@ -20,6 +20,11 @@ const ConfigSchema = z.object({
   // When ON, QR payloads without a valid signature are rejected. During the
   // migration window this stays OFF so legacy unsigned payloads keep working.
   qrSignatureVerification: FeatureFlagSchema,
+  // SIWE (EIP-4361) sign-in message parameters. `siweDomain` defaults to the
+  // apiUrl host and `siweUri` to the app's deep-link scheme, so no env change is
+  // required, but both can be overridden per environment.
+  siweDomain: z.string().optional(),
+  siweUri: z.string().optional(),
 });
 
 export type AppConfig = z.infer<typeof ConfigSchema>;
@@ -35,6 +40,8 @@ function loadConfig(): AppConfig {
     qrSignatureVerification:
       Constants.expoConfig?.extra?.qrSignatureVerification ??
       process.env.EXPO_PUBLIC_QR_SIGNATURE_VERIFICATION,
+    siweDomain: Constants.expoConfig?.extra?.siweDomain ?? process.env.EXPO_PUBLIC_SIWE_DOMAIN,
+    siweUri: Constants.expoConfig?.extra?.siweUri ?? process.env.EXPO_PUBLIC_SIWE_URI,
   };
 
   const parsed = ConfigSchema.safeParse(rawConfig);

@@ -34,6 +34,25 @@ The `src/features/` directory is organized by domain:
 - `guilds/`: API wrappers and hooks for guild metadata.
 - `membership/`: Hooks for checking user-specific membership data.
 - `access/`: Logic for the access check protocol.
+- `auth/`: SIWE (EIP-4361) message build/parse, the token-exchange client, and the
+  bearer + 401 silent-refresh fetch wrapper.
+- `session/`: The proven session: SIWE adapter, rotating refresh-token storage,
+  and the zustand session store.
+
+<!-- GuildPass Mobile: Informational section content header block. -->
+
+## Authentication & session model
+
+Sessions are proven by a Sign-In With Ethereum (EIP-4361) signature, not by a
+client-asserted address. The full flow, security properties, and the SDK
+coordination contract are documented in
+[`docs/siwe-session-architecture.md`](./siwe-session-architecture.md). In short:
+
+- Membership / role / access queries use the **authenticated session address** and
+  a bearer token; a query for a different address is rejected.
+- Access tokens are short-lived; refresh tokens **rotate** on every refresh and are
+  **revoked on logout**.
+- See `SECURITY.md` for the threat model.
 
 Each feature typically contains:
 

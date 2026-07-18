@@ -7,20 +7,30 @@ import { secureStorage } from "../../lib/storage";
 interface SessionStore extends Session {
   adapter: SessionAdapter;
   _hasHydrated: boolean;
+  /** Set when a refresh fails and the user must re-authenticate (sign again). */
+  reAuthRequired: boolean;
   setAdapter(adapter: SessionAdapter): void;
   setHasHydrated(state: boolean): void;
   /** Called after wallet address is obtained — runs the adapter sign-in flow */
   startSession(walletAddress: string): Promise<void>;
-  /** Refresh an existing session token */
+  /** Refresh the access token by rotating the stored refresh token */
   refreshSession(): Promise<void>;
-  /** Clear session and call adapter sign-out */
+  /** Clear session and call adapter sign-out (revokes the refresh token) */
   endSession(): Promise<void>;
   /** Restore session status from persisted state without re-authenticating */
   restoreSession(partial: Partial<Session>): void;
+  /**
+   * Return a non-expired access token, transparently refreshing first if the
+   * current one is expired. Returns null when no session / refresh fails.
+   */
+  getValidAccessToken(): Promise<string | null>;
 }
 
+/** Skew (ms) subtracted from expiry so we refresh slightly before the token dies. */
+const EXPIRY_SKEW_MS = 5000;
+
 function isExpired(expiresAt: number | null): boolean {
-  return expiresAt !== null && Date.now() > expiresAt;
+  return expiresAt !== null && Date.now() > expiresAt - EXPIRY_SKEW_MS;
 }
 
 export const useSessionStore = create<SessionStore>()(
@@ -28,10 +38,11 @@ export const useSessionStore = create<SessionStore>()(
     (set, get) => ({
       status: "unauthenticated",
       walletAddress: null,
-      token: null,
+      accessToken: null,
       expiresAt: null,
       adapter: noopSessionAdapter,
       _hasHydrated: false,
+      reAuthRequired: false,
 
       setAdapter(adapter) {
         set({ adapter });
@@ -42,38 +53,67 @@ export const useSessionStore = create<SessionStore>()(
       },
 
       async startSession(walletAddress) {
-        set({ status: "authenticating", walletAddress });
+        set({ status: "authenticating", walletAddress, reAuthRequired: false });
         try {
-          const { token, expiresAt } = await get().adapter.signIn(walletAddress);
-          set({ status: "authenticated", token, expiresAt });
+          const { accessToken, expiresAt } = await get().adapter.signIn(walletAddress);
+          set({ status: "authenticated", accessToken, expiresAt });
         } catch {
-          set({ status: "failed" });
+          set({ status: "failed", accessToken: null, expiresAt: null });
         }
       },
 
       async refreshSession() {
-        const { token, adapter } = get();
-        if (!token) return;
+        const { adapter, walletAddress } = get();
+        if (!walletAddress) return;
         try {
-          const result = await adapter.refresh(token);
-          set({ token: result.token, expiresAt: result.expiresAt, status: "authenticated" });
+          const result = await adapter.refresh();
+          set({
+            accessToken: result.accessToken,
+            expiresAt: result.expiresAt,
+            status: "authenticated",
+            reAuthRequired: false,
+          });
         } catch {
-          set({ status: "expired" });
+          // Refresh failed — the access token is unusable and there is no valid
+          // refresh token to rotate. Surface re-auth so the UI can prompt a
+          // fresh sign-in.
+          set({ status: "expired", accessToken: null, expiresAt: null, reAuthRequired: true });
         }
       },
 
       async endSession() {
-        const { token, adapter } = get();
-        if (token) {
-          await adapter.signOut(token).catch(() => {});
-        }
-        set({ status: "unauthenticated", walletAddress: null, token: null, expiresAt: null });
+        const { adapter } = get();
+        // Local clear is best-effort and runs first/independently of server
+        // revocation: a failing `signOut` must not leave the refresh token on
+        // device. Both are wrapped so neither can break logout.
+        await adapter.clearRefreshToken().catch(() => {});
+        await adapter.signOut().catch(() => {});
+        set({
+          status: "unauthenticated",
+          walletAddress: null,
+          accessToken: null,
+          expiresAt: null,
+          reAuthRequired: false,
+        });
       },
 
       restoreSession(partial) {
         const status: SessionStatus =
-          partial.token && !isExpired(partial.expiresAt ?? null) ? "authenticated" : "unauthenticated";
+          partial.accessToken && !isExpired(partial.expiresAt ?? null)
+            ? "authenticated"
+            : "unauthenticated";
         set({ ...partial, status });
+      },
+
+      async getValidAccessToken() {
+        const state = get();
+        if (!state.accessToken) return null;
+        if (!isExpired(state.expiresAt)) return state.accessToken;
+
+        // Access token expired — refresh transparently, then return the fresh one.
+        await state.refreshSession();
+        const next = get();
+        return next.status === "authenticated" ? next.accessToken : null;
       },
     }),
     {
@@ -82,7 +122,9 @@ export const useSessionStore = create<SessionStore>()(
       partialize: (state) => ({
         status: state.status,
         walletAddress: state.walletAddress,
-        token: state.token,
+        // Only the access token is persisted here. The refresh token lives in its
+        // own secure key (refreshTokenStorage) and is never serialized alongside.
+        accessToken: state.accessToken,
         expiresAt: state.expiresAt,
       }),
       onRehydrateStorage: () => (state) => {
@@ -95,4 +137,13 @@ export const useSessionStore = create<SessionStore>()(
 /** Convenience selector — current session status */
 export function getSessionStatus(): SessionStatus {
   return useSessionStore.getState().status;
+}
+
+/**
+ * Synchronous access-token read for the SDK fetch wrapper. Returns whatever
+ * token exists (even if slightly stale) — the fetch wrapper handles 401 →
+ * refresh, so it must not itself block on a refresh here.
+ */
+export function getCurrentAccessToken(): string | null {
+  return useSessionStore.getState().accessToken;
 }

@@ -4,6 +4,7 @@ import TestRenderer, { act } from "react-test-renderer";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ACCESS_CHECK_PARAMS, ACCESS_GRANTED_FIXTURE } from "../fixtures/access.fixtures";
 import { useAccessCheck } from "../../src/features/access/useAccessCheck";
+import { useSessionStore } from "../../src/features/session/session.store";
 
 const guildPassClientMock = vi.hoisted(() => ({
   checkAccess: vi.fn(),
@@ -54,6 +55,11 @@ function renderAccessCheckHook() {
 describe("useAccessCheck mutation flow", () => {
   beforeEach(() => {
     guildPassClientMock.checkAccess.mockReset().mockResolvedValue(ACCESS_GRANTED_FIXTURE);
+    // The access check is bound to the proven session address.
+    useSessionStore.setState({
+      walletAddress: ACCESS_CHECK_PARAMS.walletAddress,
+      status: "authenticated",
+    });
   });
 
   it("does not call checkAccess until the caller explicitly submits params", () => {

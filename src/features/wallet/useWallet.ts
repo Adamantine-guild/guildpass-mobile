@@ -3,6 +3,8 @@ import { validateAndNormalizeAddress } from "../../lib/walletValidation";
 import { createManualConnector } from "./walletConnector.service";
 import { WalletConnector } from "./walletConnector.types";
 import { useSessionStore } from "../session/session.store";
+import { createSessionAdapter } from "../session/createSessionAdapter";
+import { noopSessionAdapter } from "../session/session.adapter";
 import { queryClient } from "../../lib/queryClient";
 import { clearWalletScopedCache } from "../../lib/walletScopedCache";
 
@@ -37,6 +39,20 @@ export const useWallet = (): {
       if (!accounts.length) return { success: false, error: "No accounts returned" };
       const result = validateAndNormalizeAddress(accounts[0]);
       if (!result.valid) return { success: false, error: result.error };
+
+      // A connector that can sign backs the session with SIWE (proven ownership).
+      // One that cannot (e.g. a manually-entered address) falls back to the no-op
+      // adapter, which is unproven and must never be treated as authenticated.
+      let canSign = false;
+      try {
+        await connector.signMessage("__can_sign_probe__");
+        canSign = true;
+      } catch {
+        canSign = false;
+      }
+      const sessionStore = useSessionStore.getState();
+      sessionStore.setAdapter(canSign ? createSessionAdapter(connector.signMessage) : noopSessionAdapter);
+
       setWalletAddress(result.address);
       await startSession(result.address!);
       return { success: true };

@@ -13,6 +13,10 @@ vi.mock("react-native", () => ({
   ActivityIndicator: "ActivityIndicator",
   SafeAreaView: "SafeAreaView",
   StyleSheet: { create: (styles: Record<string, unknown>) => styles },
+  // Real expo modules (expo-constants → expo-modules-core) read these from RN;
+  // provide them so the import chain resolves in the node test environment.
+  Platform: { OS: "ios", select: (o: Record<string, unknown>) => o.ios ?? o.default },
+  DeviceEventEmitter: { addListener: () => ({ remove: () => {} }), removeListener: () => {} },
 }));
 
 const routerMocks = vi.hoisted(() => ({
@@ -29,11 +33,11 @@ vi.mock("expo-router", () => ({
 
 vi.mock("expo-camera", () => ({
   useCameraPermissions: vi.fn(),
+  CameraView: "CameraView",
 }));
 
-vi.mock("expo-camera/legacy", () => ({
-  Camera: () => null,
-  CameraType: { back: "back" },
+vi.mock("expo-constants", () => ({
+  default: { expoConfig: { extra: { apiUrl: "https://api.guildpass.test", chainId: 1 } } },
 }));
 
 vi.mock("../src/features/access/qrPayload", () => ({
