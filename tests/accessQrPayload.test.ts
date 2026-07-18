@@ -64,6 +64,16 @@ describe("parseAccessQrPayload", () => {
     ).toThrow("QR code has expired.");
   });
 
+  it("parses a payload without a wallet address", () => {
+    const payload = parseAccessQrPayload(buildPayload({ walletAddress: undefined }), now);
+
+    expect(payload).toEqual({
+      guildId: "guild_abc",
+      resourceId: "vip-door",
+      expiresAt: "2026-06-23T12:05:00.000Z",
+    });
+  });
+
   it("rejects invalid wallet addresses", () => {
     expect(() => parseAccessQrPayload(buildPayload({ walletAddress: "0x123" }), now)).toThrow(
       "QR code contains an invalid wallet address.",
