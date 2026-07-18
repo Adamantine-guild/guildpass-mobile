@@ -5,9 +5,11 @@ export type AccessQrPayload = {
   type: typeof ACCESS_QR_TYPE;
   version: typeof ACCESS_QR_VERSION;
   guildId: string;
+    signature: string;;
   resourceId: string;
   walletAddress?: string;
   expiresAt?: string;
+  signature: string;
 };
 
 export type ParsedAccessQrPayload = {
