@@ -2,6 +2,7 @@ import { View, Text } from "react-native";
 import React, { useState } from "react";
 import { useRouter } from "expo-router";
 import { useCameraPermissions } from "expo-camera";
+import * as Linking from "expo-linking";
 // eslint-disable-next-line import/no-unresolved
 import { BarCodeScanningResult, Camera, CameraType } from "expo-camera/legacy";
 import { AppHeader } from "../src/components/AppHeader";
@@ -64,10 +65,16 @@ export default function AccessScanner() {
             {permission.canAskAgain ? (
               <Button title="Allow Camera Access" onPress={requestPermission} />
             ) : (
-              <Text className="text-error">
-                Camera permission was denied. Enable camera access in your device settings to scan
-                QR codes.
-              </Text>
+              <>
+                <Text className="text-error mb-6">
+                  Camera permission was denied. Open Settings to enable camera access for GuildPass.
+                </Text>
+                <Button
+                  title="Open Settings"
+                  onPress={() => Linking.openSettings()}
+                  variant="outline"
+                />
+              </>
             )}
           </Card>
         </View>
