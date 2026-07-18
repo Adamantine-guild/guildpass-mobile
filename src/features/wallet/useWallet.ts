@@ -5,6 +5,8 @@ import { WalletConnector } from "./walletConnector.types";
 import { useSessionStore } from "../session/session.store";
 import { queryClient } from "../../lib/queryClient";
 import { clearWalletScopedCache } from "../../lib/walletScopedCache";
+import type { WalletAdapter } from "./adapter/walletAdapter.interface";
+import { WalletAdapterError } from "./adapter/walletAdapter.interface";
 
 export const useWallet = (): {
   walletAddress: string | null;
@@ -12,6 +14,7 @@ export const useWallet = (): {
   isHydrated: boolean;
   connectManually: (address: string) => { success: boolean; error?: string };
   connectWithConnector: (connector: WalletConnector) => Promise<{ success: boolean; error?: string }>;
+  connectWithAdapter: (adapter: WalletAdapter) => Promise<{ success: boolean; error?: string }>;
   disconnect: () => void;
 } => {
   const {
@@ -31,6 +34,10 @@ export const useWallet = (): {
     return { success: true };
   };
 
+  /**
+   * Legacy path — kept for backwards compatibility with the WalletConnector
+   * interface used before the WalletAdapter abstraction was introduced.
+   */
   const connectWithConnector = async (connector: WalletConnector): Promise<{ success: boolean; error?: string }> => {
     try {
       const accounts = await connector.connect();
@@ -45,13 +52,38 @@ export const useWallet = (): {
     }
   };
 
+  /**
+   * Primary path for all new wallet providers. Accepts any object that
+   * implements `WalletAdapter` — ManualAdapter, WalletConnectAdapter,
+   * MetaMaskAdapter, CoinbaseAdapter, or a custom/mock adapter.
+   *
+   * Error codes from `WalletAdapterError` are surfaced in `error` so the UI
+   * can show provider-appropriate messages without knowing which SDK is active.
+   */
+  const connectWithAdapter = async (adapter: WalletAdapter): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const accounts = await adapter.connect();
+      if (!accounts.length) return { success: false, error: "No accounts returned by the wallet." };
+      const result = validateAndNormalizeAddress(accounts[0]);
+      if (!result.valid) return { success: false, error: result.error };
+      setWalletAddress(result.address);
+      await startSession(result.address!);
+      return { success: true };
+    } catch (e) {
+      if (e instanceof WalletAdapterError) {
+        return { success: false, error: e.message };
+      }
+      return { success: false, error: e instanceof Error ? e.message : "Connection failed" };
+    }
+  };
+
   const disconnect = () => {
     clearWalletScopedCache(queryClient);
     storeDisconnect();
     void endSession();
   };
 
-  return { walletAddress, isConnected, isHydrated, connectManually, connectWithConnector, disconnect };
+  return { walletAddress, isConnected, isHydrated, connectManually, connectWithConnector, connectWithAdapter, disconnect };
 };
 
 /** Convenience — build a manual connector and connect in one step */
