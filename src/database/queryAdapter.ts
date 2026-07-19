@@ -136,6 +136,7 @@ export const DAL_BACKED_QUERY_ROOTS = [
   "guild",
   "guild-config",
   "guild-roles",
+  "memberships",
 ] as const;
 
 export type DalBackedQueryRoot = (typeof DAL_BACKED_QUERY_ROOTS)[number];
@@ -189,6 +190,13 @@ export async function resolveFromDal(
       if (!walletAddress || !guildId) return undefined;
       const membership = await dal.getMembershipByWalletAndGuild(db, walletAddress, guildId);
       return membership ? JSON.parse(membership.raw_json) : undefined;
+    }
+
+    case "memberships": {
+      const walletAddress = queryKey[1] as string;
+      if (!walletAddress) return undefined;
+      const memberships = await dal.getMembershipsByWallet(db, walletAddress);
+      return memberships.map((m) => JSON.parse(m.raw_json));
     }
 
     case "user-roles": {
