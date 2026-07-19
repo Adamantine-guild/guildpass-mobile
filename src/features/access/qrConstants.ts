@@ -1,11 +1,13 @@
 /**
  * Canonical QR payload constants.
  *
- * Kept in their own module so both the parser (`qrPayload.ts`) and the
- * signature scheme (`qrSignature.ts`) can import them without a circular
- * dependency. These values are part of the wire contract — changing them is a
- * breaking change for every issued QR.
+ * Re-exports from `constants.ts` so existing imports remain backward-compatible.
  */
 
-export const ACCESS_QR_TYPE = "guildpass.access-check";
-export const ACCESS_QR_VERSION = 1;
+export {
+  ACCESS_QR_TYPE,
+  ACCESS_QR_VERSION,
+  SUPPORTED_QR_PAYLOAD_VERSIONS,
+  type SupportedQrPayloadVersion,
+} from "./constants";
+
