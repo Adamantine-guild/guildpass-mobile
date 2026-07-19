@@ -23,7 +23,9 @@ import { describe, it, expect, vi } from "vitest";
 import TestRenderer from "react-test-renderer";
 import { RequirementCard, UnsupportedNetworkCard } from "../src/components/RequirementCard";
 import { isKnownChainId, getChainDisplayName } from "../src/lib/chainRegistry";
+import { groupRoleRequirementsByChain } from "../src/features/guilds/roleRequirements";
 import {
+  GUILD_MIXED_CHAIN_CONFIG_FIXTURE,
   GUILD_UNKNOWN_CHAIN_FIXTURE,
   ROLES_WITH_UNKNOWN_CHAIN_FIXTURE,
 } from "./fixtures/guild.fixtures";
@@ -251,6 +253,22 @@ describe("RequirementCard – mixed known/unknown chain IDs in roles list", () =
 // ---------------------------------------------------------------------------
 // 5. GUILD_UNKNOWN_CHAIN_FIXTURE – chain registry look-up
 // ---------------------------------------------------------------------------
+
+describe("groupRoleRequirementsByChain", () => {
+  it("groups mixed-chain requirements by chain while preserving fallback labels", () => {
+    const grouped = groupRoleRequirementsByChain(
+      GUILD_MIXED_CHAIN_CONFIG_FIXTURE.requirements ?? [],
+      1
+    );
+
+    expect(grouped).toHaveLength(3);
+    expect(grouped[0]?.chainId).toBe(1);
+    expect(grouped[1]?.chainId).toBe(8453);
+    expect(grouped[2]?.chainId).toBe(999999);
+    expect(grouped[0]?.label).toContain("Ethereum");
+    expect(grouped[2]?.label).toContain("Unsupported network");
+  });
+});
 
 describe("GUILD_UNKNOWN_CHAIN_FIXTURE – chain registry integration", () => {
   it("the fixture's chainId is not in the known-chain registry", () => {

@@ -26,6 +26,12 @@ export type GuildConfigFixture = {
   accessPolicy: "any" | "all";
   /** Hex-encoded secp256k1 public key the guild uses to sign QR payloads. */
   issuerPublicKey?: string;
+  /** Optional per-requirement chain metadata from the backend. */
+  requirements?: Array<{
+    id: string;
+    name: string;
+    chainId: number;
+  }>;
 };
 
 // ---------------------------------------------------------------------------
@@ -88,6 +94,17 @@ export const GUILD_CONFIG_FIXTURE: GuildConfigFixture = {
   requiredRoles: ["member", "admin"],
   accessPolicy: "any",
   issuerPublicKey: TEST_ISSUER_PUBLIC_KEY,
+};
+
+export const GUILD_MIXED_CHAIN_CONFIG_FIXTURE: GuildConfigFixture = {
+  guildId: "guild_mixed_chain",
+  requiredRoles: ["member", "contributor", "admin"],
+  accessPolicy: "all",
+  requirements: [
+    { id: "req_eth", name: "Member", chainId: 1 },
+    { id: "req_base", name: "Contributor", chainId: 8453 },
+    { id: "req_future", name: "Admin", chainId: 999999 },
+  ],
 };
 
 // ---------------------------------------------------------------------------
