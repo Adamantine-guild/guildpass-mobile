@@ -13,16 +13,18 @@ import { RequirementCard, getChainDisplayName, isKnownChainId } from "../../src/
 import { StaleDataBanner } from "../../src/components/StaleDataBanner";
 import { WalletRequired } from "../../src/components/WalletRequired";
 import { useCombinedStaleState } from "../../src/features/offline/useStaleQuery";
+import { groupRoleRequirementsByChain } from "../../src/features/guilds/roleRequirements";
 import React from "react";
 
 export default function GuildDetail() {
   const { guildId } = useLocalSearchParams<{ guildId: string }>();
   const { walletAddress } = useWallet();
-  const { useGuild, useRoles } = useGuilds();
+  const { useGuild, useGuildConfig, useRoles } = useGuilds();
   const { useMembershipQuery } = useMembership(walletAddress);
   const validGuildId = typeof guildId === "string" ? guildId : "";
 
   const guildQuery = useGuild(validGuildId);
+  const guildConfigQuery = useGuildConfig(validGuildId);
   const membershipQuery = useMembershipQuery(validGuildId);
   const rolesQuery = useRoles(validGuildId);
 
@@ -34,8 +36,36 @@ export default function GuildDetail() {
   } = guildQuery;
   const { isLoading: memLoading, isPending: memPending, data: membership } = membershipQuery;
   const { data: roles, isLoading: rolesLoading, isPending: rolesPending } = rolesQuery;
+  const { data: guildConfig } = guildConfigQuery;
 
   const staleState = useCombinedStaleState([guildQuery, membershipQuery, rolesQuery]);
+  const groupedRequirements = groupRoleRequirementsByChain(
+    (roles as Array<{ id: string; name: string; chainId?: number }> | undefined) && guildConfig?.requirements
+      ? (roles as Array<{ id: string; name: string; chainId?: number }> | undefined)?.map((role) => {
+          const requirement = guildConfig.requirements?.find(
+            (item: { id: string; name?: string; chainId: number }) => item.id === role.id || item.name === role.name,
+          );
+          return {
+            id: role.id,
+            name: role.name,
+            chainId: role.chainId ?? requirement?.chainId ?? guild?.chainId ?? 1,
+          };
+        })
+      : ((roles as Array<{ id: string; name: string; chainId?: number }> | undefined) ?? []).map((role) => ({
+          id: role.id,
+          name: role.name,
+          chainId: role.chainId ?? guild?.chainId ?? 1,
+        })),
+    guild?.chainId ?? 1,
+  );
+  const guildChainLabel =
+    groupedRequirements.length === 0
+      ? isKnownChainId(guild?.chainId ?? 1)
+        ? `${getChainDisplayName(guild?.chainId ?? 1)} (${guild?.chainId ?? 1})`
+        : `Unsupported network (chain: ${guild?.chainId ?? 1})`
+      : groupedRequirements.length === 1
+        ? groupedRequirements[0]?.label
+        : `Multiple networks (${groupedRequirements.map((group) => group.label).join(", ")})`;
 
   const showSkeleton =
     (guildLoading && !guild) ||
@@ -56,6 +86,10 @@ export default function GuildDetail() {
                 ? "You are offline. Please reconnect to load guild details."
                 : "Failed to load guild details"
             }
+            onRetry={() => {
+              void Promise.all([guildQuery.refetch(), membershipQuery.refetch(), rolesQuery.refetch()]);
+            }}
+            isRetrying={guildQuery.isFetching || membershipQuery.isFetching || rolesQuery.isFetching}
           />
         ) : !guild ? (
           <ErrorState
@@ -64,6 +98,10 @@ export default function GuildDetail() {
                 ? "You are offline. Please reconnect to load guild details."
                 : "Failed to load guild details"
             }
+            onRetry={() => {
+              void Promise.all([guildQuery.refetch(), membershipQuery.refetch(), rolesQuery.refetch()]);
+            }}
+            isRetrying={guildQuery.isFetching || membershipQuery.isFetching || rolesQuery.isFetching}
           />
         ) : (
           <>
@@ -93,12 +131,10 @@ export default function GuildDetail() {
                   <View className="flex-row justify-between">
                     <Text className="text-text-muted">Chain ID</Text>
                     <Text
-                      className={`font-medium ${isKnownChainId(guild.chainId) ? "text-text" : "text-text-muted italic"}`}
+                      className={`font-medium ${groupedRequirements.some((group) => isKnownChainId(group.chainId)) ? "text-text" : "text-text-muted italic"}`}
                       testID="guild-chain-id"
                     >
-                      {isKnownChainId(guild.chainId)
-                        ? `${getChainDisplayName(guild.chainId)} (${guild.chainId})`
-                        : `Unsupported network (chain: ${guild.chainId})`}
+                      {guildChainLabel}
                     </Text>
                   </View>
                 </View>
@@ -125,21 +161,26 @@ export default function GuildDetail() {
 
               <View className="mb-6">
                 <Text className="text-lg font-bold text-text mb-3">Available Roles</Text>
-                <View className="flex-row flex-wrap" testID="guild-roles-list">
-                  {roles && roles.length > 0 ? (
-                    roles.map((role: { id: string; name: string; chainId?: number }) => (
-                      <RequirementCard
-                        key={role.id}
-                        chainId={role.chainId ?? guild.chainId}
-                        testID={`role-requirement-${role.id}`}
-                      >
-                        <RoleBadge name={role.name} />
-                      </RequirementCard>
-                    ))
-                  ) : (
-                    <Text className="text-text-muted italic">No roles defined for this guild.</Text>
-                  )}
-                </View>
+                {groupedRequirements.length > 0 ? (
+                  groupedRequirements.map((group) => (
+                    <View key={`${group.chainId}`} className="mb-4">
+                      <Text className="text-sm font-semibold text-text-muted mb-2">{group.label}</Text>
+                      <View className="flex-row flex-wrap" testID={`guild-roles-list-${group.chainId}`}>
+                        {group.requirements.map((role) => (
+                          <RequirementCard
+                            key={role.id}
+                            chainId={role.chainId}
+                            testID={`role-requirement-${role.id}`}
+                          >
+                            <RoleBadge name={role.name} />
+                          </RequirementCard>
+                        ))}
+                      </View>
+                    </View>
+                  ))
+                ) : (
+                  <Text className="text-text-muted italic">No roles defined for this guild.</Text>
+                )}
               </View>
             </ScrollView>
           </>

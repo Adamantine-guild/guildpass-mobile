@@ -1,7 +1,6 @@
 import { View, FlatList } from "react-native";
 import { useRouter } from "expo-router";
 import { useWallet } from "../src/features/wallet/useWallet";
-import { useMembership } from "../src/features/membership/useMembership";
 import { AppHeader } from "../src/components/AppHeader";
 import { GuildCard } from "../src/components/GuildCard";
 import { LoadingState } from "../src/components/LoadingState";
@@ -9,6 +8,7 @@ import { ErrorState } from "../src/components/ErrorState";
 import { EmptyMembershipsState } from "../src/components/EmptyMembershipsState";
 import { WalletRequired } from "../src/components/WalletRequired";
 import React from "react";
+import { useMembership } from "../src/features/membership/useMembership";
 
 export default function Guilds() {
   const router = useRouter();
