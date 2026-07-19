@@ -1,12 +1,13 @@
 import { View, Text, ScrollView } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { useWallet } from "../../src/features/wallet/useWallet";
-import { useGuilds } from "../../src/features/guilds/useGuilds";
+import { useGuilds, GuildNotFoundError } from "../../src/features/guilds/useGuilds";
 import { useMembership } from "../../src/features/membership/useMembership";
 import { AppHeader } from "../../src/components/AppHeader";
 import { LoadingState } from "../../src/components/LoadingState";
 import { GuildDetailSkeleton } from "../../src/components/GuildDetailSkeleton";
 import { ErrorState } from "../../src/components/ErrorState";
+import { GuildNotFoundState } from "../../src/components/GuildNotFoundState";
 import { Card } from "../../src/components/Card";
 import { RoleBadge } from "../../src/components/RoleBadge";
 import { RequirementCard, getChainDisplayName, isKnownChainId } from "../../src/components/RequirementCard";
@@ -49,6 +50,8 @@ export default function GuildDetail() {
           <ErrorState message="Invalid guild ID provided" />
         ) : showSkeleton ? (
           <GuildDetailSkeleton />
+        ) : guildError instanceof GuildNotFoundError ? (
+          <GuildNotFoundState />
         ) : guildError && !guild ? (
           <ErrorState
             message={
