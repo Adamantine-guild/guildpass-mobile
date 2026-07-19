@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, ActivityIndicator } from "react-native";
+import { Text, TouchableOpacity, ActivityIndicator } from "react-native";
 import React from "react";
 
 type ButtonProps = {
@@ -9,6 +9,7 @@ type ButtonProps = {
   disabled?: boolean;
   className?: string;
   testID?: string;
+  accessibilityLabel?: string;
 };
 
 export const Button = ({
@@ -19,6 +20,7 @@ export const Button = ({
   disabled = false,
   className = "",
   testID,
+  accessibilityLabel,
 }: ButtonProps) => {
   const getVariantStyles = () => {
     switch (variant) {
@@ -49,7 +51,7 @@ export const Button = ({
       onPress={onPress}
       disabled={disabled || loading}
       accessibilityRole="button"
-      accessibilityLabel={title}
+      accessibilityLabel={accessibilityLabel ?? title}
       accessibilityState={{ disabled: disabled || loading, busy: loading }}
       testID={testID}
       className={`py-4 px-6 rounded-xl flex-row justify-center items-center ${getVariantStyles()} ${

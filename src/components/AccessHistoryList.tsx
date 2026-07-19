@@ -1,5 +1,5 @@
-import { View, Text } from "react-native";
-import React from "react";
+import { View, Text, ScrollView } from "react-native";
+import React, { useState } from "react";
 import { Card } from "./Card";
 import { Button } from "./Button";
 import type { AccessHistoryEntry } from "../features/access/accessHistory.store";
@@ -20,38 +20,77 @@ const statusLabel = (status: AccessHistoryEntry["status"]) => {
   }
 };
 
-const statusClassName = (status: AccessHistoryEntry["status"]) =>
-  status === "granted" ? "text-success" : "text-error";
+const statusClassName = (status: AccessHistoryEntry["status"]) => {
+  switch (status) {
+    case "granted":
+      return "text-success";
+    case "error":
+      return "text-error";
+    default:
+      return "text-error";
+  }
+};
 
 export const AccessHistoryList = ({ entries, onClear }: AccessHistoryListProps) => {
-  if (entries.length === 0) {
-    return null;
-  }
+  const [expanded, setExpanded] = useState(false);
 
   return (
-    <Card className="mb-12">
-      <View className="flex-row justify-between items-center mb-4">
-        <Text className="text-lg font-bold text-text">Recent Access Checks</Text>
-        <Button title="Clear History" onPress={onClear} variant="outline" className="py-2 px-3" />
+    <Card className="mb-4">
+      <View className="mb-4">
+        <Text className="text-lg font-bold text-text mb-3">
+          Recent Access Checks ({entries.length})
+        </Text>
+        <View className="flex-row justify-end gap-2">
+          {entries.length > 0 ? (
+            <Button
+              title="Clear"
+              accessibilityLabel="Clear History"
+              onPress={onClear}
+              variant="outline"
+              className="py-2 px-3"
+            />
+          ) : null}
+          <Button
+            title={expanded ? "Hide" : "Show"}
+            accessibilityLabel={expanded ? "Collapse access history" : "Expand access history"}
+            onPress={() => setExpanded((value) => !value)}
+            variant="outline"
+            className="py-2 px-3"
+          />
+        </View>
       </View>
 
-      {entries.map((entry) => (
-        <View key={entry.id} className="py-3 border-t border-border">
-          <View className="flex-row justify-between">
-            <Text className="text-text font-semibold">{entry.resourceId}</Text>
-            <Text className={`font-bold ${statusClassName(entry.status)}`}>
-              {statusLabel(entry.status)}
-            </Text>
-          </View>
-          <Text className="text-text-muted text-sm mt-1">{entry.guildId}</Text>
-          {entry.reason ? (
-            <Text className="text-text-muted text-sm mt-1">{entry.reason}</Text>
-          ) : null}
-          <Text className="text-text-muted text-xs mt-1">
-            {new Date(entry.checkedAt).toLocaleString()}
-          </Text>
+      {expanded && (
+        <View>
+          {entries.length === 0 ? (
+            <Text className="text-text-muted">No recent access checks.</Text>
+          ) : (
+            <ScrollView
+              className="max-h-72"
+              nestedScrollEnabled
+              contentContainerStyle={{ paddingBottom: 4 }}
+            >
+              {entries.map((entry) => (
+                <View key={entry.id} className="py-3 border-t border-border">
+                  <View className="flex-row justify-between">
+                    <Text className="text-text font-semibold">{entry.resourceName}</Text>
+                    <Text className={`font-bold ${statusClassName(entry.status)}`}>
+                      {statusLabel(entry.status)}
+                    </Text>
+                  </View>
+                  <Text className="text-text-muted text-sm mt-1">{entry.guildName}</Text>
+                  {entry.reason ? (
+                    <Text className="text-text-muted text-sm mt-1">{entry.reason}</Text>
+                  ) : null}
+                  <Text className="text-text-muted text-xs mt-1">
+                    {new Date(entry.checkedAt).toLocaleString()}
+                  </Text>
+                </View>
+              ))}
+            </ScrollView>
+          )}
         </View>
-      ))}
+      )}
     </Card>
   );
 };

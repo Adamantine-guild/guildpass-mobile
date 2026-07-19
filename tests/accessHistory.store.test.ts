@@ -1,97 +1,64 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ACCESS_DENIED_FIXTURE, ACCESS_GRANTED_FIXTURE } from "./fixtures/access.fixtures";
+import { beforeEach, describe, expect, it } from "vitest";
+import { ACCESS_GRANTED_FIXTURE } from "./fixtures/access.fixtures";
 import {
-  ACCESS_HISTORY_STORAGE_KEY,
+  MAX_ACCESS_HISTORY_ENTRIES,
   useAccessHistoryStore,
 } from "../src/features/access/accessHistory.store";
-import { resetAppState } from "../src/lib/resetAppState";
-
-const storage = vi.hoisted(() => new Map<string, string>());
-
-vi.mock("@react-native-async-storage/async-storage", () => ({
-  default: {
-    getItem: vi.fn(async (key: string) => storage.get(key) ?? null),
-    setItem: vi.fn(async (key: string, value: string) => {
-      storage.set(key, value);
-    }),
-    removeItem: vi.fn(async (key: string) => {
-      storage.delete(key);
-    }),
-  },
-}));
-
-const WALLET_A = "0x1234567890123456789012345678901234567890";
-const WALLET_B = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd";
 
 describe("access history store", () => {
   beforeEach(() => {
-    storage.clear();
-    useAccessHistoryStore.setState({ historyByWallet: {}, hydrated: false });
+    useAccessHistoryStore.setState({ entries: [] });
   });
 
-  it("stores successful and denied checks under the checked wallet only", async () => {
-    await useAccessHistoryStore.getState().recordCheck({
-      walletAddress: WALLET_A,
+  it("records granted checks", () => {
+    useAccessHistoryStore.getState().recordCheck({
       guildId: "guild-alpha",
+      guildName: "Guild Alpha",
       resourceId: "vip-door",
+      resourceName: "VIP Door",
       result: ACCESS_GRANTED_FIXTURE,
     });
-    await useAccessHistoryStore.getState().recordCheck({
-      walletAddress: WALLET_B,
-      guildId: "guild-alpha",
-      resourceId: "vip-door",
-      result: ACCESS_DENIED_FIXTURE,
-    });
 
-    const walletAHistory = useAccessHistoryStore.getState().getHistoryForWallet(WALLET_A);
-    const walletBHistory = useAccessHistoryStore.getState().getHistoryForWallet(WALLET_B);
-
-    expect(walletAHistory).toHaveLength(1);
-    expect(walletAHistory[0]).toMatchObject({
-      walletAddress: WALLET_A.toLowerCase(),
+    const [entry] = useAccessHistoryStore.getState().entries;
+    expect(entry).toMatchObject({
       guildId: "guild-alpha",
+      guildName: "Guild Alpha",
       resourceId: "vip-door",
+      resourceName: "VIP Door",
       status: "granted",
       reason: ACCESS_GRANTED_FIXTURE.reason,
     });
-    expect(walletBHistory).toHaveLength(1);
-    expect(walletBHistory[0]).toMatchObject({
-      walletAddress: WALLET_B.toLowerCase(),
-      status: "denied",
-      reason: ACCESS_DENIED_FIXTURE.reason,
-    });
-    expect(storage.has(ACCESS_HISTORY_STORAGE_KEY)).toBe(true);
   });
 
-  it("clears history for one wallet without touching another wallet", async () => {
-    await useAccessHistoryStore.getState().recordCheck({
-      walletAddress: WALLET_A,
-      guildId: "guild-alpha",
-      resourceId: "vip-door",
-      result: ACCESS_GRANTED_FIXTURE,
-    });
-    await useAccessHistoryStore.getState().recordCheck({
-      walletAddress: WALLET_B,
+  it("records denied checks", () => {
+    useAccessHistoryStore.getState().recordCheck({
       guildId: "guild-beta",
       resourceId: "members-room",
-      result: ACCESS_DENIED_FIXTURE,
+      result: {
+        hasAccess: false,
+        reason: "No access",
+        matchedRoles: [],
+        requiredRoles: ["Member"],
+      },
     });
 
-    await useAccessHistoryStore.getState().clearWalletHistory(WALLET_A);
-
-    expect(useAccessHistoryStore.getState().getHistoryForWallet(WALLET_A)).toStrictEqual([]);
-    expect(useAccessHistoryStore.getState().getHistoryForWallet(WALLET_B)).toHaveLength(1);
+    const [entry] = useAccessHistoryStore.getState().entries;
+    expect(entry).toMatchObject({
+      guildId: "guild-beta",
+      resourceId: "members-room",
+      status: "denied",
+      reason: "No access",
+    });
   });
 
-  it("stores generic error history without raw failure details", async () => {
-    await useAccessHistoryStore.getState().recordCheck({
-      walletAddress: WALLET_A,
+  it("records sanitized error checks", () => {
+    useAccessHistoryStore.getState().recordCheck({
       guildId: "guild-alpha",
       resourceId: "vip-door",
       error: new Error("Authorization: Bearer secret-token"),
     });
 
-    const [entry] = useAccessHistoryStore.getState().getHistoryForWallet(WALLET_A);
+    const [entry] = useAccessHistoryStore.getState().entries;
 
     expect(entry).toMatchObject({
       status: "error",
@@ -103,17 +70,79 @@ describe("access history store", () => {
     expect(JSON.stringify(entry)).not.toMatch(/authorization/i);
   });
 
-  it("resetAppState clears all stored access history", async () => {
-    await useAccessHistoryStore.getState().recordCheck({
-      walletAddress: WALLET_A,
+  it("stores newest entries first", () => {
+    useAccessHistoryStore.getState().recordCheck({
+      guildId: "guild-alpha",
+      resourceId: "first",
+      result: { hasAccess: true, matchedRoles: [], requiredRoles: [] },
+    });
+    useAccessHistoryStore.getState().recordCheck({
+      guildId: "guild-alpha",
+      resourceId: "second",
+      result: { hasAccess: false, matchedRoles: [], requiredRoles: [] },
+    });
+
+    const [firstEntry, secondEntry] = useAccessHistoryStore.getState().entries;
+    expect(firstEntry.resourceId).toBe("second");
+    expect(secondEntry.resourceId).toBe("first");
+  });
+
+  it("caps the list at the maximum number of entries", () => {
+    for (let index = 0; index < MAX_ACCESS_HISTORY_ENTRIES + 1; index += 1) {
+      useAccessHistoryStore.getState().recordCheck({
+        guildId: `guild-${index}`,
+        resourceId: `resource-${index}`,
+        result: { hasAccess: true, matchedRoles: [], requiredRoles: [] },
+      });
+    }
+
+    const entries = useAccessHistoryStore.getState().entries;
+    expect(entries).toHaveLength(MAX_ACCESS_HISTORY_ENTRIES);
+    expect(entries[0].resourceId).toBe(`resource-${MAX_ACCESS_HISTORY_ENTRIES}`);
+    expect(entries.at(-1)?.resourceId).toBe(`resource-1`);
+  });
+
+  it("evicts the oldest entry when the 21st entry is added", () => {
+    for (let index = 0; index < MAX_ACCESS_HISTORY_ENTRIES; index += 1) {
+      useAccessHistoryStore.getState().recordCheck({
+        guildId: `guild-${index}`,
+        resourceId: `resource-${index}`,
+        result: { hasAccess: true, matchedRoles: [], requiredRoles: [] },
+      });
+    }
+
+    useAccessHistoryStore.getState().recordCheck({
+      guildId: "guild-new",
+      resourceId: "resource-new",
+      result: { hasAccess: false, matchedRoles: [], requiredRoles: [] },
+    });
+
+    const entries = useAccessHistoryStore.getState().entries;
+    expect(entries).toHaveLength(MAX_ACCESS_HISTORY_ENTRIES);
+    expect(entries.some((entry) => entry.resourceId === "resource-0")).toBe(false);
+    expect(entries[0].resourceId).toBe("resource-new");
+  });
+
+  it("clears the history list", () => {
+    useAccessHistoryStore.getState().recordCheck({
       guildId: "guild-alpha",
       resourceId: "vip-door",
       result: ACCESS_GRANTED_FIXTURE,
     });
 
-    await resetAppState();
+    useAccessHistoryStore.getState().clearHistory();
 
-    expect(useAccessHistoryStore.getState().getHistoryForWallet(WALLET_A)).toStrictEqual([]);
-    expect(storage.has(ACCESS_HISTORY_STORAGE_KEY)).toBe(false);
+    expect(useAccessHistoryStore.getState().entries).toStrictEqual([]);
+  });
+
+  it("exposes no hydration or persistence API", () => {
+    const state = useAccessHistoryStore.getState();
+
+    expect(Object.keys(state).sort()).toStrictEqual(
+      ["clearHistory", "entries", "recordCheck"].sort(),
+    );
+    expect(state).not.toHaveProperty("hydrate");
+    expect(state).not.toHaveProperty("historyByWallet");
+    expect(state).not.toHaveProperty("clearAllHistory");
   });
 });
