@@ -77,10 +77,6 @@ export default function AccessScanner() {
             {permission.canAskAgain ? (
               <Button title="Allow Camera Access" onPress={requestPermission} />
             ) : (
-              <Text className="text-error">
-                Camera permission was denied. Enable camera access in your device settings to scan
-                QR codes.
-              </Text>
               <>
                 <Text className="text-error mb-6">
                   Camera permission was denied. Open Settings to enable camera access for GuildPass.
