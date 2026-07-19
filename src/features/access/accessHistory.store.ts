@@ -32,6 +32,8 @@ type AccessHistoryState = {
   clearWalletHistory: (walletAddress: string) => Promise<void>;
   clearAllHistory: () => Promise<void>;
   getHistoryForWallet: (walletAddress: string | null | undefined) => AccessHistoryEntry[];
+  lastDecodedPayload: Record<string, any> | null;
+  setLastDecodedPayload: (payload: Record<string, any> | null) => void;
 };
 
 const walletKey = (walletAddress: string | null | undefined) =>
@@ -54,6 +56,8 @@ const safeErrorReason = () => "Access check failed. Please try again.";
 export const useAccessHistoryStore = create<AccessHistoryState>((set, get) => ({
   historyByWallet: {},
   hydrated: false,
+  lastDecodedPayload: null,
+  setLastDecodedPayload: (payload) => set({ lastDecodedPayload: payload }),
 
   hydrate: async () => {
     const rawHistory = await AsyncStorage.getItem(ACCESS_HISTORY_STORAGE_KEY);

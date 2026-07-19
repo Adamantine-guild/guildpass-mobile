@@ -1,6 +1,7 @@
-import { View, Text, ActivityIndicator } from "react-native";
+import { View, Text, ActivityIndicator, ScrollView, TouchableOpacity } from "react-native";
 import React, { useState, useEffect } from "react";
 import { useRouter } from "expo-router";
+import * as Clipboard from "expo-clipboard";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import type { BarcodeScanningResult } from "expo-camera";
 import { AppHeader } from "../src/components/AppHeader";
@@ -10,20 +11,20 @@ import { parseAccessQrPayload } from "../src/features/access/qrPayload";
 import { useAccessCheck } from "../src/features/access/useAccessCheck";
 import { verifyAndParseAccessQrPayload } from "../src/features/access/verifyQrPayload";
 import { QrSignatureError } from "../src/features/access/qrSignature";
+import { useAccessHistoryStore } from "../src/features/access/accessHistory.store";
 
 export default function AccessScanner() {
   const router = useRouter();
   const [permission, requestPermission] = useCameraPermissions();
-  const { state, startScan, checkAccess, reset } = useAccessCheck();
+  const { state, dispatch, startScan, checkAccess, reset } = useAccessCheck();
   const [qrData, setQrData] = useState<string | null>(null);
+  const setLastDecodedPayload = useAccessHistoryStore((state) => state.setLastDecodedPayload);
+  const lastDecodedPayload = useAccessHistoryStore((state) => state.lastDecodedPayload);
 
   // Kick off scanning when camera permission granted and we are idle
   useEffect(() => {
     if (permission?.granted && state.status === "idle") {
       startScan();
-  const handleBarcodeScanned = async ({ data }: BarcodeScanningResult) => {
-    if (hasScanned) {
-      return;
     }
   }, [permission, state.status, startScan]);
 
@@ -34,30 +35,19 @@ export default function AccessScanner() {
     }
   }, [state.status, qrData, router]);
 
-  const handleBarcodeScanned = ({ data }: BarcodeScanningResult) => {
+  const handleBarcodeScanned = async ({ data }: BarcodeScanningResult) => {
     if (state.status !== "idle") return;
     try {
-      const parsed = parseAccessQrPayload(data);
+      const parsed = await verifyAndParseAccessQrPayload(data);
+      setLastDecodedPayload(parsed);
       setQrData(data);
-      // Build params for access check API
+
       const params = {
         guildId: parsed.guildId,
         resourceId: parsed.resourceId,
         walletAddress: parsed.walletAddress ?? "",
       };
       checkAccess(params);
-    } catch (e) {
-      const message = e instanceof Error ? e.message : "Unable to read QR payload.";
-      // Directly transition to error state
-      // Since reducer does not have a VALIDATION_ERROR action, we use reset then dispatch error via custom action
-      // For simplicity, we call reset and set a custom error via dispatch
-      // (dispatch is not exposed here, but we rely on error handling in useAccessCheck via reset and later UI)
-      // Instead, we can simply set a local error state – but to keep pattern, we'll call reset and let UI show generic error.
-      reset();
-      // Structural parse first (fast, sync). When the qrSignatureVerification
-      // feature flag is on, this also cryptographically verifies the payload
-      // against the guild's published issuer key and rejects forged QR codes.
-      await verifyAndParseAccessQrPayload(data);
       router.replace({
         pathname: "/access-check",
         params: { qrPayload: data },
@@ -69,7 +59,7 @@ export default function AccessScanner() {
           : scanError instanceof Error
             ? scanError.message
             : "Unable to read QR payload.";
-      setError(message);
+      dispatch({ type: "SUBMIT_ERROR", error: message });
     }
   };
 
@@ -100,7 +90,8 @@ export default function AccessScanner() {
               <Button title="Allow Camera Access" onPress={requestPermission} />
             ) : (
               <Text className="text-error">
-                Camera permission was denied. Enable camera access in your device settings to scan QR codes.
+                Camera permission was denied. Enable camera access in your device settings to scan
+                QR codes.
               </Text>
             )}
           </Card>
@@ -155,6 +146,22 @@ export default function AccessScanner() {
           </Card>
         </View>
       </View>
-    </BiometricGate>
+      {__DEV__ && lastDecodedPayload && (
+        <View className="absolute bottom-10 left-4 right-4 bg-slate-900/95 p-4 rounded-xl border border-slate-700 shadow-lg z-50">
+          <Text className="text-white font-bold mb-2">Debug QR Payload</Text>
+          <ScrollView style={{ maxHeight: 150 }}>
+            <Text className="text-slate-300 font-mono text-xs">
+              {JSON.stringify(lastDecodedPayload, null, 2)}
+            </Text>
+          </ScrollView>
+          <TouchableOpacity
+            className="mt-4 bg-slate-700 py-2 rounded-lg items-center"
+            onPress={() => Clipboard.setStringAsync(JSON.stringify(lastDecodedPayload, null, 2))}
+          >
+            <Text className="text-white font-medium">Copiar</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
   );
 }
