@@ -3,6 +3,9 @@ import React, { useRef, useState } from "react";
 import { useRouter } from "expo-router";
 import { CameraView, useCameraPermissions } from "expo-camera/next";
 import type { BarcodeScanningResult } from "expo-camera/next";
+import { CameraView, useCameraPermissions } from "expo-camera";
+import type { BarcodeScanningResult } from "expo-camera";
+import * as Linking from "expo-linking";
 import { AppHeader } from "../src/components/AppHeader";
 import { Button } from "../src/components/Button";
 import { Card } from "../src/components/Card";
@@ -78,6 +81,16 @@ export default function AccessScanner() {
                 Camera permission was denied. Enable camera access in your device settings to scan
                 QR codes.
               </Text>
+              <>
+                <Text className="text-error mb-6">
+                  Camera permission was denied. Open Settings to enable camera access for GuildPass.
+                </Text>
+                <Button
+                  title="Open Settings"
+                  onPress={() => Linking.openSettings()}
+                  variant="outline"
+                />
+              </>
             )}
           </Card>
         </View>
