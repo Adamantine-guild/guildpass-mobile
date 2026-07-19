@@ -5,6 +5,7 @@ import { useGuilds } from "../../src/features/guilds/useGuilds";
 import { useMembership } from "../../src/features/membership/useMembership";
 import { AppHeader } from "../../src/components/AppHeader";
 import { LoadingState } from "../../src/components/LoadingState";
+import { GuildDetailSkeleton } from "../../src/components/GuildDetailSkeleton";
 import { ErrorState } from "../../src/components/ErrorState";
 import { Card } from "../../src/components/Card";
 import { RoleBadge } from "../../src/components/RoleBadge";
@@ -36,13 +37,18 @@ export default function GuildDetail() {
 
   const staleState = useCombinedStaleState([guildQuery, membershipQuery, rolesQuery]);
 
+  const showSkeleton =
+    (guildLoading && !guild) ||
+    (memLoading && !membership) ||
+    (rolesLoading && !roles);
+
   return (
     <WalletRequired>
       <View className="flex-1 bg-background" testID="guild-detail-screen">
         {!validGuildId ? (
           <ErrorState message="Invalid guild ID provided" />
-        ) : (guildPending && guildLoading) || (memPending && memLoading) || (rolesPending && rolesLoading) ? (
-          <LoadingState message="Fetching guild details..." />
+        ) : showSkeleton ? (
+          <GuildDetailSkeleton />
         ) : guildError && !guild ? (
           <ErrorState
             message={
