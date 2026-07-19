@@ -1,9 +1,9 @@
 import { View, Text, ActivityIndicator, ScrollView, TouchableOpacity } from "react-native";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "expo-router";
 import * as Clipboard from "expo-clipboard";
-import { CameraView, useCameraPermissions } from "expo-camera";
-import type { BarcodeScanningResult } from "expo-camera";
+import { CameraView, useCameraPermissions } from "expo-camera/next";
+import type { BarcodeScanningResult } from "expo-camera/next";
 import { AppHeader } from "../src/components/AppHeader";
 import { Button } from "../src/components/Button";
 import { Card } from "../src/components/Card";
@@ -18,6 +18,11 @@ export default function AccessScanner() {
   const [permission, requestPermission] = useCameraPermissions();
   const { state, dispatch, startScan, checkAccess, reset } = useAccessCheck();
   const [qrData, setQrData] = useState<string | null>(null);
+  
+  const scanInProgressRef = useRef(false);
+  const [isProcessingScan, setIsProcessingScan] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
+
   const setLastDecodedPayload = useAccessHistoryStore((state) => state.setLastDecodedPayload);
   const lastDecodedPayload = useAccessHistoryStore((state) => state.lastDecodedPayload);
 
@@ -36,7 +41,11 @@ export default function AccessScanner() {
   }, [state.status, qrData, router]);
 
   const handleBarcodeScanned = async ({ data }: BarcodeScanningResult) => {
-    if (state.status !== "idle") return;
+    if (scanInProgressRef.current) return;
+    scanInProgressRef.current = true;
+    setIsProcessingScan(true);
+    setScanError(null);
+
     try {
       const parsed = await verifyAndParseAccessQrPayload(data);
       setLastDecodedPayload(parsed);
@@ -48,18 +57,25 @@ export default function AccessScanner() {
         walletAddress: parsed.walletAddress ?? "",
       };
       checkAccess(params);
+      
       router.replace({
         pathname: "/access-check",
         params: { qrPayload: data },
       });
-    } catch (scanError) {
+    } catch (error) {
+      scanInProgressRef.current = false;
+      setIsProcessingScan(false);
       const message =
-        scanError instanceof QrSignatureError
+        error instanceof QrSignatureError
           ? "QR code signature is invalid or missing."
-          : scanError instanceof Error
-            ? scanError.message
+          : error instanceof Error
+            ? error.message
             : "Unable to read QR payload.";
-      dispatch({ type: "SUBMIT_ERROR", error: message });
+      
+      setScanError(message);
+      if (dispatch) {
+        dispatch({ type: "SUBMIT_ERROR", error: message });
+      }
     }
   };
 
@@ -101,7 +117,7 @@ export default function AccessScanner() {
   }
 
   // Loading / processing UI
-  if (state.status === "scanning" || state.status === "submitting") {
+  if (state.status === "scanning" || state.status === "submitting" || isProcessingScan) {
     return (
       <View className="flex-1 bg-background justify-center items-center">
         <AppHeader title="Scan Access QR" showBack />
@@ -112,15 +128,20 @@ export default function AccessScanner() {
   }
 
   // Error UI
-  if (state.status === "error") {
+  if (state.status === "error" || scanError) {
     return (
       <View className="flex-1 bg-background">
         <AppHeader title="Scan Access QR" showBack />
         <View className="flex-1 px-4 py-6">
           <Card className="border-error bg-error/5">
             <Text className="text-error font-bold">QR code rejected</Text>
-            <Text className="text-error/80 text-sm mt-1 mb-4">{state.error}</Text>
-            <Button title="Scan Again" onPress={reset} variant="outline" />
+            <Text className="text-error/80 text-sm mt-1 mb-4">{scanError || state.error}</Text>
+            <Button title="Scan Again" onPress={() => {
+              scanInProgressRef.current = false;
+              setIsProcessingScan(false);
+              setScanError(null);
+              reset();
+            }} variant="outline" />
           </Card>
         </View>
       </View>
