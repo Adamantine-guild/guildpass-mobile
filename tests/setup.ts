@@ -1,5 +1,8 @@
 import { vi } from "vitest";
 
+// Define __DEV__ for React Native/Expo modules in node test environment
+(global as any).__DEV__ = true;
+
 // Mock AsyncStorage
 vi.mock("@react-native-async-storage/async-storage", () => ({
   default: {

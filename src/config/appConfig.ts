@@ -20,6 +20,9 @@ const ConfigSchema = z.object({
   // When ON, QR payloads without a valid signature are rejected. During the
   // migration window this stays OFF so legacy unsigned payloads keep working.
   qrSignatureVerification: FeatureFlagSchema,
+  // The threshold duration (in ms) after which foregrounding the app will trigger
+  // invalidation and background refetching of relevant membership/role queries.
+  foregroundRefetchThresholdMs: z.coerce.number().finite().default(120000),
 });
 
 export type AppConfig = z.infer<typeof ConfigSchema>;
@@ -35,12 +38,17 @@ function loadConfig(): AppConfig {
     qrSignatureVerification:
       Constants.expoConfig?.extra?.qrSignatureVerification ??
       process.env.EXPO_PUBLIC_QR_SIGNATURE_VERIFICATION,
+    foregroundRefetchThresholdMs:
+      Constants.expoConfig?.extra?.foregroundRefetchThresholdMs ??
+      process.env.EXPO_PUBLIC_FOREGROUND_REFETCH_THRESHOLD_MS,
   };
 
   const parsed = ConfigSchema.safeParse(rawConfig);
 
   if (!parsed.success) {
-    const errorMessages = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("\n");
+    const errorMessages = parsed.error.issues
+      .map((i) => `${i.path.join(".")}: ${i.message}`)
+      .join("\n");
     throw new Error(`Invalid application configuration:\n${errorMessages}`);
   }
 
