@@ -6,27 +6,60 @@ import { AppHeader } from "../src/components/AppHeader";
 import { GuildCard } from "../src/components/GuildCard";
 import { LoadingState } from "../src/components/LoadingState";
 import { ErrorState } from "../src/components/ErrorState";
-import { EmptyState } from "../src/components/EmptyState";
+import { EmptyMembershipsState } from "../src/components/EmptyMembershipsState";
 import { WalletRequired } from "../src/components/WalletRequired";
 import React from "react";
 
 export default function Guilds() {
   const router = useRouter();
-  const { walletAddress } = useWallet();
-  const { getMembership } = useMembership(walletAddress);
+  const { walletAddress, disconnect } = useWallet();
+  const { useMembershipsQuery } = useMembership(walletAddress);
+  const { data: memberships, isLoading, error } = useMembershipsQuery();
 
-  const exampleGuilds = [
-    { id: "guild_abc", name: "Alpha Guild", isActive: true, roleCount: 3 },
-    { id: "guild_xyz", name: "Beta Community", isActive: true, roleCount: 5 },
-    { id: "guild_123", name: "Gamma DAO", isActive: false, roleCount: 2 },
-  ];
+  const handleConnectDifferentWallet = async () => {
+    await disconnect();
+    router.replace("/profile");
+  };
+
+  if (isLoading) {
+    return (
+      <WalletRequired>
+        <View className="flex-1 bg-background" testID="guilds-screen">
+          <AppHeader title="My Guilds" showBack />
+          <LoadingState message="Loading memberships..." />
+        </View>
+      </WalletRequired>
+    );
+  }
+
+  if (error) {
+    return (
+      <WalletRequired>
+        <View className="flex-1 bg-background" testID="guilds-screen">
+          <AppHeader title="My Guilds" showBack />
+          <ErrorState message="Failed to load memberships" />
+        </View>
+      </WalletRequired>
+    );
+  }
+
+  if (!memberships || memberships.length === 0) {
+    return (
+      <WalletRequired>
+        <View className="flex-1 bg-background" testID="guilds-screen">
+          <AppHeader title="My Guilds" showBack />
+          <EmptyMembershipsState onConnectDifferentWallet={handleConnectDifferentWallet} />
+        </View>
+      </WalletRequired>
+    );
+  }
 
   return (
     <WalletRequired>
       <View className="flex-1 bg-background" testID="guilds-screen">
         <AppHeader title="My Guilds" showBack />
         <FlatList
-          data={exampleGuilds}
+          data={memberships}
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ padding: 16 }}
           testID="guilds-list"
@@ -39,14 +72,6 @@ export default function Guilds() {
               onPress={() => router.push(`/guilds/${item.id}`)}
             />
           )}
-          ListEmptyComponent={
-            <EmptyState
-              title="No Guilds Found"
-              message="You are not a member of any guilds yet."
-              actionTitle="Explore Guilds"
-              onAction={() => {}}
-            />
-          }
         />
       </View>
     </WalletRequired>
