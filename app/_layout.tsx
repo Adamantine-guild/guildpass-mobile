@@ -8,6 +8,7 @@ import { initConnectivityService } from "../src/features/network/connectivitySer
 import { initSyncManager, triggerSync } from "../src/features/sync/syncManager";
 import { ErrorBoundary } from "../src/components/ErrorBoundary";
 import { SyncCorrectionOverlay } from "../src/components/SyncCorrectionOverlay";
+import { WalletConnectProvider } from "../src/features/wallet/WalletConnectProvider";
 import { useSecurityInit } from "../src/features/security";
 import { initFocusManager } from "../src/lib/focusManager";
 
@@ -42,23 +43,25 @@ export default function RootLayout() {
         }}
       >
         <View className="flex-1 bg-background">
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: "#f8fafc" },
-            }}
-          >
-            <Stack.Screen name="index" />
-            <Stack.Screen name="onboarding" />
-            <Stack.Screen name="profile" />
-            <Stack.Screen name="guilds" />
-            <Stack.Screen name="guilds/[guildId]" />
-            <Stack.Screen name="access-check" />
-            <Stack.Screen name="access-scanner" />
-            <Stack.Screen name="settings" />
-            <Stack.Screen name="deep-link-error" />
-          </Stack>
-          <SyncCorrectionOverlay />
+          <WalletConnectProvider>
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: "#f8fafc" },
+              }}
+            >
+              <Stack.Screen name="index" />
+              <Stack.Screen name="onboarding" />
+              <Stack.Screen name="profile" />
+              <Stack.Screen name="guilds" />
+              <Stack.Screen name="guilds/[guildId]" />
+              <Stack.Screen name="access-check" />
+              <Stack.Screen name="access-scanner" />
+              <Stack.Screen name="settings" />
+              <Stack.Screen name="deep-link-error" />
+            </Stack>
+            <SyncCorrectionOverlay />
+          </WalletConnectProvider>
         </View>
       </PersistQueryClientProvider>
     </ErrorBoundary>

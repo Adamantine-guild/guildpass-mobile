@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import { useRouter } from "expo-router";
 import { useWallet } from "../src/features/wallet/useWallet";
 import { useWalletConnectModal } from "../src/features/wallet/WalletConnectProvider";
+import { useWalletStore } from "../src/features/wallet/wallet.store";
 import { AppHeader } from "../src/components/AppHeader";
 import { Card } from "../src/components/Card";
 import { WalletInput } from "../src/components/WalletInput";
@@ -35,6 +36,11 @@ export default function Profile() {
       await open();
       // The WalletConnectBridge in WalletConnectProvider syncs the connected
       // address into Zustand + starts the session automatically.
+      // Give the bridge a tick to process before checking the store.
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      if (!useWalletStore.getState().isConnected) {
+        setError("Connection cancelled or rejected.");
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to open WalletConnect");
     } finally {
