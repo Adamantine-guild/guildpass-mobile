@@ -28,10 +28,45 @@ export const useMembership = (walletAddress: string | null) => {
     });
   };
 
+  const useMembershipsQuery = () => {
+    return useQuery({
+      queryKey: ["memberships", walletAddress],
+      queryFn: async () => {
+        if (!walletAddress) return [];
+        const { getDatabase } = await import("../../database/connection");
+        const dal = await import("../../database/dal");
+        const db = getDatabase();
+        const rows = await dal.getMembershipsByWallet(db, walletAddress);
+
+        const membershipsWithGuildInfo = await Promise.all(
+          rows.map(async (row) => {
+            const membership = JSON.parse(row.raw_json);
+            const guildRow = await dal.getGuildById(db, row.guild_id);
+            let guildName = "Unknown Guild";
+            if (guildRow) {
+              const guildObj = JSON.parse(guildRow.raw_json);
+              guildName = guildObj.name || guildName;
+            }
+            return {
+              id: row.guild_id,
+              name: guildName,
+              isActive: row.status === "active",
+              roleCount: membership.roles?.length || 0,
+            };
+          })
+        );
+        return membershipsWithGuildInfo;
+      },
+      enabled: !!walletAddress,
+      networkMode: "offlineFirst",
+    });
+  };
+
   return {
     getMembership: useMembershipQuery,
     getUserRoles: useUserRoles,
     useMembershipQuery,
     useUserRoles,
+    useMembershipsQuery,
   };
 };

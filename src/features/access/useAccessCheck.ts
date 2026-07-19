@@ -1,6 +1,8 @@
 import { useReducer, useCallback, useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { guildPassClient } from "../../lib/guildpassClient";
+import { useMultiChainRoleEligibility } from "./useMultiChainRoleEligibility";
+import type { PerChainRoleEligibilityResolution } from "./roleEligibilityResolver";
 
 export type AccessCheckParams = {
   walletAddress: string;
@@ -15,7 +17,6 @@ export type AccessCheckResult = {
   requiredRoles: string[];
 };
 
-// ----- State machine definitions -----
 export type AccessCheckState =
   | { status: "idle" }
   | { status: "scanning" }
@@ -47,17 +48,13 @@ function reducer(state: AccessCheckState, action: AccessCheckAction): AccessChec
   }
 }
 
-/**
- * Hook that manages the access‑check flow using a reducer.
- * Call `startScan` to put the machine into the scanning state.
- * Call `checkAccess` with validated parameters to trigger the API call.
- * Call `reset` to return to idle after an error.
- */
 export const useAccessCheck = () => {
   const [state, dispatch] = useReducer(reducer, { status: "idle" } as AccessCheckState);
   const lastParamsRef = useRef<AccessCheckParams | null>(null);
+  const multiChain = useMultiChainRoleEligibility();
 
   const mutation = useMutation<AccessCheckResult, Error, AccessCheckParams>({
+    mutationKey: ["access-check"],
     mutationFn: (params) => guildPassClient.access.checkAccess(params) as Promise<AccessCheckResult>,
     onSuccess: (result) => {
       dispatch({ type: "SUBMIT_SUCCESS", result });
@@ -76,8 +73,12 @@ export const useAccessCheck = () => {
       lastParamsRef.current = params;
       dispatch({ type: "SCANNED", payload: params });
       mutation.mutate(params, options);
+
+      void multiChain.resolve(params.guildId, params.walletAddress).catch(() => {
+        // multiChain hook already stores per-chain errors.
+      });
     },
-    [mutation],
+    [mutation, multiChain],
   );
 
   const retry = useCallback(
@@ -89,8 +90,12 @@ export const useAccessCheck = () => {
 
       dispatch({ type: "SCANNED", payload: params });
       mutation.mutate(params, options);
+
+      void multiChain.resolve(params.guildId, params.walletAddress).catch(() => {
+        // multiChain hook already stores per-chain errors.
+      });
     },
-    [mutation],
+    [mutation, multiChain],
   );
 
   const reset = useCallback(() => {
@@ -112,5 +117,9 @@ export const useAccessCheck = () => {
     isError: mutation.isError,
     mutate: checkAccess,
     mutateAsync: mutation.mutateAsync,
+    perChainRoleEligibility: multiChain.perChain as PerChainRoleEligibilityResolution[],
+    isResolvingRoleEligibility: multiChain.isResolving,
+    roleEligibilityError: multiChain.error,
   };
 };
+

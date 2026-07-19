@@ -11,12 +11,14 @@ import { Button } from "../src/components/Button";
 import { WalletInput } from "../src/components/WalletInput";
 import { AccessStatusCard } from "../src/components/AccessStatusCard";
 import { LoadingState } from "../src/components/LoadingState";
-import { AccessHistoryList } from "../src/components/AccessHistoryList";
 import { areWalletAddressesEqual, validateAndNormalizeAddress } from "../src/lib/walletValidation";
 import { useAccessHistoryStore } from "../src/features/access/accessHistory.store";
 import { useNetworkStatus } from "../src/features/offline/useNetworkStatus";
 import { StaleDataBanner } from "../src/components/StaleDataBanner";
 import { ErrorState } from "../src/components/ErrorState";
+import { BiometricGate } from "../src/features/security/BiometricGate";
+import { useGuilds } from "../src/features/guilds/useGuilds";
+
 
 export default function AccessCheck() {
   const router = useRouter();
@@ -35,6 +37,8 @@ export default function AccessCheck() {
   const [resourceIdError, setResourceIdError] = useState<string | null>(null);
   const { isOffline } = useNetworkStatus();
 
+  const guilds = useGuilds();
+  const guildQuery = guilds.useGuild(guildId);
   const accessCheck = useAccessCheck();
   const {
     data: result,
@@ -43,15 +47,7 @@ export default function AccessCheck() {
     mutate: runAccessCheck,
     reset: resetAccessCheck,
   } = accessCheck;
-  const hydrateHistory = useAccessHistoryStore((state) => state.hydrate);
   const recordCheck = useAccessHistoryStore((state) => state.recordCheck);
-  const clearWalletHistory = useAccessHistoryStore((state) => state.clearWalletHistory);
-  const historyWallet = currentWallet || address;
-  const accessHistory = useAccessHistoryStore((state) => state.getHistoryForWallet(historyWallet));
-
-  useEffect(() => {
-    void hydrateHistory();
-  }, [hydrateHistory]);
 
   useEffect(() => {
     setAddress(currentWallet || "");
@@ -187,10 +183,20 @@ export default function AccessCheck() {
     resetAccessCheck();
     runAccessCheck(params, {
       onSuccess: (data) => {
-        void recordCheck({ ...params, result: data });
+        recordCheck({
+          ...params,
+          guildName: guildQuery.data?.name ?? params.guildId,
+          resourceName: params.resourceId,
+          result: data,
+        });
       },
       onError: (error) => {
-        void recordCheck({ ...params, error });
+        recordCheck({
+          ...params,
+          guildName: guildQuery.data?.name ?? params.guildId,
+          resourceName: params.resourceId,
+          error,
+        });
       },
     });
   };
@@ -317,37 +323,39 @@ export default function AccessCheck() {
 
         {isPending && <LoadingState message="Checking protocol permissions..." />}
 
-        {result && (
-          <View className="mb-12">
-            <AccessStatusCard
-              hasAccess={result.hasAccess}
-              reason={result.reason}
-              matchedRoles={result.matchedRoles}
-              requiredRoles={result.requiredRoles}
-            />
-          </View>
-        )}
+        {(result || error) && (
+          <BiometricGate
+            promptMessage="Authenticate to view access result"
+            onCancel={() => {
+              resetAccessCheck();
+            }}
+          >
+            {result && (
+              <View className="mb-12">
+                <AccessStatusCard
+                  hasAccess={result.hasAccess}
+                  reason={result.reason}
+                  matchedRoles={result.matchedRoles}
+                  requiredRoles={result.requiredRoles}
+                />
+              </View>
+            )}
 
-        {error && !result && (
-          <View className="mb-6">
-            <ErrorState
-              message={
-                isOffline
-                  ? "We couldn't complete the access check. Please check your connection and try again."
-                  : "Please verify your inputs and try again."
-              }
-              onRetry={handleRetryAccessCheck}
-              isRetrying={isPending}
-            />
-          </View>
+            {error && !result && (
+              <View className="mb-6">
+                <ErrorState
+                  message={
+                    isOffline
+                      ? "We couldn't complete the access check. Please check your connection and try again."
+                      : "Please verify your inputs and try again."
+                  }
+                  onRetry={handleRetryAccessCheck}
+                  isRetrying={isPending}
+                />
+              </View>
+            )}
+          </BiometricGate>
         )}
-
-        <AccessHistoryList
-          entries={accessHistory}
-          onClear={() => {
-            void clearWalletHistory(historyWallet);
-          }}
-        />
       </ScrollView>
     </View>
   );

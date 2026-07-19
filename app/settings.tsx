@@ -1,4 +1,4 @@
-import { View, Text, ScrollView } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity } from "react-native";
 import { useWallet } from "../src/features/wallet/useWallet";
 import { AppHeader } from "../src/components/AppHeader";
 import { Card } from "../src/components/Card";
@@ -6,11 +6,14 @@ import { Button } from "../src/components/Button";
 import { WalletRequired } from "../src/components/WalletRequired";
 import { appConfig } from "../src/config/appConfig";
 import { resetAppState } from "../src/lib/resetAppState";
+import { useBiometricStore } from "../src/features/security/biometric.store";
 import React, { useState } from "react";
 
 export default function Settings() {
   const { isConnected } = useWallet();
   const [isResetting, setIsResetting] = useState(false);
+  const biometricRequired = useBiometricStore((s) => s.biometricRequired);
+  const setBiometricRequired = useBiometricStore((s) => s.setBiometricRequired);
 
   const handleReset = async () => {
     setIsResetting(true);
@@ -49,6 +52,38 @@ export default function Settings() {
                 0.1.0-mvp
               </Text>
             </View>
+          </Card>
+
+          <Text className="text-lg font-bold text-text mb-3">Security</Text>
+          <Card className="mb-6">
+            <TouchableOpacity
+              className="flex-row justify-between items-center py-2"
+              onPress={() => setBiometricRequired(!biometricRequired)}
+              testID="settings-biometric-toggle"
+              accessibilityRole="switch"
+              accessibilityState={{ checked: biometricRequired }}
+            >
+              <View className="flex-1">
+                <Text className="text-text font-medium">
+                  Require Biometrics for Access Checks
+                </Text>
+                <Text className="text-text-muted text-sm mt-1">
+                  Use Face ID, Touch ID, or device passcode before scanning access QR codes or
+                  viewing check results.
+                </Text>
+              </View>
+              <View
+                className={`w-12 h-7 rounded-full ml-3 justify-center ${
+                  biometricRequired ? "bg-success" : "bg-border"
+                }`}
+              >
+                <View
+                  className={`w-5 h-5 rounded-full bg-white mx-0.5 ${
+                    biometricRequired ? "self-end" : "self-start"
+                  }`}
+                />
+              </View>
+            </TouchableOpacity>
           </Card>
 
           <Text className="text-lg font-bold text-text mb-3">Account</Text>

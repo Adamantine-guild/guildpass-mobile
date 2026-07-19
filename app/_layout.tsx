@@ -9,9 +9,11 @@ import { initSyncManager, triggerSync } from "../src/features/sync/syncManager";
 import { ErrorBoundary } from "../src/components/ErrorBoundary";
 import { SyncCorrectionOverlay } from "../src/components/SyncCorrectionOverlay";
 import { useSecurityInit } from "../src/features/security";
+import { initFocusManager } from "../src/lib/focusManager";
 
 initConnectivityService();
 initSyncManager();
+initFocusManager(queryClient);
 
 function SecurityInit() {
   useSecurityInit();
