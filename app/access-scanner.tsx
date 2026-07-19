@@ -1,3 +1,9 @@
+import { View, Text, ActivityIndicator, ScrollView, TouchableOpacity } from "react-native";
+import React, { useState, useEffect, useRef } from "react";
+import { useRouter } from "expo-router";
+import * as Clipboard from "expo-clipboard";
+import { CameraView, useCameraPermissions } from "expo-camera/next";
+import type { BarcodeScanningResult } from "expo-camera/next";
 import { View, Text, ActivityIndicator } from "react-native";
 import React, { useRef, useState } from "react";
 import { useRouter } from "expo-router";
