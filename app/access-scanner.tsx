@@ -4,79 +4,57 @@ import { useRouter } from "expo-router";
 import * as Clipboard from "expo-clipboard";
 import { CameraView, useCameraPermissions } from "expo-camera/next";
 import type { BarcodeScanningResult } from "expo-camera/next";
+import { View, Text, ActivityIndicator } from "react-native";
+import React, { useRef, useState } from "react";
+import { useRouter } from "expo-router";
+import { CameraView, useCameraPermissions } from "expo-camera/next";
+import type { BarcodeScanningResult } from "expo-camera/next";
+import { CameraView, useCameraPermissions } from "expo-camera";
+import type { BarcodeScanningResult } from "expo-camera";
+import * as Linking from "expo-linking";
 import { AppHeader } from "../src/components/AppHeader";
 import { Button } from "../src/components/Button";
 import { Card } from "../src/components/Card";
-import { parseAccessQrPayload } from "../src/features/access/qrPayload";
-import { useAccessCheck } from "../src/features/access/useAccessCheck";
 import { verifyAndParseAccessQrPayload } from "../src/features/access/verifyQrPayload";
 import { QrSignatureError } from "../src/features/access/qrSignature";
+import { AccessHistoryList } from "../src/components/AccessHistoryList";
 import { useAccessHistoryStore } from "../src/features/access/accessHistory.store";
 
 export default function AccessScanner() {
   const router = useRouter();
   const [permission, requestPermission] = useCameraPermissions();
-  const { state, dispatch, startScan, checkAccess, reset } = useAccessCheck();
-  const [qrData, setQrData] = useState<string | null>(null);
-  
-  const scanInProgressRef = useRef(false);
-  const [isProcessingScan, setIsProcessingScan] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
-
-  const setLastDecodedPayload = useAccessHistoryStore((state) => state.setLastDecodedPayload);
-  const lastDecodedPayload = useAccessHistoryStore((state) => state.lastDecodedPayload);
-
-  // Kick off scanning when camera permission granted and we are idle
-  useEffect(() => {
-    if (permission?.granted && state.status === "idle") {
-      startScan();
-    }
-  }, [permission, state.status, startScan]);
-
-  // Navigate to result page on successful access check
-  useEffect(() => {
-    if (state.status === "success" && qrData) {
-      router.replace({ pathname: "/access-check", params: { qrPayload: qrData } });
-    }
-  }, [state.status, qrData, router]);
+  const [isProcessingScan, setIsProcessingScan] = useState(false);
+  const scanInProgressRef = useRef(false);
+  const entries = useAccessHistoryStore((state) => state.entries);
+  const clearHistory = useAccessHistoryStore((state) => state.clearHistory);
 
   const handleBarcodeScanned = async ({ data }: BarcodeScanningResult) => {
-    if (scanInProgressRef.current) return;
+    if (scanInProgressRef.current) {
+      return;
+    }
+
     scanInProgressRef.current = true;
     setIsProcessingScan(true);
     setScanError(null);
 
     try {
-      const parsed = await verifyAndParseAccessQrPayload(data);
-      setLastDecodedPayload(parsed);
-      setQrData(data);
-
-      const params = {
-        guildId: parsed.guildId,
-        resourceId: parsed.resourceId,
-        walletAddress: parsed.walletAddress ?? "",
-      };
-      checkAccess(params);
-      
-      router.replace({
-        pathname: "/access-check",
-        params: { qrPayload: data },
-      });
-    } catch (error) {
-      scanInProgressRef.current = false;
-      setIsProcessingScan(false);
-      const message =
-        error instanceof QrSignatureError
-          ? "QR code signature is invalid or missing."
-          : error instanceof Error
-            ? error.message
-            : "Unable to read QR payload.";
-      
-      setScanError(message);
-      if (dispatch) {
-        dispatch({ type: "SUBMIT_ERROR", error: message });
+      await verifyAndParseAccessQrPayload(data);
+      router.replace({ pathname: "/access-check", params: { qrPayload: data } });
+    } catch (scanError) {
+      if (scanError instanceof QrSignatureError) {
+        setScanError("QR code signature is invalid or missing.");
+      } else {
+        setScanError("Unable to read QR payload.");
       }
+      setIsProcessingScan(false);
     }
+  };
+
+  const handleScanAgain = () => {
+    scanInProgressRef.current = false;
+    setScanError(null);
+    setIsProcessingScan(false);
   };
 
   if (!permission) {
@@ -109,6 +87,16 @@ export default function AccessScanner() {
                 Camera permission was denied. Enable camera access in your device settings to scan
                 QR codes.
               </Text>
+              <>
+                <Text className="text-error mb-6">
+                  Camera permission was denied. Open Settings to enable camera access for GuildPass.
+                </Text>
+                <Button
+                  title="Open Settings"
+                  onPress={() => Linking.openSettings()}
+                  variant="outline"
+                />
+              </>
             )}
           </Card>
         </View>
@@ -116,8 +104,7 @@ export default function AccessScanner() {
     );
   }
 
-  // Loading / processing UI
-  if (state.status === "scanning" || state.status === "submitting" || isProcessingScan) {
+  if (isProcessingScan) {
     return (
       <View className="flex-1 bg-background justify-center items-center">
         <AppHeader title="Scan Access QR" showBack />
@@ -127,28 +114,21 @@ export default function AccessScanner() {
     );
   }
 
-  // Error UI
-  if (state.status === "error" || scanError) {
+  if (scanError) {
     return (
       <View className="flex-1 bg-background">
         <AppHeader title="Scan Access QR" showBack />
         <View className="flex-1 px-4 py-6">
           <Card className="border-error bg-error/5">
             <Text className="text-error font-bold">QR code rejected</Text>
-            <Text className="text-error/80 text-sm mt-1 mb-4">{scanError || state.error}</Text>
-            <Button title="Scan Again" onPress={() => {
-              scanInProgressRef.current = false;
-              setIsProcessingScan(false);
-              setScanError(null);
-              reset();
-            }} variant="outline" />
+            <Text className="text-error/80 text-sm mt-1 mb-4">{scanError}</Text>
+            <Button title="Scan Again" onPress={handleScanAgain} variant="outline" />
           </Card>
         </View>
       </View>
     );
   }
 
-  // Main scanner UI (idle state)
   return (
     <View className="flex-1 bg-background">
       <AppHeader title="Scan Access QR" showBack />
@@ -159,30 +139,15 @@ export default function AccessScanner() {
           onBarcodeScanned={handleBarcodeScanned}
           barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
         />
-        <View className="absolute left-4 right-4 bottom-8">
-          <Card>
+        <View className="absolute left-4 right-4 bottom-4">
+          <Card className="mb-4">
             <Text className="text-text font-medium text-center">
               Point your camera at a GuildPass access QR code.
             </Text>
           </Card>
+          <AccessHistoryList entries={entries} onClear={clearHistory} />
         </View>
       </View>
-      {__DEV__ && lastDecodedPayload && (
-        <View className="absolute bottom-10 left-4 right-4 bg-slate-900/95 p-4 rounded-xl border border-slate-700 shadow-lg z-50">
-          <Text className="text-white font-bold mb-2">Debug QR Payload</Text>
-          <ScrollView style={{ maxHeight: 150 }}>
-            <Text className="text-slate-300 font-mono text-xs">
-              {JSON.stringify(lastDecodedPayload, null, 2)}
-            </Text>
-          </ScrollView>
-          <TouchableOpacity
-            className="mt-4 bg-slate-700 py-2 rounded-lg items-center"
-            onPress={() => Clipboard.setStringAsync(JSON.stringify(lastDecodedPayload, null, 2))}
-          >
-            <Text className="text-white font-medium">Copiar</Text>
-          </TouchableOpacity>
-        </View>
-      )}
     </View>
   );
 }

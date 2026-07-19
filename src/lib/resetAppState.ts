@@ -8,7 +8,7 @@ import { useSyncStore } from "../features/sync/sync.store";
 export async function resetAppState(): Promise<void> {
   useWalletStore.getState().disconnect();
   await useSessionStore.getState().endSession();
-  await useAccessHistoryStore.getState().clearAllHistory();
+  useAccessHistoryStore.getState().clearHistory();
   useSyncStore.getState().clearSyncState();
   queryClient.clear();
   await asyncStoragePersister.removeClient();
