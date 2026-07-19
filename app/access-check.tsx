@@ -11,12 +11,12 @@ import { Button } from "../src/components/Button";
 import { WalletInput } from "../src/components/WalletInput";
 import { AccessStatusCard } from "../src/components/AccessStatusCard";
 import { LoadingState } from "../src/components/LoadingState";
-import { AccessHistoryList } from "../src/components/AccessHistoryList";
 import { areWalletAddressesEqual, validateAndNormalizeAddress } from "../src/lib/walletValidation";
 import { useAccessHistoryStore } from "../src/features/access/accessHistory.store";
 import { useNetworkStatus } from "../src/features/offline/useNetworkStatus";
 import { StaleDataBanner } from "../src/components/StaleDataBanner";
 import { BiometricGate } from "../src/features/security/BiometricGate";
+import { useGuilds } from "../src/features/guilds/useGuilds";
 
 export default function AccessCheck() {
   const router = useRouter();
@@ -35,6 +35,8 @@ export default function AccessCheck() {
   const [resourceIdError, setResourceIdError] = useState<string | null>(null);
   const { isOffline } = useNetworkStatus();
 
+  const guilds = useGuilds();
+  const guildQuery = guilds.useGuild(guildId);
   const accessCheck = useAccessCheck();
   const {
     data: result,
@@ -43,15 +45,7 @@ export default function AccessCheck() {
     mutate: runAccessCheck,
     reset: resetAccessCheck,
   } = accessCheck;
-  const hydrateHistory = useAccessHistoryStore((state) => state.hydrate);
   const recordCheck = useAccessHistoryStore((state) => state.recordCheck);
-  const clearWalletHistory = useAccessHistoryStore((state) => state.clearWalletHistory);
-  const historyWallet = currentWallet || address;
-  const accessHistory = useAccessHistoryStore((state) => state.getHistoryForWallet(historyWallet));
-
-  useEffect(() => {
-    void hydrateHistory();
-  }, [hydrateHistory]);
 
   useEffect(() => {
     setAddress(currentWallet || "");
@@ -152,18 +146,15 @@ export default function AccessCheck() {
   const handleCheck = () => {
     const trimmedGuildId = guildId.trim();
     const trimmedResourceId = resourceId.trim();
-    let hasError = false;
 
     if (!trimmedGuildId) {
       setGuildIdError("Guild ID is required");
-      hasError = true;
     } else {
       setGuildIdError(null);
     }
 
     if (!trimmedResourceId) {
       setResourceIdError("Resource ID is required");
-      hasError = true;
     } else {
       setResourceIdError(null);
     }
@@ -190,10 +181,20 @@ export default function AccessCheck() {
     resetAccessCheck();
     runAccessCheck(params, {
       onSuccess: (data) => {
-        void recordCheck({ ...params, result: data });
+        recordCheck({
+          ...params,
+          guildName: guildQuery.data?.name ?? params.guildId,
+          resourceName: params.resourceId,
+          result: data,
+        });
       },
       onError: (error) => {
-        void recordCheck({ ...params, error });
+        recordCheck({
+          ...params,
+          guildName: guildQuery.data?.name ?? params.guildId,
+          resourceName: params.resourceId,
+          error,
+        });
       },
     });
   };
@@ -344,13 +345,6 @@ export default function AccessCheck() {
             )}
           </BiometricGate>
         )}
-
-        <AccessHistoryList
-          entries={accessHistory}
-          onClear={() => {
-            void clearWalletHistory(historyWallet);
-          }}
-        />
       </ScrollView>
     </View>
   );
