@@ -1,17 +1,16 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import type { AccessCheckParams, AccessCheckResult } from "./useAccessCheck";
 
-export const ACCESS_HISTORY_STORAGE_KEY = "guildpass:access-history:v1";
-const MAX_HISTORY_PER_WALLET = 20;
+export const MAX_ACCESS_HISTORY_ENTRIES = 20;
 
 export type AccessHistoryStatus = "granted" | "denied" | "error";
 
 export type AccessHistoryEntry = {
   id: string;
-  walletAddress: string;
   guildId: string;
+  guildName: string;
   resourceId: string;
+  resourceName: string;
   status: AccessHistoryStatus;
   reason?: string;
   checkedAt: string;
@@ -19,113 +18,51 @@ export type AccessHistoryEntry = {
   requiredRoles: string[];
 };
 
-type RecordCheckInput = AccessCheckParams & {
+export type RecordCheckInput = Pick<AccessCheckParams, "guildId" | "resourceId"> & {
+  guildName?: string;
+  resourceName?: string;
   result?: AccessCheckResult;
   error?: unknown;
 };
 
 type AccessHistoryState = {
-  historyByWallet: Record<string, AccessHistoryEntry[]>;
-  hydrated: boolean;
-  hydrate: () => Promise<void>;
-  recordCheck: (input: RecordCheckInput) => Promise<void>;
-  clearWalletHistory: (walletAddress: string) => Promise<void>;
-  clearAllHistory: () => Promise<void>;
-  getHistoryForWallet: (walletAddress: string | null | undefined) => AccessHistoryEntry[];
-};
-
-const walletKey = (walletAddress: string | null | undefined) =>
-  walletAddress?.trim().toLowerCase() ?? "";
-
-const hasHistory = (historyByWallet: Record<string, AccessHistoryEntry[]>) =>
-  Object.values(historyByWallet).some((entries) => entries.length > 0);
-
-const persistHistory = async (historyByWallet: Record<string, AccessHistoryEntry[]>) => {
-  if (!hasHistory(historyByWallet)) {
-    await AsyncStorage.removeItem(ACCESS_HISTORY_STORAGE_KEY);
-    return;
-  }
-
-  await AsyncStorage.setItem(ACCESS_HISTORY_STORAGE_KEY, JSON.stringify(historyByWallet));
+  entries: AccessHistoryEntry[];
+  recordCheck: (input: RecordCheckInput) => void;
+  clearHistory: () => void;
 };
 
 const safeErrorReason = () => "Access check failed. Please try again.";
 
+const safeName = (value: string | undefined, fallback: string) => value?.trim() || fallback;
+let entrySequence = 0;
+
 export const useAccessHistoryStore = create<AccessHistoryState>((set, get) => ({
-  historyByWallet: {},
-  hydrated: false,
+  entries: [],
 
-  hydrate: async () => {
-    const rawHistory = await AsyncStorage.getItem(ACCESS_HISTORY_STORAGE_KEY);
-
-    if (!rawHistory) {
-      set({ historyByWallet: {}, hydrated: true });
-      return;
-    }
-
-    try {
-      const parsed = JSON.parse(rawHistory) as Record<string, AccessHistoryEntry[]>;
-      set({ historyByWallet: parsed, hydrated: true });
-    } catch {
-      await AsyncStorage.removeItem(ACCESS_HISTORY_STORAGE_KEY);
-      set({ historyByWallet: {}, hydrated: true });
-    }
-  },
-
-  recordCheck: async ({ walletAddress, guildId, resourceId, result, error }) => {
-    const key = walletKey(walletAddress);
-    if (!key) {
-      return;
-    }
-
+  recordCheck: ({ guildId, resourceId, guildName, resourceName, result }) => {
     const checkedAt = new Date().toISOString();
+    const status = result ? (result.hasAccess ? "granted" : "denied") : "error";
+
     const entry: AccessHistoryEntry = {
-      id: `${checkedAt}:${key}:${guildId}:${resourceId}`,
-      walletAddress: key,
+      id: `${checkedAt}:${guildId}:${resourceId}:${entrySequence}`,
       guildId,
+      guildName: safeName(guildName, guildId),
       resourceId,
-      status: result ? (result.hasAccess ? "granted" : "denied") : "error",
-      reason: result?.reason ?? (error ? safeErrorReason() : undefined),
+      resourceName: safeName(resourceName, resourceId),
+      status,
+      reason: status === "error" ? safeErrorReason() : result?.reason,
       checkedAt,
       matchedRoles: result?.matchedRoles ?? [],
       requiredRoles: result?.requiredRoles ?? [],
     };
 
-    const current = get().historyByWallet;
-    const nextForWallet = [entry, ...(current[key] ?? [])].slice(0, MAX_HISTORY_PER_WALLET);
-    const next = {
-      ...current,
-      [key]: nextForWallet,
-    };
+    entrySequence += 1;
 
-    set({ historyByWallet: next, hydrated: true });
-    await persistHistory(next);
+    const nextEntries = [entry, ...get().entries].slice(0, MAX_ACCESS_HISTORY_ENTRIES);
+    set({ entries: nextEntries });
   },
 
-  clearWalletHistory: async (walletAddress) => {
-    const key = walletKey(walletAddress);
-    if (!key) {
-      return;
-    }
-
-    const next = { ...get().historyByWallet };
-    delete next[key];
-
-    set({ historyByWallet: next, hydrated: true });
-    await persistHistory(next);
-  },
-
-  clearAllHistory: async () => {
-    set({ historyByWallet: {}, hydrated: true });
-    await AsyncStorage.removeItem(ACCESS_HISTORY_STORAGE_KEY);
-  },
-
-  getHistoryForWallet: (walletAddress) => {
-    const key = walletKey(walletAddress);
-    if (!key) {
-      return [];
-    }
-
-    return get().historyByWallet[key] ?? [];
+  clearHistory: () => {
+    set({ entries: [] });
   },
 }));

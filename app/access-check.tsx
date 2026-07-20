@@ -11,11 +11,14 @@ import { Button } from "../src/components/Button";
 import { WalletInput } from "../src/components/WalletInput";
 import { AccessStatusCard } from "../src/components/AccessStatusCard";
 import { LoadingState } from "../src/components/LoadingState";
-import { AccessHistoryList } from "../src/components/AccessHistoryList";
-import { validateAndNormalizeAddress } from "../src/lib/walletValidation";
+import { areWalletAddressesEqual, validateAndNormalizeAddress } from "../src/lib/walletValidation";
 import { useAccessHistoryStore } from "../src/features/access/accessHistory.store";
 import { useNetworkStatus } from "../src/features/offline/useNetworkStatus";
 import { StaleDataBanner } from "../src/components/StaleDataBanner";
+import { ErrorState } from "../src/components/ErrorState";
+import { BiometricGate } from "../src/features/security/BiometricGate";
+import { useGuilds } from "../src/features/guilds/useGuilds";
+
 
 export default function AccessCheck() {
   const router = useRouter();
@@ -26,11 +29,16 @@ export default function AccessCheck() {
   const [resourceId, setResourceId] = useState("");
   const [scanError, setScanError] = useState<string | null>(null);
   const [scannedPayload, setScannedPayload] = useState<ParsedAccessQrPayload | null>(null);
+  const [walletWarningDecision, setWalletWarningDecision] = useState<
+    "connected" | "scanned" | "dismissed" | null
+  >(null);
   const [addressError, setAddressError] = useState<string | null>(null);
   const [guildIdError, setGuildIdError] = useState<string | null>(null);
   const [resourceIdError, setResourceIdError] = useState<string | null>(null);
   const { isOffline } = useNetworkStatus();
 
+  const guilds = useGuilds();
+  const guildQuery = guilds.useGuild(guildId);
   const accessCheck = useAccessCheck();
   const {
     data: result,
@@ -39,18 +47,11 @@ export default function AccessCheck() {
     mutate: runAccessCheck,
     reset: resetAccessCheck,
   } = accessCheck;
-  const hydrateHistory = useAccessHistoryStore((state) => state.hydrate);
   const recordCheck = useAccessHistoryStore((state) => state.recordCheck);
-  const clearWalletHistory = useAccessHistoryStore((state) => state.clearWalletHistory);
-  const historyWallet = currentWallet || address;
-  const accessHistory = useAccessHistoryStore((state) => state.getHistoryForWallet(historyWallet));
-
-  useEffect(() => {
-    void hydrateHistory();
-  }, [hydrateHistory]);
 
   useEffect(() => {
     setAddress(currentWallet || "");
+    setWalletWarningDecision(null);
     setAddressError(null);
     resetAccessCheck();
   }, [currentWallet, resetAccessCheck]);
@@ -75,6 +76,7 @@ export default function AccessCheck() {
       setResourceId(parsedPayload.resourceId);
       setAddress(parsedPayload.walletAddress ?? currentWallet ?? "");
       setScannedPayload(parsedPayload);
+      setWalletWarningDecision(null);
       setScanError(null);
       setAddressError(null);
       resetAccessCheck();
@@ -87,6 +89,7 @@ export default function AccessCheck() {
 
   const handleAddressChange = (nextAddress: string) => {
     setAddress(nextAddress);
+    setWalletWarningDecision(null);
     setAddressError(null);
     resetCompletedCheck();
   };
@@ -103,30 +106,66 @@ export default function AccessCheck() {
     resetCompletedCheck();
   };
 
-  const handleCheck = () => {
-    const trimmedGuildId = guildId.trim();
-    const trimmedResourceId = resourceId.trim();
-    let hasError = false;
+  const handleUseConnectedWallet = () => {
+    if (currentWallet) {
+      setAddress(currentWallet);
+    }
+    setWalletWarningDecision("connected");
+    setAddressError(null);
+    resetCompletedCheck();
+  };
+
+  const handleContinueWithScannedWallet = () => {
+    if (scannedPayload?.walletAddress) {
+      setAddress(scannedPayload.walletAddress);
+    }
+    setWalletWarningDecision("scanned");
+    setAddressError(null);
+    resetCompletedCheck();
+  };
+
+  const handleDismissWalletWarning = () => {
+    setWalletWarningDecision("dismissed");
+    resetCompletedCheck();
+  };
+
+  const walletMismatchWarning = (() => {
+    if (!scannedPayload?.walletAddress || !currentWallet) {
+      return null;
+    }
+
+    if (walletWarningDecision !== null) {
+      return null;
+    }
+
+    if (areWalletAddressesEqual(currentWallet, scannedPayload.walletAddress)) {
+      return null;
+    }
+
+    return "This QR payload uses a different wallet address from your connected wallet. Review the wallet before continuing.";
+  })();
+
+  const submitAccessCheck = (nextAddress: string, nextGuildId: string, nextResourceId: string) => {
+    const trimmedGuildId = nextGuildId.trim();
+    const trimmedResourceId = nextResourceId.trim();
 
     if (!trimmedGuildId) {
       setGuildIdError("Guild ID is required");
-      hasError = true;
     } else {
       setGuildIdError(null);
     }
 
     if (!trimmedResourceId) {
       setResourceIdError("Resource ID is required");
-      hasError = true;
     } else {
       setResourceIdError(null);
     }
 
-    if (!address || !trimmedGuildId || !trimmedResourceId) {
+    if (!nextAddress || !trimmedGuildId || !trimmedResourceId) {
       return;
     }
 
-    const validation = validateAndNormalizeAddress(address);
+    const validation = validateAndNormalizeAddress(nextAddress);
     if (!validation.valid) {
       setAddressError(validation.error);
       resetAccessCheck();
@@ -144,12 +183,30 @@ export default function AccessCheck() {
     resetAccessCheck();
     runAccessCheck(params, {
       onSuccess: (data) => {
-        void recordCheck({ ...params, result: data });
+        recordCheck({
+          ...params,
+          guildName: guildQuery.data?.name ?? params.guildId,
+          resourceName: params.resourceId,
+          result: data,
+        });
       },
       onError: (error) => {
-        void recordCheck({ ...params, error });
+        recordCheck({
+          ...params,
+          guildName: guildQuery.data?.name ?? params.guildId,
+          resourceName: params.resourceId,
+          error,
+        });
       },
     });
+  };
+
+  const handleCheck = () => {
+    submitAccessCheck(address, guildId, resourceId);
+  };
+
+  const handleRetryAccessCheck = () => {
+    submitAccessCheck(address, guildId, resourceId);
   };
 
   return (
@@ -218,6 +275,32 @@ export default function AccessCheck() {
           </Card>
         )}
 
+        {walletMismatchWarning && (
+          <Card
+            className="mb-6 border-primary/30 bg-primary/5"
+            accessibilityRole="alert"
+            accessibilityLabel="Wallet address mismatch warning. This QR payload uses a different wallet address from your connected wallet."
+          >
+            <Text className="text-primary font-bold">Wallet address mismatch</Text>
+            <Text className="text-text text-sm mt-2">{walletMismatchWarning}</Text>
+            <View className="mt-4">
+              <Button
+                title="Use connected wallet"
+                onPress={handleUseConnectedWallet}
+                variant="outline"
+                className="mb-2"
+              />
+              <Button
+                title="Continue with scanned wallet"
+                onPress={handleContinueWithScannedWallet}
+                variant="primary"
+                className="mb-2"
+              />
+              <Button title="Cancel" onPress={handleDismissWalletWarning} variant="secondary" />
+            </View>
+          </Card>
+        )}
+
         {scannedPayload && !scanError && (
           <Card className="mb-6 border-success/30">
             <Text className="text-success font-bold mb-3">Scanned access details</Text>
@@ -240,36 +323,39 @@ export default function AccessCheck() {
 
         {isPending && <LoadingState message="Checking protocol permissions..." />}
 
-        {result && (
-          <View className="mb-12">
-            <AccessStatusCard
-              hasAccess={result.hasAccess}
-              reason={result.reason}
-              matchedRoles={result.matchedRoles}
-              requiredRoles={result.requiredRoles}
-            />
-          </View>
-        )}
-
-        {error && !result && (
-          <Card
-            className="border-error bg-error/5"
-            accessibilityRole="alert"
-            accessibilityLabel="Error checking access. Please verify your inputs and try again."
+        {(result || error) && (
+          <BiometricGate
+            promptMessage="Authenticate to view access result"
+            onCancel={() => {
+              resetAccessCheck();
+            }}
           >
-            <Text className="text-error font-bold">Error checking access</Text>
-            <Text className="text-error/80 text-sm mt-1">
-              Please verify your inputs and try again.
-            </Text>
-          </Card>
-        )}
+            {result && (
+              <View className="mb-12">
+                <AccessStatusCard
+                  hasAccess={result.hasAccess}
+                  reason={result.reason}
+                  matchedRoles={result.matchedRoles}
+                  requiredRoles={result.requiredRoles}
+                />
+              </View>
+            )}
 
-        <AccessHistoryList
-          entries={accessHistory}
-          onClear={() => {
-            void clearWalletHistory(historyWallet);
-          }}
-        />
+            {error && !result && (
+              <View className="mb-6">
+                <ErrorState
+                  message={
+                    isOffline
+                      ? "We couldn't complete the access check. Please check your connection and try again."
+                      : "Please verify your inputs and try again."
+                  }
+                  onRetry={handleRetryAccessCheck}
+                  isRetrying={isPending}
+                />
+              </View>
+            )}
+          </BiometricGate>
+        )}
       </ScrollView>
     </View>
   );

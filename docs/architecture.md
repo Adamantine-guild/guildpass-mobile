@@ -34,6 +34,11 @@ The `src/features/` directory is organized by domain:
 - `guilds/`: API wrappers and hooks for guild metadata.
 - `membership/`: Hooks for checking user-specific membership data.
 - `access/`: Logic for the access check protocol.
+- `network/`: NetInfo-backed connectivity service and network store.
+- `offline/`: Hooks for network status and stale-cache indicators.
+- `sync/`: Offline-first sync engine — reconciles cached entities against
+  server state on reconnect with a server-authoritative conflict policy and
+  visible correction notices (see `docs/sync-engine.md`).
 
 Each feature typically contains:
 

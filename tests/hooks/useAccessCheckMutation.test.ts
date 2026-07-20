@@ -73,4 +73,38 @@ describe("useAccessCheck mutation flow", () => {
     expect(guildPassClientMock.checkAccess).toHaveBeenCalledTimes(1);
     expect(guildPassClientMock.checkAccess).toHaveBeenCalledWith(ACCESS_CHECK_PARAMS);
   });
+
+  it("uses the access-check mutation key", async () => {
+    const queryClient = new QueryClient();
+    let mutation: ReturnType<typeof useAccessCheck> | null = null;
+
+    const HookHarness = () => {
+      mutation = useAccessCheck();
+      return null;
+    };
+
+    act(() => {
+      TestRenderer.create(
+        React.createElement(
+          QueryClientProvider,
+          { client: queryClient },
+          React.createElement(HookHarness),
+        ),
+      );
+    });
+
+    const renderedMutation = mutation as NonNullable<ReturnType<typeof useAccessCheck>> | null;
+
+    if (!renderedMutation) {
+      throw new Error("Hook did not render");
+    }
+
+    await act(async () => {
+      await renderedMutation.mutateAsync(ACCESS_CHECK_PARAMS);
+    });
+
+    expect(queryClient.getMutationCache().getAll()[0]?.options.mutationKey).toStrictEqual([
+      "access-check",
+    ]);
+  });
 });

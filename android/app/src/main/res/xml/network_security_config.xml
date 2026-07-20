@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  GuildPass Mobile — Network Security Configuration
+  Generated: 2026-07-18
+  See docs/pin-rotation-runbook.md for certificate pin rotation procedure.
+  See docs/threat-model.md for scope and limitations.
+-->
+<network-security-config>
+    <!-- GuildPass API — Production -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">api.guildpass.xyz</domain>
+        <pin-set expiration="2027-07-18">
+            <pin digest="SHA-256">REPLACE_WITH_ACTUAL_SPKI_SHA256_BASE64</pin>
+            <pin digest="SHA-256">REPLACE_WITH_ACTUAL_BACKUP_SPKI_SHA256_BASE64</pin>
+        </pin-set>
+    </domain-config>
+
+    <!-- GuildPass API — Staging -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">staging.guildpass.xyz</domain>
+        <pin-set expiration="2027-07-18">
+            <pin digest="SHA-256">REPLACE_WITH_ACTUAL_SPKI_SHA256_BASE64</pin>
+            <pin digest="SHA-256">REPLACE_WITH_ACTUAL_BACKUP_SPKI_SHA256_BASE64</pin>
+        </pin-set>
+    </domain-config>
+
+    <!-- Default: disallow cleartext for all other domains -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

@@ -8,7 +8,26 @@ declare module "@guildpass/sdk" {
     constructor(options: GuildPassClientOptions);
     guilds: {
       getGuild(params: { guildId: string }): Promise<any>;
-      getGuildConfig(params: { guildId: string }): Promise<any>;
+      getGuildConfig(params: { guildId: string }): Promise<{
+        guildId: string;
+        requiredRoles?: string[];
+        accessPolicy?: "any" | "all";
+        /** Hex-encoded secp256k1 public key used to sign QR access payloads (legacy static key). */
+        issuerPublicKey?: string;
+        /** Map or array of versioned issuer public keys identified by key ID (kid). */
+        issuerKeys?:
+          | Record<string, string>
+          | Array<{ kid: string; publicKey: string; status?: "active" | "revoked" }>;
+        /** List of revoked key IDs for this guild. */
+        revokedKids?: string[];
+        /** Optional per-requirement chain IDs for multi-chain guilds. */
+        requirements?: Array<{
+          id: string;
+          name?: string;
+          chainId: number;
+        }>;
+        [key: string]: unknown;
+      }>;
     };
     roles: {
       getRoles(params: { guildId: string }): Promise<any>;
