@@ -11,6 +11,8 @@ import { WalletInput } from "../src/components/WalletInput";
 import { Button } from "../src/components/Button";
 import { StaleDataBanner } from "../src/components/StaleDataBanner";
 import { useNetworkStatus } from "../src/features/offline/useNetworkStatus";
+import { useMembership } from "../src/features/membership/useMembership";
+import { useStaleQuery } from "../src/features/offline/useStaleQuery";
 
 const CONNECTION_LABELS: Record<string, string> = {
   walletconnect: "WalletConnect",
@@ -65,11 +67,19 @@ export default function Profile() {
     await disconnect();
   };
 
+  const { useMembershipsQuery } = useMembership(walletAddress);
+  const membershipsQuery = useMembershipsQuery();
+  const staleState = useStaleQuery(membershipsQuery);
+
   return (
     <View className="flex-1 bg-background" testID="profile-screen">
       <AppHeader title="Profile" />
       <ScrollView className="flex-1 px-4 py-6">
-        {isOffline ? <StaleDataBanner reason="offline" /> : null}
+        {staleState.isOffline ? (
+          <StaleDataBanner reason="offline" lastSyncedAt={staleState.lastSyncedAt} />
+        ) : staleState.isStale && staleState.reason ? (
+          <StaleDataBanner reason={staleState.reason} lastSyncedAt={staleState.lastSyncedAt} />
+        ) : null}
         {!isConnected ? (
           <View testID="wallet-connect-form">
             <Text className="text-2xl font-bold text-text mb-2">Connect Wallet</Text>

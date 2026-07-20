@@ -11,6 +11,8 @@ import { WalletRequired } from "../src/components/WalletRequired";
 import { useDebouncedValue } from "../src/lib/useDebouncedValue";
 import React, { useState, useMemo } from "react";
 import { useMembership } from "../src/features/membership/useMembership";
+import { StaleDataBanner } from "../src/components/StaleDataBanner";
+import { useStaleQuery } from "../src/features/offline/useStaleQuery";
 
 type Membership = {
   id: string;
@@ -23,7 +25,9 @@ export default function Guilds() {
   const router = useRouter();
   const { walletAddress, disconnect } = useWallet();
   const { useMembershipsQuery } = useMembership(walletAddress);
-  const { data: memberships, isLoading, error } = useMembershipsQuery();
+  const membershipsQuery = useMembershipsQuery();
+  const { data: memberships, isLoading, error } = membershipsQuery;
+  const staleState = useStaleQuery(membershipsQuery);
 
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedQuery = useDebouncedValue(searchQuery, 300);
@@ -51,11 +55,14 @@ export default function Guilds() {
     );
   }
 
-  if (error) {
+  if (error && !memberships) {
     return (
       <WalletRequired>
         <View className="flex-1 bg-background" testID="guilds-screen">
           <AppHeader title="My Guilds" showBack />
+          {staleState.isOffline ? (
+            <StaleDataBanner reason="offline" lastSyncedAt={staleState.lastSyncedAt} />
+          ) : null}
           <ErrorState message="Failed to load memberships" />
         </View>
       </WalletRequired>
@@ -67,6 +74,9 @@ export default function Guilds() {
       <WalletRequired>
         <View className="flex-1 bg-background" testID="guilds-screen">
           <AppHeader title="My Guilds" showBack />
+          {staleState.isOffline ? (
+            <StaleDataBanner reason="offline" lastSyncedAt={staleState.lastSyncedAt} />
+          ) : null}
           <EmptyMembershipsState onConnectDifferentWallet={handleConnectDifferentWallet} />
         </View>
       </WalletRequired>
@@ -77,6 +87,25 @@ export default function Guilds() {
     <WalletRequired>
       <View className="flex-1 bg-background" testID="guilds-screen">
         <AppHeader title="My Guilds" showBack />
+        <FlatList
+          data={memberships}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={{ padding: 16 }}
+          testID="guilds-list"
+          ListHeaderComponent={
+            staleState.isOffline ? (
+              <StaleDataBanner reason="offline" lastSyncedAt={staleState.lastSyncedAt} />
+            ) : staleState.isStale && staleState.reason ? (
+              <StaleDataBanner reason={staleState.reason} lastSyncedAt={staleState.lastSyncedAt} />
+            ) : null
+          }
+          renderItem={({ item }) => (
+            <GuildCard
+              name={item.name}
+              id={item.id}
+              isActive={item.isActive}
+              roleCount={item.roleCount}
+              onPress={() => router.push(`/guilds/${item.id}`)}
         {/* Search Input */}
         <View className="px-4 pt-2 pb-1">
           <View className="flex-row items-center bg-white rounded-xl px-4 py-3 border border-border">
