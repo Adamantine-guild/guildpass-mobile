@@ -280,6 +280,41 @@ describe("AccessScanner", () => {
     });
   });
 
+  it("automatically re-arms the scanner guard after a scan error", async () => {
+    mockCameraPermission(createPermissionResponse(true, true));
+    verifyAndParseAccessQrPayloadMock
+      .mockRejectedValueOnce(new Error("first error"))
+      .mockResolvedValueOnce({
+        guildId: "guild-alpha",
+        resourceId: "vip-door",
+        walletAddress: "0xabc",
+        expiresAt: "2099-01-01T00:00:00.000Z",
+      });
+
+    TestRenderer.create(<AccessScanner />);
+
+    const getCameraProps = () => {
+      const props = cameraViewMock.mock.calls.at(-1)?.[0];
+      if (!props) throw new Error("CameraView did not render");
+      return props;
+    };
+
+    // First scan → error
+    await act(async () => {
+      await getCameraProps().onBarcodeScanned?.({ data: "bad" });
+    });
+
+    // Guard should be reset after error — invoke handler directly on same ref
+    await act(async () => {
+      await getCameraProps().onBarcodeScanned?.({ data: "good" });
+    });
+
+    expect(routerMocks.replace).toHaveBeenCalledWith({
+      pathname: "/access-check",
+      params: { qrPayload: "good" },
+    });
+  });
+
   it("clears the in-memory history", () => {
     mockCameraPermission(createPermissionResponse(true, true));
     useAccessHistoryStore.setState({
