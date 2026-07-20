@@ -49,6 +49,11 @@ describe("parseAccessQrPayload edge cases", () => {
       input: JSON.stringify({ ...basePayload, expiresAt: "2026-07-18T23:59:59.000Z" }),
       expectedError: "QR code has expired.",
     },
+    {
+      name: "Invalid nonce (blank string)",
+      input: JSON.stringify({ ...basePayload, nonce: "   " }),
+      expectedError: "QR code contains an invalid nonce.",
+    },
   ])("should reject case: $name", ({ input, expectedError }) => {
     expect(() => parseAccessQrPayload(input, mockNow)).toThrowError(expectedError);
   });
@@ -61,5 +66,13 @@ describe("parseAccessQrPayload edge cases", () => {
       walletAddress: "0x1234567890123456789012345678901234567890",
       expiresAt: "2026-07-20T00:00:00.000Z",
     });
+  });
+
+  it("should parse a valid nonce through to the result", () => {
+    const result = parseAccessQrPayload(
+      JSON.stringify({ ...basePayload, nonce: "nonce-abc-123" }),
+      mockNow,
+    );
+    expect(result.nonce).toBe("nonce-abc-123");
   });
 });

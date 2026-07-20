@@ -11,6 +11,7 @@ import { Button } from "../src/components/Button";
 import { Card } from "../src/components/Card";
 import { verifyAndParseAccessQrPayload } from "../src/features/access/verifyQrPayload";
 import { QrSignatureError } from "../src/features/access/qrSignature";
+import { QrPayloadError, QR_PAYLOAD_ERROR_CODES } from "../src/features/access/qrPayload";
 import { AccessHistoryList } from "../src/components/AccessHistoryList";
 import { useAccessHistoryStore } from "../src/features/access/accessHistory.store";
 
@@ -38,6 +39,11 @@ export default function AccessScanner() {
     } catch (scanError) {
       if (scanError instanceof QrSignatureError) {
         setScanError("QR code signature is invalid or missing.");
+      } else if (
+        scanError instanceof QrPayloadError &&
+        scanError.code === QR_PAYLOAD_ERROR_CODES.ALREADY_USED
+      ) {
+        setScanError("This QR code has already been used.");
       } else {
         setScanError("Unable to read QR payload.");
       }

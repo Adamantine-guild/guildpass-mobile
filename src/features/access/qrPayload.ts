@@ -19,6 +19,8 @@ export const QR_PAYLOAD_ERROR_CODES = {
   INVALID_EXPIRATION: "QR_PAYLOAD_INVALID_EXPIRATION",
   EXPIRED: "QR_PAYLOAD_EXPIRED",
   INVALID_SIGNATURE: "QR_PAYLOAD_INVALID_SIGNATURE",
+  INVALID_NONCE: "QR_PAYLOAD_INVALID_NONCE",
+  ALREADY_USED: "QR_PAYLOAD_ALREADY_USED",
 } as const;
 
 export type QrPayloadErrorCode =
@@ -47,6 +49,14 @@ export type AccessQrPayload = {
    * published issuer public key. Optional during the migration window.
    */
   signature?: string;
+  /**
+   * Unique per-issuance identifier used for client-side replay protection
+   * (see qrReplayGuard.ts). A payload photographed or screen-recorded before
+   * `expiresAt` carries the same nonce on every reuse, so a second
+   * presentation of it is rejected as already-used. Optional during the
+   * migration window until the issuer backend mints one for every payload.
+   */
+  nonce?: string;
 };
 
 export type ParsedAccessQrPayload = {
@@ -54,6 +64,7 @@ export type ParsedAccessQrPayload = {
   resourceId: string;
   walletAddress?: string;
   expiresAt?: string;
+  nonce?: string;
 };
 
 const ETHEREUM_ADDRESS_PATTERN = /^0x[a-fA-F0-9]{40}$/;
@@ -163,6 +174,16 @@ export const parseAccessQrPayload = (
     );
   }
 
+  // Nonce is optional at the structural layer for the same migration-window
+  // reason as signature above; replay enforcement in verifyAndParseAccessQrPayload
+  // only runs when a payload actually carries one.
+  if (decodedPayload.nonce !== undefined && !isNonEmptyString(decodedPayload.nonce)) {
+    throw new QrPayloadError(
+      QR_PAYLOAD_ERROR_CODES.INVALID_NONCE,
+      "QR code contains an invalid nonce.",
+    );
+  }
+
   return {
     guildId: decodedPayload.guildId.trim(),
     resourceId: decodedPayload.resourceId.trim(),
@@ -170,5 +191,6 @@ export const parseAccessQrPayload = (
       ? decodedPayload.walletAddress
       : undefined,
     expiresAt: isNonEmptyString(decodedPayload.expiresAt) ? decodedPayload.expiresAt : undefined,
+    nonce: isNonEmptyString(decodedPayload.nonce) ? decodedPayload.nonce : undefined,
   };
 };
