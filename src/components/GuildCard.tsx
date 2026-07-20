@@ -1,6 +1,7 @@
 import { View, Text, TouchableOpacity } from "react-native";
 import React from "react";
 import { Card } from "./Card";
+import { RoleBadge } from "./RoleBadge";
 
 type GuildCardProps = {
   name: string;
@@ -30,8 +31,11 @@ export const GuildCard = ({ name, id, isActive, roleCount, onPress }: GuildCardP
           </View>
         </View>
         <Text className="text-text-muted text-sm mb-4">ID: {id}</Text>
-        <View className="flex-row items-center">
-          <Text className="text-primary font-semibold">{roleCount} Roles</Text>
+        <View className="flex-row items-center flex-wrap">
+          <RoleBadge
+            name={`${roleCount} ${roleCount === 1 ? "Role" : "Roles"}`}
+            tier={isActive ? "premium" : "default"}
+          />
           <Text className="text-text-muted mx-2">•</Text>
           <Text className="text-text-muted">Tap to view details</Text>
         </View>

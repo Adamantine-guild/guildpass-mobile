@@ -56,6 +56,22 @@ function makeQueryClient() {
   });
 }
 
+// Import the error class after mocks are registered
+import { GuildNotFoundError } from "../../src/features/guilds/useGuilds";
+
+// ---------------------------------------------------------------------------
+// GuildNotFoundError
+// ---------------------------------------------------------------------------
+
+describe("GuildNotFoundError", () => {
+  it("extends Error and has the correct name and message", () => {
+    const error = new GuildNotFoundError("guild_404");
+    expect(error).toBeInstanceOf(Error);
+    expect(error.name).toBe("GuildNotFoundError");
+    expect(error.message).toMatch(/guild_404/);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // getGuild
 // ---------------------------------------------------------------------------
@@ -112,6 +128,44 @@ describe("useGuilds – getGuild", () => {
     // We assert the shape here as documentation – the hook test file uses this
     // same key shape; any change to the hook must also update this expectation.
     expect(expectedQueryKey).toStrictEqual(["guild", "guild_abc"]);
+  });
+
+  it("surfaces GuildNotFoundError when the SDK responds with 'Guild not found'", async () => {
+    const guildId = "nonexistent";
+    sdk.guilds.getGuild.mockRejectedValueOnce(new Error("Guild not found"));
+
+    // Simulate the queryFn wrapping used by the hook
+    const queryFn = async () => {
+      try {
+        return await guildPassClient.guilds.getGuild({ guildId });
+      } catch (error) {
+        if (error instanceof Error && /not found/i.test(error.message)) {
+          throw new GuildNotFoundError(guildId);
+        }
+        throw error;
+      }
+    };
+
+    await expect(queryFn()).rejects.toThrow(GuildNotFoundError);
+  });
+
+  it("preserves generic SDK errors (e.g. network failures) unchanged", async () => {
+    const guildId = "guild_abc";
+    const networkError = new Error("Network request failed");
+    sdk.guilds.getGuild.mockRejectedValueOnce(networkError);
+
+    const queryFn = async () => {
+      try {
+        return await guildPassClient.guilds.getGuild({ guildId });
+      } catch (error) {
+        if (error instanceof Error && /not found/i.test(error.message)) {
+          throw new GuildNotFoundError(guildId);
+        }
+        throw error;
+      }
+    };
+
+    await expect(queryFn()).rejects.toThrow("Network request failed");
   });
 
   it("does not call the SDK when guildId is an empty string (enabled guard)", async () => {

@@ -3,8 +3,10 @@ import React, { useState } from "react";
 import { useRouter } from "expo-router";
 import { useWallet } from "../src/features/wallet/useWallet";
 import { useWalletConnectModal } from "../src/features/wallet/WalletConnectProvider";
+import { useWalletStore } from "../src/features/wallet/wallet.store";
 import { AppHeader } from "../src/components/AppHeader";
 import { Card } from "../src/components/Card";
+import { AddressChip } from "../src/components/AddressChip";
 import { WalletInput } from "../src/components/WalletInput";
 import { Button } from "../src/components/Button";
 import { StaleDataBanner } from "../src/components/StaleDataBanner";
@@ -35,6 +37,11 @@ export default function Profile() {
       await open();
       // The WalletConnectBridge in WalletConnectProvider syncs the connected
       // address into Zustand + starts the session automatically.
+      // Give the bridge a tick to process before checking the store.
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      if (!useWalletStore.getState().isConnected) {
+        setError("Connection cancelled or rejected.");
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to open WalletConnect");
     } finally {
@@ -146,13 +153,11 @@ export default function Profile() {
                 CONNECTED WALLET
                 {connectionKind ? ` · ${CONNECTION_LABELS[connectionKind] ?? connectionKind}` : ""}
               </Text>
-              <Text
-                className="text-lg font-bold text-text mb-4"
-                numberOfLines={1}
-                testID="connected-wallet-address"
-              >
-                {walletAddress}
-              </Text>
+              <View className="mb-4">
+                {walletAddress ? (
+                  <AddressChip address={walletAddress} testID="connected-wallet-address" />
+                ) : null}
+              </View>
               <Button
                 title="Disconnect"
                 onPress={handleDisconnect}

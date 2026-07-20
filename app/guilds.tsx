@@ -1,7 +1,6 @@
 import { View, FlatList, TextInput, TouchableOpacity, Text } from "react-native";
 import { useRouter } from "expo-router";
 import { useWallet } from "../src/features/wallet/useWallet";
-import { useMembership } from "../src/features/membership/useMembership";
 import { AppHeader } from "../src/components/AppHeader";
 import { GuildCard } from "../src/components/GuildCard";
 import { LoadingState } from "../src/components/LoadingState";
@@ -11,6 +10,7 @@ import { EmptyState } from "../src/components/EmptyState";
 import { WalletRequired } from "../src/components/WalletRequired";
 import { useDebouncedValue } from "../src/lib/useDebouncedValue";
 import React, { useState, useMemo } from "react";
+import { useMembership } from "../src/features/membership/useMembership";
 
 type Membership = {
   id: string;

@@ -32,6 +32,12 @@ vi.mock("expo-secure-store", () => ({
   ALWAYS_THIS_DEVICE_ONLY: "ALWAYS_THIS_DEVICE_ONLY",
 }));
 
+// Mock expo-clipboard
+vi.mock("expo-clipboard", () => ({
+  setStringAsync: vi.fn(async () => true),
+  getStringAsync: vi.fn(async () => ""),
+}));
+
 // Mock expo-sqlite (avoids typeof import issues with Vite/Rollup)
 vi.mock("expo-sqlite", () => {
   const noop = () => {

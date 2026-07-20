@@ -14,6 +14,12 @@ declare module "@guildpass/sdk" {
         accessPolicy?: "any" | "all";
         /** Hex-encoded secp256k1 public key used to sign QR access payloads. */
         issuerPublicKey?: string;
+        /** Optional per-requirement chain IDs for multi-chain guilds. */
+        requirements?: Array<{
+          id: string;
+          name?: string;
+          chainId: number;
+        }>;
         [key: string]: unknown;
       }>;
     };
