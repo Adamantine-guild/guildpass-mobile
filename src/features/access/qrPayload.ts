@@ -20,6 +20,7 @@ export const QR_PAYLOAD_ERROR_CODES = {
   EXPIRED: "QR_PAYLOAD_EXPIRED",
   INVALID_SIGNATURE: "QR_PAYLOAD_INVALID_SIGNATURE",
   INVALID_NONCE: "QR_PAYLOAD_INVALID_NONCE",
+  INVALID_KID: "QR_PAYLOAD_INVALID_KID",
   ALREADY_USED: "QR_PAYLOAD_ALREADY_USED",
 } as const;
 
@@ -44,6 +45,10 @@ export type AccessQrPayload = {
   walletAddress?: string;
   expiresAt?: string;
   /**
+   * Key ID (kid) indicating which versioned issuer public key was used to sign the payload.
+   */
+  kid?: string;
+  /**
    * DER-encoded, hex-secp256k1 signature over the canonical signing message
    * (see qrSignature.buildSigningMessage). Verified against the guild's
    * published issuer public key. Optional during the migration window.
@@ -64,6 +69,7 @@ export type ParsedAccessQrPayload = {
   resourceId: string;
   walletAddress?: string;
   expiresAt?: string;
+  kid?: string;
   nonce?: string;
 };
 
@@ -184,6 +190,13 @@ export const parseAccessQrPayload = (
     );
   }
 
+  if (decodedPayload.kid !== undefined && !isNonEmptyString(decodedPayload.kid)) {
+    throw new QrPayloadError(
+      QR_PAYLOAD_ERROR_CODES.INVALID_KID,
+      "QR code contains an invalid key ID.",
+    );
+  }
+
   return {
     guildId: decodedPayload.guildId.trim(),
     resourceId: decodedPayload.resourceId.trim(),
@@ -191,6 +204,7 @@ export const parseAccessQrPayload = (
       ? decodedPayload.walletAddress
       : undefined,
     expiresAt: isNonEmptyString(decodedPayload.expiresAt) ? decodedPayload.expiresAt : undefined,
+    kid: isNonEmptyString(decodedPayload.kid) ? decodedPayload.kid.trim() : undefined,
     nonce: isNonEmptyString(decodedPayload.nonce) ? decodedPayload.nonce : undefined,
   };
 };

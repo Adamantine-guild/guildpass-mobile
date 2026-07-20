@@ -26,10 +26,10 @@ This repository is a React Native / Expo mobile application.
 - Authentication or access-gate bypass via deep links or URL schemes
 - Insecure storage of sensitive user data on device
 - Man-in-the-middle vulnerabilities in API calls to guildpass-core
-- **Forged access QR codes** — QR payloads are signed by the guild issuer and
-  verified client-side against the guild's published `issuerPublicKey`
-  (secp256k1 + keccak256 ECDSA). A QR without a valid signature must be
-  rejected. See `docs/qr-signature-verification.md`.
+- **Forged or revoked access QR codes** — QR payloads are signed by the guild issuer using
+  secp256k1 + keccak256 ECDSA and carrying a Key ID (`kid`). Payloads are verified client-side
+  against the guild's published key registry, supporting concurrent key versions (rotation overlap)
+  and rejecting revoked key IDs. See `docs/qr-key-rotation-protocol.md` and `docs/qr-signature-verification.md`.
 - XSS-equivalent attacks via WebView components (if used)
 - Root/jailbreak detection bypass
 - Certificate pinning bypass
@@ -140,10 +140,12 @@ GuildPass Mobile implements a defense-in-depth security hardening layer:
 | **Device Integrity** | Best-effort root/jailbreak detection with configurable response (warn vs. block) | [Source](./src/features/security/deviceIntegrity.ts) |
 | **Certificate Pinning** | TLS public-key pinning for all traffic to GuildPass API domains | [Source](./src/features/security/certificatePinning.ts) |
 | **Secure Fetch** | Fetch wrapper enforcing domain validation and device integrity gates | [Source](./src/lib/secureFetch.ts) |
+| **QR Key Rotation** | Versioned secp256k1 key verification with revocation list checks & bounded TTL | [Source](./src/features/access/guildIssuerKey.ts) |
 
 ### Supporting Documentation
 
 - **[Threat Model](./docs/threat-model.md)** — scopes what the hardening does and does not protect against
+- **[QR Key Rotation Protocol](./docs/qr-key-rotation-protocol.md)** — protocol specification and threat model for key rotation & revocation
 - **[Pin Rotation Runbook](./docs/pin-rotation-runbook.md)** — procedure for rotating TLS certificate pins without bricking connectivity
 
 ### Security Architecture

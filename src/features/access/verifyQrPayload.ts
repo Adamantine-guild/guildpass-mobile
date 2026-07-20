@@ -49,7 +49,7 @@ export const verifyAndParseAccessQrPayload = async (
     const signature =
       isRecord(decoded) && typeof decoded.signature === "string" ? decoded.signature : undefined;
 
-    const issuerPublicKey = await getGuildIssuerPublicKey(parsed.guildId);
+    const issuerPublicKey = await getGuildIssuerPublicKey(parsed.guildId, parsed.kid, now);
 
     verifyQrSignature(
       {
@@ -57,6 +57,7 @@ export const verifyAndParseAccessQrPayload = async (
         resourceId: parsed.resourceId,
         walletAddress: parsed.walletAddress,
         expiresAt: parsed.expiresAt,
+        kid: parsed.kid,
       },
       signature ?? "",
       issuerPublicKey,
