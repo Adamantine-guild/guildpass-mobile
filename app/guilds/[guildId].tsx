@@ -10,6 +10,7 @@ import { ErrorState } from "../../src/components/ErrorState";
 import { GuildNotFoundState } from "../../src/components/GuildNotFoundState";
 import { Card } from "../../src/components/Card";
 import { RoleBadge } from "../../src/components/RoleBadge";
+import { AddressChip } from "../../src/components/AddressChip";
 import { RequirementCard, getChainDisplayName, isKnownChainId } from "../../src/components/RequirementCard";
 import { StaleDataBanner } from "../../src/components/StaleDataBanner";
 import { WalletRequired } from "../../src/components/WalletRequired";
@@ -125,11 +126,9 @@ export default function GuildDetail() {
                 </Text>
 
                 <View className="border-t border-border pt-4">
-                  <View className="flex-row justify-between mb-2">
+                  <View className="flex-row justify-between items-center mb-2">
                     <Text className="text-text-muted">Owner</Text>
-                    <Text className="text-text font-medium" numberOfLines={1} testID="guild-owner">
-                      {guild.ownerAddress.substring(0, 6)}...{guild.ownerAddress.substring(38)}
-                    </Text>
+                    <AddressChip address={guild.ownerAddress} testID="guild-owner" />
                   </View>
                   <View className="flex-row justify-between">
                     <Text className="text-text-muted">Chain ID</Text>
