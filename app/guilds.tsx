@@ -9,12 +9,16 @@ import { EmptyMembershipsState } from "../src/components/EmptyMembershipsState";
 import { WalletRequired } from "../src/components/WalletRequired";
 import React from "react";
 import { useMembership } from "../src/features/membership/useMembership";
+import { StaleDataBanner } from "../src/components/StaleDataBanner";
+import { useStaleQuery } from "../src/features/offline/useStaleQuery";
 
 export default function Guilds() {
   const router = useRouter();
   const { walletAddress, disconnect } = useWallet();
   const { useMembershipsQuery } = useMembership(walletAddress);
-  const { data: memberships, isLoading, error } = useMembershipsQuery();
+  const membershipsQuery = useMembershipsQuery();
+  const { data: memberships, isLoading, error } = membershipsQuery;
+  const staleState = useStaleQuery(membershipsQuery);
 
   const handleConnectDifferentWallet = async () => {
     await disconnect();
@@ -32,11 +36,14 @@ export default function Guilds() {
     );
   }
 
-  if (error) {
+  if (error && !memberships) {
     return (
       <WalletRequired>
         <View className="flex-1 bg-background" testID="guilds-screen">
           <AppHeader title="My Guilds" showBack />
+          {staleState.isOffline ? (
+            <StaleDataBanner reason="offline" lastSyncedAt={staleState.lastSyncedAt} />
+          ) : null}
           <ErrorState message="Failed to load memberships" />
         </View>
       </WalletRequired>
@@ -48,6 +55,9 @@ export default function Guilds() {
       <WalletRequired>
         <View className="flex-1 bg-background" testID="guilds-screen">
           <AppHeader title="My Guilds" showBack />
+          {staleState.isOffline ? (
+            <StaleDataBanner reason="offline" lastSyncedAt={staleState.lastSyncedAt} />
+          ) : null}
           <EmptyMembershipsState onConnectDifferentWallet={handleConnectDifferentWallet} />
         </View>
       </WalletRequired>
@@ -63,6 +73,13 @@ export default function Guilds() {
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ padding: 16 }}
           testID="guilds-list"
+          ListHeaderComponent={
+            staleState.isOffline ? (
+              <StaleDataBanner reason="offline" lastSyncedAt={staleState.lastSyncedAt} />
+            ) : staleState.isStale && staleState.reason ? (
+              <StaleDataBanner reason={staleState.reason} lastSyncedAt={staleState.lastSyncedAt} />
+            ) : null
+          }
           renderItem={({ item }) => (
             <GuildCard
               name={item.name}
