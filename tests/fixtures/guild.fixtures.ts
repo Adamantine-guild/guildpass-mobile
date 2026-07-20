@@ -40,11 +40,29 @@ export type GuildConfigFixture = {
 // and a matching published public key. Never used outside tests.
 // ---------------------------------------------------------------------------
 
+import { ec as EC } from "elliptic";
+
+const ec = new EC("secp256k1");
+
 export const TEST_ISSUER_PRIVATE_KEY =
   "541e96dcbd902e0d8e6e12a9805fcb0a6563c445e4779f81c8aeadae14197ac4";
 
 export const TEST_ISSUER_PUBLIC_KEY =
   "043531a2fb8dd43af42b386c706b45aa03191fb518fc309b62bf5ed976806187b4a05f2157cac94457dfb72cc37cff021a544b03b2f99049097c2f45e7e81527de";
+
+export const TEST_ISSUER_PRIVATE_KEY_V2 =
+  "c87509a1c067bbde78beb793e6fa76530b6382a4c0241e5e4a9ec0a0f44dc0d3";
+
+export const TEST_ISSUER_PUBLIC_KEY_V2 = ec
+  .keyFromPrivate(TEST_ISSUER_PRIVATE_KEY_V2, "hex")
+  .getPublic(false, "hex");
+
+export const TEST_REVOKED_PRIVATE_KEY =
+  "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
+
+export const TEST_REVOKED_PUBLIC_KEY = ec
+  .keyFromPrivate(TEST_REVOKED_PRIVATE_KEY, "hex")
+  .getPublic(false, "hex");
 
 export type RoleFixture = {
   id: string;
