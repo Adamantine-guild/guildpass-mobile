@@ -1,9 +1,13 @@
-import { View, Text, SafeAreaView, Image } from "react-native";
+import { View, Text, SafeAreaView } from "react-native";
+import { useState } from "react";
 import { useRouter } from "expo-router";
 import { Button } from "../src/components/Button";
+import { EmbeddedWalletOnboarding } from "../src/features/wallet/EmbeddedWalletOnboarding";
+import { isEmbeddedWalletEnabled } from "../src/features/wallet/EmbeddedWalletProvider";
 
 export default function Onboarding() {
   const router = useRouter();
+  const [showEmbeddedWallet, setShowEmbeddedWallet] = useState(false);
 
   return (
     <SafeAreaView className="flex-1 bg-white" testID="onboarding-screen">
@@ -21,18 +25,34 @@ export default function Onboarding() {
         </View>
 
         <View className="space-y-4">
-          <View className="bg-background p-4 rounded-2xl mb-8">
-            <Text className="text-text font-semibold mb-2 text-center">MVP Preview Mode</Text>
-            <Text className="text-text-muted text-sm text-center">
-              you can manually enter any wallet address to explore guild memberships.
-            </Text>
-          </View>
-
-          <Button
-            title="Get Started"
-            onPress={() => router.push("/profile")}
-            testID="onboarding-get-started-button"
-          />
+          {showEmbeddedWallet && isEmbeddedWalletEnabled ? (
+            <EmbeddedWalletOnboarding
+              onComplete={() => router.replace("/profile")}
+              onBack={() => setShowEmbeddedWallet(false)}
+            />
+          ) : (
+            <>
+              <Text className="text-text font-semibold text-center">How would you like to continue?</Text>
+              {isEmbeddedWalletEnabled ? (
+                <Button
+                  title="Get started without a wallet"
+                  onPress={() => setShowEmbeddedWallet(true)}
+                  testID="onboarding-embedded-wallet-button"
+                />
+              ) : null}
+              <Button
+                title="I have a wallet"
+                variant={isEmbeddedWalletEnabled ? "outline" : "primary"}
+                onPress={() => router.push("/profile")}
+                testID="onboarding-get-started-button"
+              />
+              {!isEmbeddedWalletEnabled ? (
+                <Text className="text-text-muted text-sm text-center">
+                  You can connect an existing wallet or enter an address manually.
+                </Text>
+              ) : null}
+            </>
+          )}
         </View>
       </View>
     </SafeAreaView>

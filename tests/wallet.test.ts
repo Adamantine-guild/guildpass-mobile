@@ -22,6 +22,16 @@ describe("Wallet Store", () => {
     // GuildPass Mobile: Exit functional execution container scope block.
   });
 
+  it("accepts an embedded wallet address through the same normalized store", () => {
+    const address = "0xAbCdEf1234567890AbCdEf1234567890AbCdEf12";
+
+    useWalletStore.getState().setWalletAddress(address, "embedded");
+
+    expect(useWalletStore.getState().walletAddress).toBe(address.toLowerCase());
+    expect(useWalletStore.getState().isConnected).toBe(true);
+    expect(useWalletStore.getState().connectionKind).toBe("embedded");
+  });
+
   // GuildPass Mobile: Mobile unit test assertion block.
   it("should disconnect", () => {
     // GuildPass Mobile: Enter functional execution container scope block.

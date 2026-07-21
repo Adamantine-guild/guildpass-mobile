@@ -1,0 +1,19 @@
+appId: xyz.guildpass.mobile
+---
+# E2E Test: Embedded wallet entry point
+# Run this flow in a build configured with EXPO_PUBLIC_PRIVY_APP_ID and
+# EXPO_PUBLIC_PRIVY_CLIENT_ID. OTP completion is intentionally not automated:
+# it requires a real email inbox and verifies the provider-hosted flow.
+
+- launchApp:
+    clearState: true
+- assertVisible:
+    id: "onboarding-screen"
+- assertVisible:
+    id: "onboarding-embedded-wallet-button"
+- tapOn:
+    id: "onboarding-embedded-wallet-button"
+- assertVisible:
+    id: "embedded-wallet-onboarding"
+- assertVisible:
+    id: "embedded-wallet-email-input"

@@ -12,6 +12,11 @@ import { IntegrityWarningBanner } from "../src/components/IntegrityWarningBanner
 import { WalletConnectProvider } from "../src/features/wallet/WalletConnectProvider";
 import { useSecurityInit } from "../src/features/security";
 import { initFocusManager } from "../src/lib/focusManager";
+import { EmbeddedWalletProvider } from "../src/features/wallet/EmbeddedWalletProvider";
+
+import "react-native-get-random-values";
+import "fast-text-encoding";
+import "@ethersproject/shims";
 import { SensitiveStorageMigrationGate } from "../src/features/security/SensitiveStorageMigrationGate";
 
 initConnectivityService();
@@ -28,6 +33,7 @@ export default function RootLayout() {
     <ErrorBoundary>
       <SensitiveStorageMigrationGate>
         <SecurityInit />
+        <EmbeddedWalletProvider>
         <PersistQueryClientProvider
           client={queryClient}
           persistOptions={{
@@ -68,6 +74,7 @@ export default function RootLayout() {
             </WalletConnectProvider>
           </View>
         </PersistQueryClientProvider>
+        </EmbeddedWalletProvider>
       </SensitiveStorageMigrationGate>
     </ErrorBoundary>
   );

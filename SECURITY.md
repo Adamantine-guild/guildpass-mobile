@@ -124,6 +124,31 @@ Encrypting and decrypting the offline cache is bounded by the
 - `src/lib/encryptedPersister.ts` — TanStack Query persister wrapper and migration
 - `src/lib/queryPersister.ts` — wired into the app's `PersistQueryClientProvider`
 
+## Embedded wallet custody review
+
+Social/email onboarding uses Privy's embedded Ethereum wallet SDK. Privy is
+the wallet custody/MPC provider: GuildPass never receives, stores, exports, or
+logs a private key, recovery share, OTP, or OAuth credential. GuildPass stores
+only the public EVM address in `wallet-storage`, exactly as it does for an
+externally connected wallet.
+
+- The `EXPO_PUBLIC_PRIVY_APP_ID` and `EXPO_PUBLIC_PRIVY_CLIENT_ID` values are
+  publishable identifiers, not server secrets. Privy API secrets must stay in
+  server-side secret management and must never be added to Expo `extra` values.
+- Enable only the required login methods and configured redirect origins in the
+  Privy dashboard. Require verified email/OAuth through the provider before a
+  wallet address reaches GuildPass state.
+- Embedded-wallet transaction/signature requests remain user-authorized via the
+  provider. This release does not add automatic signing, server signers, or
+  recovery/export functionality.
+- Treat a compromised device or authenticated provider session as able to act
+  through the embedded wallet. Keep device integrity checks, OS lock, and
+  provider MFA/recovery policy enabled; test logout, account recovery, and
+  session revocation before production rollout.
+- Wallet ownership is not membership authorization. Every guild and access
+  request still uses the existing server-side membership/access checks for the
+  normalized address.
+
 ## Wallet and Session Storage
 
 Wallet-linked state and authentication state are never persisted in plaintext AsyncStorage.

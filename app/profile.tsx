@@ -20,6 +20,7 @@ const CONNECTION_LABELS: Record<string, string> = {
   manual: "Manual Entry",
   coinbase: "Coinbase Wallet",
   metamask: "MetaMask",
+  embedded: "Embedded Wallet",
 };
 
 export default function Profile() {
