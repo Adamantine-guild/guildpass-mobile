@@ -17,6 +17,8 @@ const ConfigSchema = z.object({
   chainId: z.coerce.number().finite("EXPO_PUBLIC_CHAIN_ID must be a finite number"),
   appEnv: AppEnvSchema,
   walletConnectProjectId: z.string().optional(),
+  privyAppId: z.string().min(1).optional(),
+  privyClientId: z.string().min(1).optional(),
   // When ON, QR payloads without a valid signature are rejected. During the
   // migration window this stays OFF so legacy unsigned payloads keep working.
   qrSignatureVerification: FeatureFlagSchema,
@@ -35,6 +37,9 @@ function loadConfig(): AppConfig {
     walletConnectProjectId:
       Constants.expoConfig?.extra?.walletConnectProjectId ??
       process.env.EXPO_PUBLIC_WALLET_CONNECT_PROJECT_ID,
+    privyAppId: Constants.expoConfig?.extra?.privyAppId ?? process.env.EXPO_PUBLIC_PRIVY_APP_ID,
+    privyClientId:
+      Constants.expoConfig?.extra?.privyClientId ?? process.env.EXPO_PUBLIC_PRIVY_CLIENT_ID,
     qrSignatureVerification:
       Constants.expoConfig?.extra?.qrSignatureVerification ??
       process.env.EXPO_PUBLIC_QR_SIGNATURE_VERIFICATION,

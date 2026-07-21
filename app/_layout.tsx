@@ -10,6 +10,11 @@ import { ErrorBoundary } from "../src/components/ErrorBoundary";
 import { SyncCorrectionOverlay } from "../src/components/SyncCorrectionOverlay";
 import { useSecurityInit } from "../src/features/security";
 import { initFocusManager } from "../src/lib/focusManager";
+import { EmbeddedWalletProvider } from "../src/features/wallet/EmbeddedWalletProvider";
+
+import "react-native-get-random-values";
+import "fast-text-encoding";
+import "@ethersproject/shims";
 
 initConnectivityService();
 initSyncManager();
@@ -24,43 +29,45 @@ export default function RootLayout() {
   return (
     <ErrorBoundary>
       <SecurityInit />
-      <PersistQueryClientProvider
-        client={queryClient}
-        persistOptions={{
-          persister: asyncStoragePersister,
-          maxAge: QUERY_GC_TIME_MS,
-          dehydrateOptions: {
-            shouldDehydrateQuery: (query) =>
-              query.state.status === "success" && isPersistableQuery(query.queryKey),
-          },
-        }}
-        onSuccess={() => {
-          // The persisted cache is only fully restored now; reconcile it so a
-          // device that reopens online (after being offline) still corrects
-          // stale grants instead of waiting for the next reconnect event.
-          void triggerSync();
-        }}
-      >
-        <View className="flex-1 bg-background">
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: "#f8fafc" },
-            }}
-          >
-            <Stack.Screen name="index" />
-            <Stack.Screen name="onboarding" />
-            <Stack.Screen name="profile" />
-            <Stack.Screen name="guilds" />
-            <Stack.Screen name="guilds/[guildId]" />
-            <Stack.Screen name="access-check" />
-            <Stack.Screen name="access-scanner" />
-            <Stack.Screen name="settings" />
-            <Stack.Screen name="deep-link-error" />
-          </Stack>
-          <SyncCorrectionOverlay />
-        </View>
-      </PersistQueryClientProvider>
+      <EmbeddedWalletProvider>
+        <PersistQueryClientProvider
+          client={queryClient}
+          persistOptions={{
+            persister: asyncStoragePersister,
+            maxAge: QUERY_GC_TIME_MS,
+            dehydrateOptions: {
+              shouldDehydrateQuery: (query) =>
+                query.state.status === "success" && isPersistableQuery(query.queryKey),
+            },
+          }}
+          onSuccess={() => {
+            // The persisted cache is only fully restored now; reconcile it so a
+            // device that reopens online (after being offline) still corrects
+            // stale grants instead of waiting for the next reconnect event.
+            void triggerSync();
+          }}
+        >
+          <View className="flex-1 bg-background">
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: "#f8fafc" },
+              }}
+            >
+              <Stack.Screen name="index" />
+              <Stack.Screen name="onboarding" />
+              <Stack.Screen name="profile" />
+              <Stack.Screen name="guilds" />
+              <Stack.Screen name="guilds/[guildId]" />
+              <Stack.Screen name="access-check" />
+              <Stack.Screen name="access-scanner" />
+              <Stack.Screen name="settings" />
+              <Stack.Screen name="deep-link-error" />
+            </Stack>
+            <SyncCorrectionOverlay />
+          </View>
+        </PersistQueryClientProvider>
+      </EmbeddedWalletProvider>
     </ErrorBoundary>
   );
 }

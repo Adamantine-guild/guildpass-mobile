@@ -42,6 +42,13 @@ This directory contains end-to-end tests for GuildPass Mobile using [Maestro](ht
 - ✅ Confirms app returns to disconnected state
 - **File**: `06-reset-app-state.yaml`
 
+### 08. Social/email embedded wallet entry
+- âœ… Verifies the configured social/email onboarding branch and its email input
+- **File**: `08-embedded-wallet-entry.yaml`
+- **Note**: Run this flow explicitly against a development build configured with
+  `EXPO_PUBLIC_PRIVY_APP_ID` and `EXPO_PUBLIC_PRIVY_CLIENT_ID`. It is excluded
+  from the default suite because OTP sign-in requires a real provider account.
+
 ## Prerequisites
 
 ### Install Maestro

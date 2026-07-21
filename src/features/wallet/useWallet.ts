@@ -14,9 +14,11 @@ import { useSyncStore } from "../sync/sync.store";
 export const useWallet = (): {
   walletAddress: string | null;
   isConnected: boolean;
-  connectionKind: "manual" | "walletconnect" | "coinbase" | "metamask" | null;
+  connectionKind: "manual" | "walletconnect" | "embedded" | "coinbase" | "metamask" | null;
   isHydrated: boolean;
   connectManually: (address: string) => { success: boolean; error?: string };
+  /** Store an EVM address created by an embedded wallet provider. */
+  connectEmbeddedWallet: (address: string) => Promise<{ success: boolean; error?: string }>;
   connectWithConnector: (connector: WalletConnector) => Promise<{ success: boolean; error?: string }>;
   /** Connect using WalletConnect — requires the WC provider from useWalletConnectModal */
   connectWalletConnect: (provider: {
@@ -40,6 +42,18 @@ export const useWallet = (): {
     if (!result.valid) return { success: false, error: result.error };
     setWalletAddress(result.address, "manual");
     void startSession(result.address!);
+    return { success: true };
+  };
+
+  const connectEmbeddedWallet = async (
+    address: string,
+  ): Promise<{ success: boolean; error?: string }> => {
+    const result = validateAndNormalizeAddress(address);
+    if (!result.valid) return { success: false, error: result.error };
+    // This intentionally writes to the normal wallet store. Downstream code
+    // only sees a validated EVM address, never provider-specific user data.
+    setWalletAddress(result.address, "embedded");
+    await startSession(result.address!);
     return { success: true };
   };
 
@@ -94,6 +108,7 @@ export const useWallet = (): {
     connectionKind,
     isHydrated,
     connectManually,
+    connectEmbeddedWallet,
     connectWithConnector,
     connectWalletConnect,
     disconnect,

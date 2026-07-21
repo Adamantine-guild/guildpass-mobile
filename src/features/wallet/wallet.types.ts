@@ -1,4 +1,15 @@
-export type WalletConnectionKind = "manual" | "walletconnect" | "coinbase" | "metamask" | null;
+/**
+ * `embedded` is an EVM address provisioned by the configured embedded-wallet
+ * provider. It deliberately uses the same address/session path as external
+ * wallets so membership and access checks remain provider-agnostic.
+ */
+export type WalletConnectionKind =
+  | "manual"
+  | "walletconnect"
+  | "embedded"
+  | "coinbase"
+  | "metamask"
+  | null;
 
 export type WalletState = {
   walletAddress: string | null;
