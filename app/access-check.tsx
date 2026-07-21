@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useWallet } from "../src/features/wallet/useWallet";
 import { useAccessCheck } from "../src/features/access/useAccessCheck";
+import { useCountdown } from "../src/features/access/useCountdown";
 import type { ParsedAccessQrPayload } from "../src/features/access/qrPayload";
 import { parseAccessQrPayload } from "../src/features/access/qrPayload";
 import { AppHeader } from "../src/components/AppHeader";
@@ -18,7 +19,6 @@ import { StaleDataBanner } from "../src/components/StaleDataBanner";
 import { ErrorState } from "../src/components/ErrorState";
 import { BiometricGate } from "../src/features/security/BiometricGate";
 import { useGuilds } from "../src/features/guilds/useGuilds";
-
 
 export default function AccessCheck() {
   const router = useRouter();
@@ -36,6 +36,7 @@ export default function AccessCheck() {
   const [guildIdError, setGuildIdError] = useState<string | null>(null);
   const [resourceIdError, setResourceIdError] = useState<string | null>(null);
   const { isOffline } = useNetworkStatus();
+  const countdown = useCountdown(scannedPayload?.expiresAt);
 
   const guilds = useGuilds();
   const guildQuery = guilds.useGuild(guildId);
@@ -146,6 +147,10 @@ export default function AccessCheck() {
   })();
 
   const submitAccessCheck = (nextAddress: string, nextGuildId: string, nextResourceId: string) => {
+    if (countdown.isExpired) {
+      return;
+    }
+
     const trimmedGuildId = nextGuildId.trim();
     const trimmedResourceId = nextResourceId.trim();
 
@@ -264,7 +269,16 @@ export default function AccessCheck() {
             onPress={handleCheck}
             className="mt-6"
             loading={isPending}
-            disabled={!address || !guildId.trim() || !resourceId.trim() || !!addressError || !!guildIdError || !!resourceIdError || isOffline}
+            disabled={
+              !address ||
+              !guildId.trim() ||
+              !resourceId.trim() ||
+              !!addressError ||
+              !!guildIdError ||
+              !!resourceIdError ||
+              isOffline ||
+              countdown.isExpired
+            }
           />
         </Card>
 
@@ -302,8 +316,26 @@ export default function AccessCheck() {
         )}
 
         {scannedPayload && !scanError && (
-          <Card className="mb-6 border-success/30">
-            <Text className="text-success font-bold mb-3">Scanned access details</Text>
+          <Card
+            className={`mb-6 ${
+              countdown.isExpired
+                ? "border-error bg-error/5"
+                : countdown.isExpiringSoon
+                  ? "border-amber-400 bg-amber-50"
+                  : "border-success/30"
+            }`}
+          >
+            <Text
+              className={`font-bold mb-3 ${
+                countdown.isExpired
+                  ? "text-error"
+                  : countdown.isExpiringSoon
+                    ? "text-amber-700"
+                    : "text-success"
+              }`}
+            >
+              {countdown.isExpired ? "Scanned access expired" : "Scanned access details"}
+            </Text>
             <View className="flex-row justify-between py-1">
               <Text className="text-text-muted">Guild ID</Text>
               <Text className="text-text font-medium">{scannedPayload.guildId}</Text>
@@ -313,9 +345,24 @@ export default function AccessCheck() {
               <Text className="text-text font-medium">{scannedPayload.resourceId}</Text>
             </View>
             {scannedPayload.expiresAt && (
-              <View className="flex-row justify-between py-1">
-                <Text className="text-text-muted">Expires</Text>
-                <Text className="text-text font-medium">{scannedPayload.expiresAt}</Text>
+              <View
+                className="flex-row justify-between py-1"
+                accessibilityLiveRegion={countdown.isExpired ? "assertive" : "none"}
+                accessibilityRole={countdown.isExpired ? "alert" : undefined}
+              >
+                <Text className="text-text-muted">Validity</Text>
+                <Text
+                  className={`font-medium ${
+                    countdown.isExpired
+                      ? "text-error"
+                      : countdown.isExpiringSoon
+                        ? "text-amber-700"
+                        : "text-text"
+                  }`}
+                  testID="access-expiration-countdown"
+                >
+                  {countdown.label}
+                </Text>
               </View>
             )}
           </Card>
@@ -330,7 +377,21 @@ export default function AccessCheck() {
               resetAccessCheck();
             }}
           >
-            {result && (
+            {countdown.isExpired && scannedPayload?.expiresAt && (
+              <Card className="mb-12 border-2 border-error bg-error/5" accessibilityRole="alert">
+                <View className="items-center">
+                  <View className="w-16 h-16 rounded-full items-center justify-center mb-4 bg-error">
+                    <Text className="text-white text-3xl">!</Text>
+                  </View>
+                  <Text className="text-2xl font-bold text-error">Expired</Text>
+                  <Text className="text-text-muted mt-2 text-center">
+                    This access result is no longer valid. Scan a new QR code to continue.
+                  </Text>
+                </View>
+              </Card>
+            )}
+
+            {result && !countdown.isExpired && (
               <View className="mb-12">
                 <AccessStatusCard
                   hasAccess={result.hasAccess}
@@ -341,7 +402,7 @@ export default function AccessCheck() {
               </View>
             )}
 
-            {error && !result && (
+            {error && !result && !countdown.isExpired && (
               <View className="mb-6">
                 <ErrorState
                   message={
