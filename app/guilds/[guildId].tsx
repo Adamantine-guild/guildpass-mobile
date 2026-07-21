@@ -1,14 +1,16 @@
 import { View, Text, ScrollView } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { useWallet } from "../../src/features/wallet/useWallet";
-import { useGuilds } from "../../src/features/guilds/useGuilds";
+import { useGuilds, GuildNotFoundError } from "../../src/features/guilds/useGuilds";
 import { useMembership } from "../../src/features/membership/useMembership";
 import { AppHeader } from "../../src/components/AppHeader";
 import { LoadingState } from "../../src/components/LoadingState";
 import { GuildDetailSkeleton } from "../../src/components/GuildDetailSkeleton";
 import { ErrorState } from "../../src/components/ErrorState";
+import { GuildNotFoundState } from "../../src/components/GuildNotFoundState";
 import { Card } from "../../src/components/Card";
 import { RoleBadge } from "../../src/components/RoleBadge";
+import { AddressChip } from "../../src/components/AddressChip";
 import { RequirementCard, getChainDisplayName, isKnownChainId } from "../../src/components/RequirementCard";
 import { StaleDataBanner } from "../../src/components/StaleDataBanner";
 import { WalletRequired } from "../../src/components/WalletRequired";
@@ -79,6 +81,8 @@ export default function GuildDetail() {
           <ErrorState message="Invalid guild ID provided" />
         ) : showSkeleton ? (
           <GuildDetailSkeleton />
+        ) : guildError instanceof GuildNotFoundError ? (
+          <GuildNotFoundState />
         ) : guildError && !guild ? (
           <ErrorState
             message={
@@ -122,11 +126,9 @@ export default function GuildDetail() {
                 </Text>
 
                 <View className="border-t border-border pt-4">
-                  <View className="flex-row justify-between mb-2">
+                  <View className="flex-row justify-between items-center mb-2">
                     <Text className="text-text-muted">Owner</Text>
-                    <Text className="text-text font-medium" numberOfLines={1} testID="guild-owner">
-                      {guild.ownerAddress.substring(0, 6)}...{guild.ownerAddress.substring(38)}
-                    </Text>
+                    <AddressChip address={guild.ownerAddress} testID="guild-owner" />
                   </View>
                   <View className="flex-row justify-between">
                     <Text className="text-text-muted">Chain ID</Text>

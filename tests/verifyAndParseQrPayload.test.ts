@@ -1,10 +1,12 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { QrSignatureError } from "../src/features/access/qrSignature";
+import { QrPayloadError, QR_PAYLOAD_ERROR_CODES } from "../src/features/access/qrPayload";
 import {
   clearIssuerKeyCache,
   getGuildIssuerPublicKey,
 } from "../src/features/access/guildIssuerKey";
 import { verifyAndParseAccessQrPayload } from "../src/features/access/verifyQrPayload";
+import { clearNonceCache } from "../src/features/access/qrReplayGuard";
 import { GUILD_CONFIG_FIXTURE } from "./fixtures/guild.fixtures";
 import {
   buildSignedQrPayloadString,
@@ -40,6 +42,7 @@ const validFields = {
 
 beforeEach(() => {
   clearIssuerKeyCache();
+  clearNonceCache();
   mockGetGuildConfig.mockReset();
   mockGetGuildConfig.mockResolvedValue(GUILD_CONFIG_FIXTURE);
   flagState.qrSignatureVerification = false;
@@ -106,6 +109,65 @@ describe("verifyAndParseAccessQrPayload", () => {
     const tampered = JSON.stringify(signed);
     await expect(verifyAndParseAccessQrPayload(tampered, now)).rejects.toMatchObject({
       code: "QR_SIGNATURE_VERIFICATION_FAILED",
+    });
+  });
+
+  it("accepts a payload with a nonce seen for the first time", async () => {
+    const withNonce = JSON.stringify({
+      type: "guildpass.access-check",
+      version: 1,
+      guildId: "guild_abc",
+      resourceId: "vip-door",
+      expiresAt: "2026-06-23T12:05:00.000Z",
+      nonce: "nonce-first-use",
+    });
+    const parsed = await verifyAndParseAccessQrPayload(withNonce, now);
+    expect(parsed.nonce).toBe("nonce-first-use");
+  });
+
+  it("rejects a replayed payload (same nonce presented twice) as already used", async () => {
+    const withNonce = JSON.stringify({
+      type: "guildpass.access-check",
+      version: 1,
+      guildId: "guild_abc",
+      resourceId: "vip-door",
+      expiresAt: "2026-06-23T12:05:00.000Z",
+      nonce: "nonce-replayed",
+    });
+
+    await verifyAndParseAccessQrPayload(withNonce, now);
+
+    await expect(verifyAndParseAccessQrPayload(withNonce, now)).rejects.toMatchObject({
+      code: QR_PAYLOAD_ERROR_CODES.ALREADY_USED,
+    });
+    await expect(verifyAndParseAccessQrPayload(withNonce, now)).rejects.toBeInstanceOf(
+      QrPayloadError,
+    );
+  });
+
+  it("allows two different payloads with distinct nonces", async () => {
+    const first = JSON.stringify({
+      type: "guildpass.access-check",
+      version: 1,
+      guildId: "guild_abc",
+      resourceId: "vip-door",
+      expiresAt: "2026-06-23T12:05:00.000Z",
+      nonce: "nonce-a",
+    });
+    const second = JSON.stringify({
+      type: "guildpass.access-check",
+      version: 1,
+      guildId: "guild_abc",
+      resourceId: "vip-door",
+      expiresAt: "2026-06-23T12:05:00.000Z",
+      nonce: "nonce-b",
+    });
+
+    await expect(verifyAndParseAccessQrPayload(first, now)).resolves.toMatchObject({
+      nonce: "nonce-a",
+    });
+    await expect(verifyAndParseAccessQrPayload(second, now)).resolves.toMatchObject({
+      nonce: "nonce-b",
     });
   });
 });

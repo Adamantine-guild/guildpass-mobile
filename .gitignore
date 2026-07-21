@@ -11,3 +11,15 @@ yarn-error.log*
 # Maestro E2E test results and recordings
 test-results/
 *.mp4
+
+# Excluded files
+AGENTS.md
+update-test.js
+update-test.mjs
+temp/
+
+# Lock files
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+bun.lock

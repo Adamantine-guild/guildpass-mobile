@@ -36,6 +36,10 @@ export const QR_SIGNATURE_ERROR_CODES = {
   INVALID_SIGNATURE_FORMAT: "QR_SIGNATURE_FORMAT_INVALID",
   VERIFICATION_FAILED: "QR_SIGNATURE_VERIFICATION_FAILED",
   PUBLIC_KEY_UNAVAILABLE: "QR_SIGNATURE_PUBLIC_KEY_UNAVAILABLE",
+  REVOKED_KEY: "QR_KEY_REVOKED",
+  UNKNOWN_KEY: "QR_KEY_UNKNOWN",
+  MISSING_KID: "QR_KID_MISSING",
+  KEY_REGISTRY_EXPIRED: "QR_KEY_REGISTRY_EXPIRED",
 } as const;
 
 export type QrSignatureErrorCode =
@@ -58,6 +62,7 @@ export type SignableQrPayload = {
   resourceId: string;
   walletAddress?: string;
   expiresAt?: string;
+  kid?: string;
 };
 
 /**
@@ -75,6 +80,7 @@ export const buildSigningMessage = (payload: SignableQrPayload): string =>
     payload.resourceId,
     payload.walletAddress ?? "",
     payload.expiresAt ?? "",
+    payload.kid ?? "",
   ].join("\n");
 
 const stripHexPrefix = (value: string): string =>
