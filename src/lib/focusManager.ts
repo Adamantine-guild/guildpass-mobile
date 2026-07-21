@@ -1,6 +1,7 @@
 import { AppState, AppStateStatus } from "react-native";
 import { focusManager, QueryClient } from "@tanstack/react-query";
 import { appConfig } from "../config/appConfig";
+import { queryKeys } from "../lib/queryKeys";
 
 let lastBackgroundTime: number | null = null;
 let subscription: { remove: () => void } | null = null;
@@ -24,11 +25,11 @@ export function initFocusManager(queryClient: QueryClient): () => void {
         if (elapsed > threshold) {
           // Invalidate membership and user-roles queries to trigger refetch
           void queryClient.invalidateQueries({
-            queryKey: ["membership"],
+            queryKey: queryKeys.membership.all,
             refetchType: "all",
           });
           void queryClient.invalidateQueries({
-            queryKey: ["user-roles"],
+            queryKey: queryKeys.userRoles.all,
             refetchType: "all",
           });
         }

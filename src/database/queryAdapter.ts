@@ -14,6 +14,10 @@
 import type { Persister, QueryClient } from "@tanstack/react-query";
 import { getDatabase } from "./connection";
 import * as dal from "./dal";
+import {
+  DAL_BACKED_QUERY_ROOTS as _DAL_BACKED_QUERY_ROOTS,
+  isDalBackedQuery as _isDalBackedQuery,
+} from "../lib/queryKeys";
 
 /** Prefix used to namespace persisted queries in the relational store. */
 const QUERY_CACHE_VERSION = 1;
@@ -126,31 +130,10 @@ export function createSqlitePersister(): Persister {
 // when the device is offline, without hydrating the entire QueryClient.
 // ---------------------------------------------------------------------------
 
-/**
- * Queries that should be served from the relational DAL when offline
- * rather than from the generic persister blob.
- */
-export const DAL_BACKED_QUERY_ROOTS = [
-  "membership",
-  "user-roles",
-  "guild",
-  "guild-config",
-  "guild-roles",
-  "memberships",
-] as const;
+export { _DAL_BACKED_QUERY_ROOTS as DAL_BACKED_QUERY_ROOTS };
+export type DalBackedQueryRoot = (typeof _DAL_BACKED_QUERY_ROOTS)[number];
 
-export type DalBackedQueryRoot = (typeof DAL_BACKED_QUERY_ROOTS)[number];
-
-/**
- * Returns true if the query key root can be served from the relational DAL.
- */
-export function isDalBackedQuery(queryKey: readonly unknown[]): boolean {
-  const root = queryKey[0];
-  return (
-    typeof root === "string" &&
-    DAL_BACKED_QUERY_ROOTS.includes(root as DalBackedQueryRoot)
-  );
-}
+export { _isDalBackedQuery as isDalBackedQuery };
 
 /**
  * Try to resolve a query from the DAL.  Returns `undefined` if no cached
