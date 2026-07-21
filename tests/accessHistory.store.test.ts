@@ -13,7 +13,6 @@ describe("access history store", () => {
   it("records granted checks", () => {
     useAccessHistoryStore.getState().recordCheck({
       guildId: "guild-alpha",
-      guildName: "Guild Alpha",
       resourceId: "vip-door",
       resourceName: "VIP Door",
       result: ACCESS_GRANTED_FIXTURE,
@@ -22,7 +21,6 @@ describe("access history store", () => {
     const [entry] = useAccessHistoryStore.getState().entries;
     expect(entry).toMatchObject({
       guildId: "guild-alpha",
-      guildName: "Guild Alpha",
       resourceId: "vip-door",
       resourceName: "VIP Door",
       status: "granted",
