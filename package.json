@@ -14,7 +14,8 @@
     "test:e2e:studio": "maestro studio",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "verify:deep-links": "node scripts/verify-deep-links.mjs"
   },
   "dependencies": {
     "@guildpass/sdk": "github:Adamantine-Guild/guildpass-sdk",

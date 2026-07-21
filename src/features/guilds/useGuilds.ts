@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { guildPassClient } from "../../lib/guildpassClient";
+import { queryKeys } from "../../lib/queryKeys";
 
 export class GuildNotFoundError extends Error {
   constructor(guildId: string) {
@@ -11,7 +12,7 @@ export class GuildNotFoundError extends Error {
 export const useGuilds = () => {
   const useGuild = (guildId: string) => {
     return useQuery({
-      queryKey: ["guild", guildId],
+      queryKey: queryKeys.guild.byId(guildId),
       queryFn: async () => {
         try {
           return await guildPassClient.guilds.getGuild({ guildId });
@@ -29,7 +30,7 @@ export const useGuilds = () => {
 
   const useGuildConfig = (guildId: string) => {
     return useQuery({
-      queryKey: ["guild-config", guildId],
+      queryKey: queryKeys.guildConfig.byId(guildId),
       queryFn: () => guildPassClient.guilds.getGuildConfig({ guildId }),
       enabled: !!guildId,
       networkMode: "offlineFirst",
@@ -38,7 +39,7 @@ export const useGuilds = () => {
 
   const useRoles = (guildId: string) => {
     return useQuery({
-      queryKey: ["guild-roles", guildId],
+      queryKey: queryKeys.guildRoles.byId(guildId),
       queryFn: () => guildPassClient.roles.getRoles({ guildId }),
       enabled: !!guildId,
       networkMode: "offlineFirst",

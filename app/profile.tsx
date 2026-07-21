@@ -1,5 +1,5 @@
 import { View, Text, ScrollView, TouchableOpacity } from "react-native";
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "expo-router";
 import { useWallet } from "../src/features/wallet/useWallet";
 import { useWalletConnectModal } from "../src/features/wallet/WalletConnectProvider";
@@ -13,6 +13,7 @@ import { StaleDataBanner } from "../src/components/StaleDataBanner";
 import { useNetworkStatus } from "../src/features/offline/useNetworkStatus";
 import { useMembership } from "../src/features/membership/useMembership";
 import { useStaleQuery } from "../src/features/offline/useStaleQuery";
+import { validateAddressInput } from "../src/lib/walletValidation";
 
 const CONNECTION_LABELS: Record<string, string> = {
   walletconnect: "WalletConnect",
@@ -30,6 +31,53 @@ export default function Profile() {
   const [error, setError] = useState<string | null>(null);
   const [showManualEntry, setShowManualEntry] = useState(false);
   const [wcConnecting, setWcConnecting] = useState(false);
+
+  // ── Field-level validation state ────────────────────────────────────
+  const [fieldError, setFieldError] = useState<string | null>(null);
+  const [touched, setTouched] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const validateField = useCallback((value: string) => {
+    const result = validateAddressInput(value);
+    setFieldError(result.error);
+    return result.valid;
+  }, []);
+
+  const handleAddressChange = useCallback(
+    (text: string) => {
+      setInputValue(text);
+      // Clear submit-level error on edit
+      setError(null);
+
+      // Debounce field validation (300 ms)
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        validateField(text);
+      }, 300);
+    },
+    [validateField],
+  );
+
+  const handleAddressBlur = useCallback(() => {
+    setTouched(true);
+    // Immediate validation on blur
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    validateField(inputValue);
+  }, [inputValue, validateField]);
+
+  // Cleanup debounce on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
+
+  const isAddressValid = inputValue.trim()
+    ? validateAddressInput(inputValue).valid
+    : false;
 
   // ── WalletConnect flow ──────────────────────────────────────────────
   const handleWalletConnect = async () => {
@@ -130,16 +178,15 @@ export default function Profile() {
               <Card className="mb-8">
                 <WalletInput
                   value={inputValue}
-                  onChangeText={(text) => {
-                    setInputValue(text);
-                    setError(null);
-                  }}
-                  error={error}
+                  onChangeText={handleAddressChange}
+                  onBlur={handleAddressBlur}
+                  error={touched ? fieldError : null}
                   testID="wallet-address-input"
                 />
                 <Button
                   title="Continue"
                   onPress={handleConnect}
+                  disabled={!isAddressValid}
                   className="mt-6"
                   testID="wallet-connect-button"
                 />
@@ -147,6 +194,9 @@ export default function Profile() {
                   onPress={() => {
                     setShowManualEntry(false);
                     setError(null);
+                    setFieldError(null);
+                    setTouched(false);
+                    if (debounceRef.current) clearTimeout(debounceRef.current);
                   }}
                   className="items-center mt-4 py-2"
                   testID="hide-manual-entry-button"

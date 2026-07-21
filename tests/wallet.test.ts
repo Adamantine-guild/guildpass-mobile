@@ -212,7 +212,7 @@ describe("Bug Condition: Invalid Address Rejection (exploration)", () => {
   });
 });
 
-import { validateAndNormalizeAddress } from "../src/lib/walletValidation";
+import { validateAndNormalizeAddress, validateAddressInput } from "../src/lib/walletValidation";
 
 // NOTE: useWallet is a React hook and cannot be instantiated outside a React context.
 // We test connectManually's logic by testing validateAndNormalizeAddress directly
@@ -564,5 +564,87 @@ describe("Integration: Access-Check Flow", () => {
 
     expect(storedAddress).toBe(validAddress);
     expect(storedConnected).toBe(true);
+  });
+});
+
+/**
+ * Field-Level Validation: validateAddressInput
+ *
+ * Validates real-time (on-change / on-blur) field-level error text used
+ * in the manual wallet entry form (app/profile.tsx). This is the UI-side
+ * validation that runs BEFORE submission, providing specific actionable
+ * error messages and disabling the submit button until the address is valid.
+ */
+describe("validateAddressInput", () => {
+  it('returns { valid: false, error: null } for empty string (no error until touched)', () => {
+    const result = validateAddressInput("");
+    expect(result.valid).toBe(false);
+    expect(result.error).toBeNull();
+  });
+
+  it('returns { valid: false, error: null } for whitespace-only string', () => {
+    const result = validateAddressInput("   ");
+    expect(result.valid).toBe(false);
+    expect(result.error).toBeNull();
+  });
+
+  it('returns { valid: false, error: "Must start with 0x" } for address missing prefix', () => {
+    const result = validateAddressInput("123456789012345678901234567890123456789012");
+    expect(result.valid).toBe(false);
+    expect(result.error).toBe("Must start with 0x");
+  });
+
+  it('returns { valid: false, error: "Must start with 0x" } for address without 0x prefix', () => {
+    const result = validateAddressInput("deadbeefdeadbeefdeadbeefdeadbeefdeadbeef");
+    expect(result.valid).toBe(false);
+    expect(result.error).toBe("Must start with 0x");
+  });
+
+  it('returns error including "42 characters" for address with 0x but too short', () => {
+    const result = validateAddressInput("0x1234");
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain("42 characters");
+  });
+
+  it('returns error including "42 characters" for address with 0x but too long', () => {
+    const result = validateAddressInput("0x12345678901234567890123456789012345678901234");
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain("42 characters");
+  });
+
+  it('returns error including "42 characters" for address with 0x and 39 hex chars', () => {
+    const result = validateAddressInput("0x" + "a".repeat(39));
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain("42 characters");
+  });
+
+  it('returns { valid: false, error: "Must only contain hex characters" } for non-hex chars after 0x', () => {
+    const result = validateAddressInput("0xGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG");
+    expect(result.valid).toBe(false);
+    expect(result.error).toBe("Must only contain hex characters (0-9, a-f)");
+  });
+
+  it('returns { valid: false, error: "Must only contain hex characters" } for special chars after 0x', () => {
+    const result = validateAddressInput("0x!!!!!aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    expect(result.valid).toBe(false);
+    expect(result.error).toBe("Must only contain hex characters (0-9, a-f)");
+  });
+
+  it('returns { valid: true, error: null } for valid lowercase address', () => {
+    const result = validateAddressInput("0x1234567890123456789012345678901234567890");
+    expect(result.valid).toBe(true);
+    expect(result.error).toBeNull();
+  });
+
+  it('returns { valid: true, error: null } for valid mixed-case address', () => {
+    const result = validateAddressInput("0xAbCdEf1234567890AbCdEf1234567890AbCdEf12");
+    expect(result.valid).toBe(true);
+    expect(result.error).toBeNull();
+  });
+
+  it('returns { valid: true, error: null } for valid address with leading/trailing whitespace', () => {
+    const result = validateAddressInput("  0x1234567890123456789012345678901234567890  ");
+    expect(result.valid).toBe(true);
+    expect(result.error).toBeNull();
   });
 });

@@ -15,29 +15,22 @@ import { StaleDataBanner } from "../src/components/StaleDataBanner";
 import { useStaleQuery } from "../src/features/offline/useStaleQuery";
 import { useQueryClient } from "@tanstack/react-query";
 
-type Membership = {
-  id: string;
-  name: string;
-  isActive: boolean;
-  roleCount: number;
-};
-
 export default function Guilds() {
   const router = useRouter();
   const { walletAddress, disconnect } = useWallet();
-  const { useMembershipsQuery } = useMembership(walletAddress);
-  const membershipsQuery = useMembershipsQuery();
+  const { useEnrichedMemberships } = useMembership(walletAddress);
+  const membershipsQuery = useEnrichedMemberships();
   const { data: memberships, isLoading, error } = membershipsQuery;
   const staleState = useStaleQuery(membershipsQuery);
 
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedQuery = useDebouncedValue(searchQuery, 300);
 
-  const filteredMemberships = useMemo<Membership[]>(() => {
+  const filteredMemberships = useMemo(() => {
     if (!memberships) return [];
     const query = debouncedQuery.trim().toLowerCase();
     if (!query) return memberships;
-    return memberships.filter((m) => m.name.toLowerCase().includes(query));
+    return memberships.filter((m) => m.guildName.toLowerCase().includes(query));
   }, [memberships, debouncedQuery]);
 
   const handleConnectDifferentWallet = async () => {
@@ -135,55 +128,34 @@ export default function Guilds() {
 
   const isRefreshing = isRefetching || membershipsQuery.isRefetching;
 
-  if (filteredMemberships.length === 0 && searchQuery.trim().length > 0) {
-    return (
-      <WalletRequired>
-        <View className="flex-1 bg-background" testID="guilds-screen">
-          <AppHeader title="My Guilds" showBack />
-          <FlatList
-            data={[]}
-            keyExtractor={(_item: Membership, index: number) => String(index)}
-            contentContainerStyle={{ flexGrow: 1, padding: 16 }}
-            testID="guilds-list"
-            ListHeaderComponent={searchHeader}
-            refreshControl={
-              <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />
-            }
-            renderItem={null}
-            ListEmptyComponent={
-              <EmptyState
-                title="No Guilds Found"
-                message={`No guilds match "${debouncedQuery}". Try a different search term.`}
-              />
-            }
-          />
-        </View>
-      </WalletRequired>
-    );
-  }
-
   return (
     <WalletRequired>
       <View className="flex-1 bg-background" testID="guilds-screen">
         <AppHeader title="My Guilds" showBack />
         <FlatList
           data={filteredMemberships}
-          keyExtractor={(item: Membership) => item.id}
+          keyExtractor={(item) => item.guildId}
           contentContainerStyle={{ padding: 16 }}
           testID="guilds-list"
           ListHeaderComponent={searchHeader}
           refreshControl={
             <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />
           }
-          renderItem={({ item }: { item: Membership }) => (
+          renderItem={({ item }) => (
             <GuildCard
-              name={item.name}
-              id={item.id}
+              name={item.guildName}
+              id={item.guildId}
               isActive={item.isActive}
               roleCount={item.roleCount}
-              onPress={() => router.push(`/guilds/${item.id}`)}
+              onPress={() => router.push(`/guilds/${item.guildId}`)}
             />
           )}
+          ListEmptyComponent={
+            <EmptyState
+              title="No Guilds Found"
+              message={`No guilds match "${debouncedQuery}". Try a different search term.`}
+            />
+          }
         />
       </View>
     </WalletRequired>

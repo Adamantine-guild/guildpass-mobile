@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import { Card } from "./Card";
 import { Button } from "./Button";
 import type { AccessHistoryEntry } from "../features/access/accessHistory.store";
+import { useResolvedGuildName } from "../features/guilds/useGuildName";
 
 type AccessHistoryListProps = {
   entries: AccessHistoryEntry[];
@@ -29,6 +30,28 @@ const statusClassName = (status: AccessHistoryEntry["status"]) => {
     default:
       return "text-error";
   }
+};
+
+const HistoryRow = ({ entry }: { entry: AccessHistoryEntry }) => {
+  const guildName = useResolvedGuildName(entry.guildId);
+
+  return (
+    <View className="py-3 border-t border-border">
+      <View className="flex-row justify-between">
+        <Text className="text-text font-semibold">{entry.resourceName}</Text>
+        <Text className={`font-bold ${statusClassName(entry.status)}`}>
+          {statusLabel(entry.status)}
+        </Text>
+      </View>
+      <Text className="text-text-muted text-sm mt-1">{guildName}</Text>
+      {entry.reason ? (
+        <Text className="text-text-muted text-sm mt-1">{entry.reason}</Text>
+      ) : null}
+      <Text className="text-text-muted text-xs mt-1">
+        {new Date(entry.checkedAt).toLocaleString()}
+      </Text>
+    </View>
+  );
 };
 
 export const AccessHistoryList = ({ entries, onClear }: AccessHistoryListProps) => {
@@ -71,21 +94,7 @@ export const AccessHistoryList = ({ entries, onClear }: AccessHistoryListProps) 
               contentContainerStyle={{ paddingBottom: 4 }}
             >
               {entries.map((entry) => (
-                <View key={entry.id} className="py-3 border-t border-border">
-                  <View className="flex-row justify-between">
-                    <Text className="text-text font-semibold">{entry.resourceName}</Text>
-                    <Text className={`font-bold ${statusClassName(entry.status)}`}>
-                      {statusLabel(entry.status)}
-                    </Text>
-                  </View>
-                  <Text className="text-text-muted text-sm mt-1">{entry.guildName}</Text>
-                  {entry.reason ? (
-                    <Text className="text-text-muted text-sm mt-1">{entry.reason}</Text>
-                  ) : null}
-                  <Text className="text-text-muted text-xs mt-1">
-                    {new Date(entry.checkedAt).toLocaleString()}
-                  </Text>
-                </View>
+                <HistoryRow key={entry.id} entry={entry} />
               ))}
             </ScrollView>
           )}

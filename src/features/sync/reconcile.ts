@@ -6,7 +6,7 @@
  */
 
 import { PERSISTABLE_QUERY_KEY_ROOTS } from "../../lib/offlineCache";
-import { walletScopedQueryRoots } from "../../lib/walletScopedCache";
+import { isWalletScopedQueryRoot } from "../../lib/queryKeys";
 import type {
   SyncCorrection,
   SyncCorrectionSeverity,
@@ -22,10 +22,6 @@ export const RECONCILED_QUERY_KEY_ROOTS: readonly SyncEntityKind[] =
   PERSISTABLE_QUERY_KEY_ROOTS.filter(
     (root): root is SyncEntityKind => root !== "access-check",
   );
-
-// Shared with the disconnect-time cache clearing so both agree on which key
-// shapes carry a wallet-address segment.
-const WALLET_SCOPED_KINDS = walletScopedQueryRoots;
 
 /**
  * Parses a React Query key into a sync entity descriptor.
@@ -44,7 +40,7 @@ export function describeSyncableQuery(
   const kind = RECONCILED_QUERY_KEY_ROOTS.find((k) => k === root);
   if (!kind) return null;
 
-  if (WALLET_SCOPED_KINDS.has(kind)) {
+  if (isWalletScopedQueryRoot(root)) {
     const [, walletAddress, guildId] = queryKey;
     if (typeof walletAddress !== "string" || typeof guildId !== "string") {
       return null;
