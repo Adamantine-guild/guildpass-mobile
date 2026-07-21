@@ -255,3 +255,49 @@ export function isDeviceSecure(): boolean {
 export function getLastIntegrityResult(): DeviceIntegrityResult | null {
   return _lastResult;
 }
+
+// ---------------------------------------------------------------------------
+// Transition detection (for foreground re-validation)
+// ---------------------------------------------------------------------------
+
+/**
+ * The type of transition between two consecutive integrity checks.
+ *
+ * - `"no_change"`: result is the same as the previous check (or no prior check).
+ * - `"secure_to_compromised"`: device WAS secure and is NOW compromised.
+ * - `"compromised_to_secure"`: device WAS compromised and is NOW secure.
+ */
+export type IntegrityTransition =
+  | "no_change"
+  | "secure_to_compromised"
+  | "compromised_to_secure";
+
+/**
+ * Force a fresh integrity assessment, compare against the previous result,
+ * and return the type of transition (if any).
+ *
+ * This is the core building-block for foreground re-validation:
+ * calling this on each app-foreground event lets the caller detect a
+ * mid-session compromise and respond according to the configured policy.
+ *
+ * On the very first call (no previous result) the transition is always
+ * `"no_change"` to avoid a false-positive invalidation at startup.
+ */
+export function checkIntegrityTransition(): IntegrityTransition {
+  const previous = _lastResult;
+  const current = assessDeviceIntegrity(true);
+
+  if (!previous) {
+    return "no_change";
+  }
+
+  if (previous.isSecure === current.isSecure) {
+    return "no_change";
+  }
+
+  if (previous.isSecure && !current.isSecure) {
+    return "secure_to_compromised";
+  }
+
+  return "compromised_to_secure";
+}

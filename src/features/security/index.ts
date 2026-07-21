@@ -4,7 +4,18 @@ export {
   getLastIntegrityResult,
   configureDeviceIntegrity,
   getIntegrityResponsePolicy,
+  checkIntegrityTransition,
 } from "./deviceIntegrity";
+
+export type { IntegrityTransition } from "./deviceIntegrity";
+
+export {
+  useIntegrityWarningStore,
+  getIntegrityWarningMessage,
+  dismissIntegrityWarning,
+} from "./integrityWarning.store";
+
+export type { CompromiseAction } from "./integrityWarning.store";
 
 export {
   getPinningConfig,
