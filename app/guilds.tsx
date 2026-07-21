@@ -1,4 +1,4 @@
-import { View, FlatList, TextInput, TouchableOpacity, Text } from "react-native";
+import { View, FlatList, TextInput, TouchableOpacity, Text, RefreshControl } from "react-native";
 import { useRouter } from "expo-router";
 import { useWallet } from "../src/features/wallet/useWallet";
 import { AppHeader } from "../src/components/AppHeader";
@@ -9,10 +9,11 @@ import { EmptyMembershipsState } from "../src/components/EmptyMembershipsState";
 import { EmptyState } from "../src/components/EmptyState";
 import { WalletRequired } from "../src/components/WalletRequired";
 import { useDebouncedValue } from "../src/lib/useDebouncedValue";
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import { useMembership } from "../src/features/membership/useMembership";
 import { StaleDataBanner } from "../src/components/StaleDataBanner";
 import { useStaleQuery } from "../src/features/offline/useStaleQuery";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function Guilds() {
   const router = useRouter();
@@ -36,6 +37,15 @@ export default function Guilds() {
     await disconnect();
     router.replace("/profile");
   };
+
+  const queryClient = useQueryClient();
+  const [isRefetching, setIsRefetching] = useState(false);
+
+  const handleRefresh = useCallback(async () => {
+    setIsRefetching(true);
+    await queryClient.invalidateQueries({ queryKey: ["memberships", walletAddress] });
+    setIsRefetching(false);
+  }, [queryClient, walletAddress]);
 
   if (isLoading) {
     return (
@@ -76,51 +86,61 @@ export default function Guilds() {
     );
   }
 
+  const staleBanner =
+    staleState.isOffline ? (
+      <StaleDataBanner reason="offline" lastSyncedAt={staleState.lastSyncedAt} />
+    ) : staleState.isStale && staleState.reason ? (
+      <StaleDataBanner reason={staleState.reason} lastSyncedAt={staleState.lastSyncedAt} />
+    ) : null;
+
+  const searchHeader = (
+    <View>
+      {staleBanner}
+      <View className="px-4 pt-2 pb-1">
+        <View className="flex-row items-center bg-white rounded-xl px-4 py-3 border border-border">
+          <Text className="text-text-muted mr-2">🔍</Text>
+          <TextInput
+            className="flex-1 text-text text-base"
+            placeholder="Search guilds..."
+            placeholderTextColor="#9CA3AF"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
+            clearButtonMode="while-editing"
+            testID="guild-search-input"
+            accessibilityLabel="Search guilds by name"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity
+              onPress={() => setSearchQuery("")}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              testID="guild-search-clear"
+              accessibilityLabel="Clear search"
+            >
+              <Text className="text-text-muted text-lg ml-2">✕</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    </View>
+  );
+
+  const isRefreshing = isRefetching || membershipsQuery.isRefetching;
+
   return (
     <WalletRequired>
       <View className="flex-1 bg-background" testID="guilds-screen">
         <AppHeader title="My Guilds" showBack />
-        {/* Search Input */}
-        <View className="px-4 pt-2 pb-1">
-          <View className="flex-row items-center bg-white rounded-xl px-4 py-3 border border-border">
-            <Text className="text-text-muted mr-2">🔍</Text>
-            <TextInput
-              className="flex-1 text-text text-base"
-              placeholder="Search guilds..."
-              placeholderTextColor="#9CA3AF"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              autoCapitalize="none"
-              autoCorrect={false}
-              clearButtonMode="while-editing"
-              testID="guild-search-input"
-              accessibilityLabel="Search guilds by name"
-            />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity
-                onPress={() => setSearchQuery("")}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                testID="guild-search-clear"
-                accessibilityLabel="Clear search"
-              >
-                <Text className="text-text-muted text-lg ml-2">✕</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-        {/* Guild List */}
         <FlatList
-          ListHeaderComponent={
-            staleState.isOffline ? (
-              <StaleDataBanner reason="offline" lastSyncedAt={staleState.lastSyncedAt} />
-            ) : staleState.isStale && staleState.reason ? (
-              <StaleDataBanner reason={staleState.reason} lastSyncedAt={staleState.lastSyncedAt} />
-            ) : null
-          }
           data={filteredMemberships}
           keyExtractor={(item) => item.guildId}
           contentContainerStyle={{ padding: 16 }}
           testID="guilds-list"
+          ListHeaderComponent={searchHeader}
+          refreshControl={
+            <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />
+          }
           renderItem={({ item }) => (
             <GuildCard
               name={item.guildName}
