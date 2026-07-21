@@ -4,8 +4,8 @@
  * Cached locally for offline verification
  */
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { type GuildIssuerKey, ATTESTATION_STORAGE_KEYS } from './types';
+import { migratingSecureStorage } from '../../lib/storage';
 
 /**
  * Get the cached issuer key for a guild
@@ -21,7 +21,7 @@ export async function getCachedIssuerKey(
 ): Promise<GuildIssuerKey | null> {
   try {
     const key = `${ATTESTATION_STORAGE_KEYS.ISSUER_KEYS}${guildId}`;
-    const stored = await AsyncStorage.getItem(key);
+    const stored = await migratingSecureStorage.getItem(key);
 
     if (!stored) {
       return null;
@@ -33,7 +33,7 @@ export async function getCachedIssuerKey(
 
     if (ageDays > maxCacheAgeDays) {
       // Cache is stale, remove it
-      await AsyncStorage.removeItem(key);
+      await migratingSecureStorage.removeItem(key);
       return null;
     }
 
@@ -52,15 +52,15 @@ export async function getCachedIssuerKey(
 export async function cacheIssuerKey(issuerKey: GuildIssuerKey): Promise<void> {
   try {
     const key = `${ATTESTATION_STORAGE_KEYS.ISSUER_KEYS}${issuerKey.guildId}`;
-    await AsyncStorage.setItem(key, JSON.stringify(issuerKey));
+    await migratingSecureStorage.setItem(key, JSON.stringify(issuerKey));
 
     // Add to index
-    const index = await AsyncStorage.getItem(ATTESTATION_STORAGE_KEYS.ISSUER_KEYS_INDEX);
+    const index = await migratingSecureStorage.getItem(ATTESTATION_STORAGE_KEYS.ISSUER_KEYS_INDEX);
     const guildIds = index ? (JSON.parse(index) as string[]) : [];
 
     if (!guildIds.includes(issuerKey.guildId)) {
       guildIds.push(issuerKey.guildId);
-      await AsyncStorage.setItem(
+      await migratingSecureStorage.setItem(
         ATTESTATION_STORAGE_KEYS.ISSUER_KEYS_INDEX,
         JSON.stringify(guildIds)
       );
@@ -80,7 +80,7 @@ export async function cacheIssuerKey(issuerKey: GuildIssuerKey): Promise<void> {
 export async function invalidateIssuerKeyCache(guildId: string): Promise<void> {
   try {
     const key = `${ATTESTATION_STORAGE_KEYS.ISSUER_KEYS}${guildId}`;
-    await AsyncStorage.removeItem(key);
+    await migratingSecureStorage.removeItem(key);
   } catch (error) {
     console.warn(`Failed to invalidate issuer key cache for guild ${guildId}:`, error);
   }
@@ -94,7 +94,7 @@ export async function invalidateIssuerKeyCache(guildId: string): Promise<void> {
  */
 export async function getAllCachedIssuerKeys(): Promise<GuildIssuerKey[]> {
   try {
-    const index = await AsyncStorage.getItem(ATTESTATION_STORAGE_KEYS.ISSUER_KEYS_INDEX);
+    const index = await migratingSecureStorage.getItem(ATTESTATION_STORAGE_KEYS.ISSUER_KEYS_INDEX);
     const guildIds = index ? (JSON.parse(index) as string[]) : [];
 
     const issuerKeys: GuildIssuerKey[] = [];
@@ -118,13 +118,13 @@ export async function getAllCachedIssuerKeys(): Promise<GuildIssuerKey[]> {
  */
 export async function clearIssuerKeyCache(): Promise<void> {
   try {
-    const index = await AsyncStorage.getItem(ATTESTATION_STORAGE_KEYS.ISSUER_KEYS_INDEX);
+    const index = await migratingSecureStorage.getItem(ATTESTATION_STORAGE_KEYS.ISSUER_KEYS_INDEX);
     const guildIds = index ? (JSON.parse(index) as string[]) : [];
 
     const keys = guildIds.map((guildId) => `${ATTESTATION_STORAGE_KEYS.ISSUER_KEYS}${guildId}`);
     keys.push(ATTESTATION_STORAGE_KEYS.ISSUER_KEYS_INDEX);
 
-    await AsyncStorage.multiRemove(keys);
+    await Promise.all(keys.map((key) => migratingSecureStorage.removeItem(key)));
   } catch (error) {
     console.error('Failed to clear issuer key cache:', error);
     throw error;
