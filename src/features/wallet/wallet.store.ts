@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { WalletState, WalletActions, WalletConnectionKind } from "./wallet.types";
 import { validateAndNormalizeAddress } from "../../lib/walletValidation";
-import { asyncStorage } from "../../lib/storage";
+import { migratingSecureStorage } from "../../lib/storage";
 
 export const useWalletStore = create<WalletState & WalletActions & { _hasHydrated: boolean }>()(
   persist(
@@ -32,7 +32,7 @@ export const useWalletStore = create<WalletState & WalletActions & { _hasHydrate
     }),
     {
       name: "wallet-storage",
-      storage: createJSONStorage(() => asyncStorage),
+      storage: createJSONStorage(() => migratingSecureStorage),
       // Only persist the address, not transient WC session state
       partialize: (state) => ({
         walletAddress: state.walletAddress,

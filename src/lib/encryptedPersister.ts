@@ -3,6 +3,7 @@ import type { AsyncStorage, PersistedClient } from "@tanstack/query-persist-clie
 import { EncryptionService, EncryptionError } from "./encryptionService";
 import { KeyManager } from "./keyManager";
 import { MaybePromise } from "@tanstack/react-query-persist-client";
+import { MAX_CACHE_AGE_MS, MAX_CACHE_SIZE_BYTES } from "./offlineCache";
 
 /**
  * EncryptedPersister wraps the TanStack Query async-storage persister with
@@ -105,11 +106,60 @@ export interface EncryptedPersisterOptions {
   encryptionService: EncryptionService;
   /** KeyManager supplying the device-bound key. */
   keyManager: KeyManager;
+  /** Maximum age in ms for persisted query cache entries. */
+  maxAge?: number;
+  /** Maximum size in bytes for the persisted query cache payload. */
+  maxSize?: number;
   /**
    * Optional: hook invoked when migration from a legacy unencrypted cache
    * succeeds or fails. Useful for telemetry without coupling to logs.
    */
   onMigration?: (result: { status: "migrated" | "cleared"; reason?: string }) => void;
+}
+
+/**
+ * Helper to perform max-age and max-size eviction on a PersistedClient.
+ */
+export function evictUnboundedData(
+  client: PersistedClient,
+  maxAge: number = MAX_CACHE_AGE_MS,
+  maxSize: number = MAX_CACHE_SIZE_BYTES,
+): PersistedClient {
+  const now = client.timestamp || Date.now();
+  let queries = (client.clientState?.queries ? [...client.clientState.queries] : []) as any[];
+
+  if (maxAge > 0) {
+    queries = queries.filter((q) => {
+      const dataUpdatedAt = q.state?.dataUpdatedAt;
+      if (dataUpdatedAt === undefined || dataUpdatedAt === 0) return true;
+      return now - dataUpdatedAt <= maxAge;
+    });
+  }
+
+  let prunedClient: PersistedClient = {
+    ...client,
+    clientState: {
+      ...client.clientState,
+      queries,
+    },
+  };
+
+  if (maxSize > 0 && JSON.stringify(prunedClient).length > maxSize) {
+    queries.sort((a, b) => (a.state?.dataUpdatedAt ?? 0) - (b.state?.dataUpdatedAt ?? 0));
+
+    while (queries.length > 0 && JSON.stringify(prunedClient).length > maxSize) {
+      queries.shift();
+      prunedClient = {
+        ...client,
+        clientState: {
+          ...client.clientState,
+          queries,
+        },
+      };
+    }
+  }
+
+  return prunedClient;
 }
 
 /**
@@ -125,6 +175,8 @@ export function createEncryptedAsyncStoragePersister({
   throttleTime = 1000,
   encryptionService,
   keyManager,
+  maxAge = MAX_CACHE_AGE_MS,
+  maxSize = MAX_CACHE_SIZE_BYTES,
   onMigration,
 }: EncryptedPersisterOptions) {
   // Lazily-loaded raw key bytes. Cached for the lifetime of the persister
@@ -173,7 +225,8 @@ export function createEncryptedAsyncStoragePersister({
       // then store nothing meaningful. We never write plaintext.
       return "";
     }
-    const plaintext = JSON.stringify(client);
+    const prunedClient = evictUnboundedData(client, maxAge, maxSize);
+    const plaintext = JSON.stringify(prunedClient);
     const { encrypted, nonce, authTag } = await encryptionService.encrypt(
       plaintext,
       keyBuffer,
@@ -316,6 +369,10 @@ export function createEncryptedAsyncStoragePersister({
         authTag,
         keyBuffer,
       );
+      if (decrypted && maxAge > 0 && Date.now() - decrypted.timestamp > maxAge) {
+        await safeClearStoredValue();
+        return undefined;
+      }
       return decrypted;
     } catch (error) {
       if (error instanceof EncryptionError) {

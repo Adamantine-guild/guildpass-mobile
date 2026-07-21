@@ -290,6 +290,42 @@ describe("AccessCheck screen", () => {
     expect(outputText(screen!)).not.toContain("This QR payload uses a different wallet address");
   });
 
+  it("retries the access check after an initial failure and shows the success state", async () => {
+    guildPassClientMock.checkAccess
+      .mockRejectedValueOnce(new Error("Temporary network error"))
+      .mockResolvedValueOnce(ACCESS_GRANTED_FIXTURE);
+
+    let screen: ReactTestRenderer;
+
+    await act(async () => {
+      screen = renderScreen();
+    });
+
+    await act(async () => {
+      screen!.root
+        .findByProps({ testID: "access-check-guild-id-input" })
+        .props.onChangeText("guild-alpha");
+      screen!.root
+        .findByProps({ testID: "access-check-resource-id-input" })
+        .props.onChangeText("vip-door");
+    });
+
+    await act(async () => {
+      screen!.root.findByProps({ accessibilityLabel: "Check Access" }).props.onPress();
+      await flush();
+    });
+
+    expect(outputText(screen!)).toContain("Error checking access");
+
+    await act(async () => {
+      screen!.root.findByProps({ accessibilityLabel: "Try Again" }).props.onPress();
+      await flush();
+    });
+
+    expect(guildPassClientMock.checkAccess).toHaveBeenCalledTimes(2);
+    expect(outputText(screen!)).toContain("Access Granted");
+  });
+
   it("renders the offline banner and disables the check button when offline", async () => {
     useNetworkStore.setState({ isOnline: false, isOffline: true });
 

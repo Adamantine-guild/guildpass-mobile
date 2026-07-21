@@ -26,10 +26,10 @@ This repository is a React Native / Expo mobile application.
 - Authentication or access-gate bypass via deep links or URL schemes
 - Insecure storage of sensitive user data on device
 - Man-in-the-middle vulnerabilities in API calls to guildpass-core
-- **Forged access QR codes** — QR payloads are signed by the guild issuer and
-  verified client-side against the guild's published `issuerPublicKey`
-  (secp256k1 + keccak256 ECDSA). A QR without a valid signature must be
-  rejected. See `docs/qr-signature-verification.md`.
+- **Forged or revoked access QR codes** — QR payloads are signed by the guild issuer using
+  secp256k1 + keccak256 ECDSA and carrying a Key ID (`kid`). Payloads are verified client-side
+  against the guild's published key registry, supporting concurrent key versions (rotation overlap)
+  and rejecting revoked key IDs. See `docs/qr-key-rotation-protocol.md` and `docs/qr-signature-verification.md`.
 - XSS-equivalent attacks via WebView components (if used)
 - Root/jailbreak detection bypass
 - Certificate pinning bypass
@@ -124,6 +124,60 @@ Encrypting and decrypting the offline cache is bounded by the
 - `src/lib/encryptedPersister.ts` — TanStack Query persister wrapper and migration
 - `src/lib/queryPersister.ts` — wired into the app's `PersistQueryClientProvider`
 
+## Wallet and Session Storage
+
+Wallet-linked state and authentication state are never persisted in plaintext AsyncStorage.
+The `wallet-storage`, `session-storage`, `sync-storage`, and
+`guildpass:reconciliation:v1` Zustand slices use
+`expo-secure-store`, backed by the iOS Keychain and Android Keystore, with the
+iOS accessibility level set to `WHEN_UNLOCKED_THIS_DEVICE_ONLY`. This includes:
+
+- the connected wallet address and connection status;
+- the connector kind (manual entry, WalletConnect, or another provider); and
+- session tokens, expiry timestamps, and their associated wallet address;
+- wallet-scoped sync metadata and reconciliation sequence numbers; and
+- cached wallet role attestations, issuer verification keys, and their indexes.
+
+### Upgrade migration
+
+Before the first application render after upgrading, a migration gate enumerates
+all known sensitive AsyncStorage keys, including dynamic attestation and issuer
+cache entries. Each legacy value is copied to SecureStore and its AsyncStorage
+entry is deleted and verified absent. Cleanup is retried three times. If the
+secure write, enumeration, or verified cleanup fails, migration fails closed:
+plaintext data is never returned for hydration and the application remains
+behind a recovery screen until the user retries and receives a clean migration
+report. Normal writes and sign-out/reset operations also remove any stale legacy
+copy, making the migration one-way.
+
+Storage names containing characters unsupported by SecureStore are mapped to
+opaque SHA-256 identifiers before reaching the native API. This prevents dynamic
+names from exposing wallet addresses through Android's SecureStore preferences.
+Values written by pre-release builds with the former reversible hexadecimal key
+format are migrated to the opaque format on access and the former entry is
+deleted. Values larger than SecureStore's 2048-byte per-entry limit are split
+into bounded chunks with a versioned manifest; no chunk exceeds 1800 bytes.
+
+The persistence tests in `tests/storage.test.ts` audit every address-bearing
+persistence path. They seed every historical key family, execute the same
+first-launch migration used by the app, verify AsyncStorage is empty afterward,
+enforce SecureStore's real key and value constraints, exercise cleanup failure
+and recovery-gate behavior, and reject wallet identifiers in AsyncStorage values
+or reversible SecureStore entry names.
+
+### Relevant source
+
+- `src/lib/storage/index.ts` — SecureStore adapter and one-way migration
+- `src/features/wallet/wallet.store.ts` — wallet persistence configuration
+- `src/features/session/session.store.ts` — session persistence configuration
+- `src/features/sync/sync.store.ts` — wallet-scoped sync persistence
+- `src/features/notifications/reconciliation.store.ts` — per-wallet reconciliation state
+- `src/features/attestation/attestationStorage.ts` — per-wallet attestation cache
+- `src/features/attestation/issuerKeyRegistry.ts` — issuer verification-key cache
+- `src/features/security/SensitiveStorageMigrationGate.tsx` — fail-closed startup gate
+- `tests/storage.test.ts` — migration and plaintext-write audit coverage
+- `tests/sensitiveStorageMigrationGate.test.tsx` — failure and verified-retry coverage
+
 ### Disclosure Policy
 
 - We ask for a **90-day** coordinated disclosure window.
@@ -140,10 +194,12 @@ GuildPass Mobile implements a defense-in-depth security hardening layer:
 | **Device Integrity** | Best-effort root/jailbreak detection with configurable response (warn vs. block) | [Source](./src/features/security/deviceIntegrity.ts) |
 | **Certificate Pinning** | TLS public-key pinning for all traffic to GuildPass API domains | [Source](./src/features/security/certificatePinning.ts) |
 | **Secure Fetch** | Fetch wrapper enforcing domain validation and device integrity gates | [Source](./src/lib/secureFetch.ts) |
+| **QR Key Rotation** | Versioned secp256k1 key verification with revocation list checks & bounded TTL | [Source](./src/features/access/guildIssuerKey.ts) |
 
 ### Supporting Documentation
 
 - **[Threat Model](./docs/threat-model.md)** — scopes what the hardening does and does not protect against
+- **[QR Key Rotation Protocol](./docs/qr-key-rotation-protocol.md)** — protocol specification and threat model for key rotation & revocation
 - **[Pin Rotation Runbook](./docs/pin-rotation-runbook.md)** — procedure for rotating TLS certificate pins without bricking connectivity
 
 ### Security Architecture

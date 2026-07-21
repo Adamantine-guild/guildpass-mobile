@@ -1,14 +1,14 @@
 /**
- * Reconciliation Store — Zustand + AsyncStorage persistence
+ * Reconciliation Store — Zustand + SecureStore persistence
  *
  * Tracks the highest `roleChangeSeq` the client has processed for each
  * (guildId, walletAddress) pair.  The store is the authoritative local
  * source-of-truth against which every reconciliation fetch is compared.
  */
 
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
+import { migratingSecureStorage } from "../../lib/storage";
 import type {
   EntityKey,
   ReconciliationPersistedState,
@@ -163,7 +163,7 @@ export const useReconciliationStore = create<ReconciliationStore>()(
     }),
     {
       name: STORAGE_KEY,
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(() => migratingSecureStorage),
       partialize: (state) => ({ versions: state.versions }),
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true);
