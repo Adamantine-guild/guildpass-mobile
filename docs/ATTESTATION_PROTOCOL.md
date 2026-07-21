@@ -122,30 +122,44 @@ interface GuildIssuerKey {
 
 ## Verification Process
 
-### Online Verification (with backend)
+### Validation Ordering
+
+`validateAttestation()` runs checks in the following order, deliberately chosen
+to minimise work before rejecting an invalid attestation:
+
+1. **Expiry check** (O(1), no I/O) — cheapest check first.
+2. **Revocation check** (in-memory Map lookup) — faster than crypto.
+3. **Cryptographic signature verification** (asymmetric crypto) — most expensive, performed last.
+
+### Revocation-Aware Online Verification (with backend)
 
 ```
 1. Fetch attestation from backend
-   - walletAddress, guildId, roleId → RoleAttestation
+   - walletAddress, guildId, roleId → RoleAttestation (with optional kid)
 
 2. Fetch issuer key (cached or fresh)
    - If cache miss: fetch from backend
    - Cache locally for 7 days
 
-3. Verify signature
+3. Check expiration
+   - Current time < attestation.expiresAt
+
+4. Check issuer key revocation
+   - Look up issuer address in the cached revocation registry
+   - If data unavailable (offline, no cached registry): FAIL CLOSED — reject
+   - If key is revoked: reject with ATTESTATION_REVOCATION_REASONS.KEY_REVOKED
+
+5. Verify signature
    - Use viem's verifyTypedData
    - Recover signer from signature
    - Compare to issuer address
 
-4. Check expiration
-   - Current time < attestation.expiresAt
-
-5. Cache result
+6. Cache result
    - Store attestation in local AsyncStorage
    - Store validation result
 ```
 
-### Offline Verification (cached)
+### Revocation-Aware Offline Verification (cached)
 
 ```
 1. Load attestation from local cache
@@ -154,14 +168,18 @@ interface GuildIssuerKey {
 2. Load issuer key from cache
    - If not found: fail (requires online fetch first)
 
-3. Verify signature locally
+3. Check expiration
+   - Current time < attestation.expiresAt
+
+4. Check issuer key revocation from cached registry
+   - If cached revocation data available (within offline trust window): check it
+   - If NOT available (cache expired or never fetched): FAIL CLOSED — reject
+
+5. Verify signature locally
    - Use cached issuer key
    - No network required
 
-4. Check expiration
-   - Current time < attestation.expiresAt
-
-5. Return result
+6. Return result
 ```
 
 ### Error Cases
@@ -170,6 +188,8 @@ interface GuildIssuerKey {
 |----------|----------|
 | Invalid signature | Rejected, not cached |
 | Expired attestation | Rejected, removed from cache if cached |
+| Revoked issuer key | Rejected with `issuerKeyRevoked: true` |
+| Revocation data unavailable (offline) | Rejected with `revocationCheckSkipped: true` (fail closed) |
 | Missing issuer key (offline) | Fails with "Issuer key not cached - requires online fetch" |
 | Network error fetching attestation | Returns cached version if available |
 | Network error fetching issuer key | Uses cached key if available, otherwise fails |
@@ -188,6 +208,60 @@ interface GuildIssuerKey {
 - Attestations must be checked against current time
 - Clock skew handling: consider removing attestations that are >1 hour past expiration
 - Front-end should refresh attestations approaching expiration
+
+### Issuer Key Revocation Model
+
+GuildPass attestations adopt the same issuer key revocation model as the QR
+access path (see `docs/qr-key-rotation-protocol.md`).  Each guild publishes
+its key registry (active keys + revoked key set) via the SDK, and the client
+caches it locally with a bounded TTL.
+
+**Key identifier (`kid`)**
+
+An optional `kid` field in `RoleAttestation` identifies which specific issuer
+key signed the proof.  When a guild has multiple rotating keys, including
+`kid` enables the verifier to check whether that particular key has been
+revoked.
+
+**Revocation check flow**
+
+```
+validateAttestation()
+  ├── 1. Check expiry
+  ├── 2. Check revocation  ← NEW
+  │       └── checkIssuerKeyRevoked(guildId, issuerAddress)
+  │             ├── Cache fresh (< 15 min TTL) → use cached data
+  │             ├── Cache expired but within trust window (24 h)
+  │             │     → attempt refresh; fall back to cached on failure
+  │             └── No cache / past trust window → return null (fail closed)
+  └── 3. Verify signature
+```
+
+**Offline policy: FAIL CLOSED**
+
+When the revocation registry data is unavailable (no cached copy and the
+device is offline), `validateAttestation()` **rejects** the attestation with
+`revocationCheckSkipped: true`.  This is the deliberate conservative policy:
+
+- Attestations are designed as **portable, long-lived proofs** — they
+  may be verified months after issuance by a third-party verifier with no
+  connection to the GuildPass backend.
+- Accepting a proof whose issuer key status cannot be confirmed would
+  allow a compromised key's attestations to be accepted indefinitely.
+- An online verifier can always fetch fresh revocation data; the fail-closed
+  policy only affects offline scenarios where the cached registry has
+  expired (24-hour trust window).
+
+**Revocation data caching parameters**
+
+| Parameter | Value |
+|-----------|-------|
+| In-memory cache TTL | 15 minutes |
+| Offline trust window | 24 hours |
+| Persisted storage | Expo Secure Store |
+
+These mirror the QR path's parameters exactly, ensuring consistent
+behaviour across both verification paths.
 
 ### Issuer Key Management
 
@@ -209,6 +283,7 @@ interface GuildIssuerKey {
 - Cannot verify new attestations without network
 - Cannot fetch new issuer keys offline
 - Cannot update expiration checks without current time
+- **Offline revocation checks require cached revocation data within the 24-hour trust window** — after 24 hours without connectivity, attestations are rejected (fail closed)
 
 ## Integration Guide
 
@@ -318,10 +393,12 @@ const onGuildKeyRotation = async (guildId: string) => {
 - Use `verifyingContract` pointing to smart contract
 - Enable trustless verification without issuer key cache
 
-### Attestation Revocation
+### Attestation Revocation (✅ Implemented)
 
-- Support revocation lists (CRLs) or OSCP-like mechanism
-- Allow immediate invalidation of compromised attestations
+- ✅ Issuer key revocation checked via `checkIssuerKeyRevoked()`
+- ✅ Revocation data cached with bounded TTL and offline trust window
+- ✅ `kid` field support for identifying the signing key
+- ✅ Fail-closed policy when revocation data is unavailable offline
 
 ### Multi-Key Support
 
