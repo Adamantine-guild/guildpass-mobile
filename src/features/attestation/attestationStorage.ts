@@ -5,6 +5,47 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { type CachedAttestation, type RoleAttestation, ATTESTATION_STORAGE_KEYS } from './types';
+import { migratingSecureStorage } from '../../lib/storage';
+
+type AttestationIndexEntry = { guildId: string; roleId: string };
+
+const ATTESTATION_WALLET_INDEX_KEY = `${ATTESTATION_STORAGE_KEYS.ATTESTATION_INDEX}:wallets`;
+
+function getAttestationIndexKey(walletAddress: string): string {
+  return `${ATTESTATION_STORAGE_KEYS.ATTESTATION_INDEX}${walletAddress}`;
+}
+
+async function getAttestationIndex(walletAddress: string): Promise<AttestationIndexEntry[]> {
+  const index = await migratingSecureStorage.getItem(getAttestationIndexKey(walletAddress));
+  return index ? (JSON.parse(index) as AttestationIndexEntry[]) : [];
+}
+
+async function getAttestationWalletIndex(): Promise<string[]> {
+  const index = await migratingSecureStorage.getItem(ATTESTATION_WALLET_INDEX_KEY);
+  return index ? (JSON.parse(index) as string[]) : [];
+}
+
+async function registerAttestationWallet(walletAddress: string): Promise<void> {
+  const wallets = await getAttestationWalletIndex();
+  const normalized = walletAddress.toLowerCase();
+  if (!wallets.includes(normalized)) {
+    await migratingSecureStorage.setItem(
+      ATTESTATION_WALLET_INDEX_KEY,
+      JSON.stringify([...wallets, normalized])
+    );
+  }
+}
+
+async function unregisterAttestationWallet(walletAddress: string): Promise<void> {
+  const wallets = await getAttestationWalletIndex();
+  const normalized = walletAddress.toLowerCase();
+  const filtered = wallets.filter((wallet) => wallet !== normalized);
+  if (filtered.length === 0) {
+    await migratingSecureStorage.removeItem(ATTESTATION_WALLET_INDEX_KEY);
+  } else if (filtered.length !== wallets.length) {
+    await migratingSecureStorage.setItem(ATTESTATION_WALLET_INDEX_KEY, JSON.stringify(filtered));
+  }
+}
 
 /**
  * Create a unique storage key for an attestation
@@ -34,12 +75,11 @@ export async function cacheAttestation(
       cachedAt: Date.now(),
     };
 
-    await AsyncStorage.setItem(key, JSON.stringify(cached));
+    await migratingSecureStorage.setItem(key, JSON.stringify(cached));
 
     // Add to index
-    const indexKey = `${ATTESTATION_STORAGE_KEYS.ATTESTATION_INDEX}${walletAddress}`;
-    const index = await AsyncStorage.getItem(indexKey);
-    const entries = index ? (JSON.parse(index) as Array<{ guildId: string; roleId: string }>) : [];
+    const indexKey = getAttestationIndexKey(walletAddress);
+    const entries = await getAttestationIndex(walletAddress);
 
     const exists = entries.some(
       (e) => e.guildId === attestation.guildId && e.roleId === attestation.roleId
@@ -50,8 +90,9 @@ export async function cacheAttestation(
         guildId: attestation.guildId,
         roleId: attestation.roleId,
       });
-      await AsyncStorage.setItem(indexKey, JSON.stringify(entries));
+      await migratingSecureStorage.setItem(indexKey, JSON.stringify(entries));
     }
+    await registerAttestationWallet(walletAddress);
   } catch (error) {
     console.error(
       `Failed to cache attestation for ${walletAddress} in guild ${attestation.guildId}:`,
@@ -76,12 +117,13 @@ export async function getCachedAttestation(
 ): Promise<CachedAttestation | null> {
   try {
     const key = getAttestationStorageKey(walletAddress, guildId, roleId);
-    const stored = await AsyncStorage.getItem(key);
+    const stored = await migratingSecureStorage.getItem(key);
 
     if (!stored) {
       return null;
     }
 
+    await registerAttestationWallet(walletAddress);
     return JSON.parse(stored) as CachedAttestation;
   } catch (error) {
     console.warn(
@@ -102,9 +144,11 @@ export async function getAllAttestationsForWallet(
   walletAddress: string
 ): Promise<CachedAttestation[]> {
   try {
-    const indexKey = `${ATTESTATION_STORAGE_KEYS.ATTESTATION_INDEX}${walletAddress}`;
-    const index = await AsyncStorage.getItem(indexKey);
-    const entries = index ? (JSON.parse(index) as Array<{ guildId: string; roleId: string }>) : [];
+    const entries = await getAttestationIndex(walletAddress);
+
+    if (entries.length > 0) {
+      await registerAttestationWallet(walletAddress);
+    }
 
     const attestations: CachedAttestation[] = [];
 
@@ -155,21 +199,21 @@ export async function removeCachedAttestation(
 ): Promise<void> {
   try {
     const key = getAttestationStorageKey(walletAddress, guildId, roleId);
-    await AsyncStorage.removeItem(key);
+    await migratingSecureStorage.removeItem(key);
 
     // Update index
-    const indexKey = `${ATTESTATION_STORAGE_KEYS.ATTESTATION_INDEX}${walletAddress}`;
-    const index = await AsyncStorage.getItem(indexKey);
-    const entries = index ? (JSON.parse(index) as Array<{ guildId: string; roleId: string }>) : [];
+    const indexKey = getAttestationIndexKey(walletAddress);
+    const entries = await getAttestationIndex(walletAddress);
 
     const filtered = entries.filter(
       (e) => !(e.guildId === guildId && e.roleId === roleId)
     );
 
     if (filtered.length > 0) {
-      await AsyncStorage.setItem(indexKey, JSON.stringify(filtered));
+      await migratingSecureStorage.setItem(indexKey, JSON.stringify(filtered));
     } else {
-      await AsyncStorage.removeItem(indexKey);
+      await migratingSecureStorage.removeItem(indexKey);
+      await unregisterAttestationWallet(walletAddress);
     }
   } catch (error) {
     console.warn(
@@ -186,14 +230,14 @@ export async function removeCachedAttestation(
  */
 export async function clearAttestationsForWallet(walletAddress: string): Promise<void> {
   try {
-    const attestations = await getAllAttestationsForWallet(walletAddress);
-
-    const keys = attestations.map((a) =>
-      getAttestationStorageKey(walletAddress, a.guildId, a.roleId)
+    const entries = await getAttestationIndex(walletAddress);
+    const keys = entries.map((entry) =>
+      getAttestationStorageKey(walletAddress, entry.guildId, entry.roleId)
     );
-    keys.push(`${ATTESTATION_STORAGE_KEYS.ATTESTATION_INDEX}${walletAddress}`);
+    keys.push(getAttestationIndexKey(walletAddress));
 
-    await AsyncStorage.multiRemove(keys);
+    await Promise.all(keys.map((key) => migratingSecureStorage.removeItem(key)));
+    await unregisterAttestationWallet(walletAddress);
   } catch (error) {
     console.error(`Failed to clear attestations for wallet ${walletAddress}:`, error);
     throw error;
@@ -206,14 +250,19 @@ export async function clearAttestationsForWallet(walletAddress: string): Promise
  */
 export async function clearAllAttestations(): Promise<void> {
   try {
-    const allKeys = await AsyncStorage.getAllKeys();
-    const attestationKeys = allKeys.filter(
+    const wallets = await getAttestationWalletIndex();
+    await Promise.all(wallets.map((walletAddress) => clearAttestationsForWallet(walletAddress)));
+
+    // Clean up legacy entries that have not yet been encountered and migrated.
+    const legacyKeys = (await AsyncStorage.getAllKeys()) ?? [];
+    const attestationKeys = legacyKeys.filter(
       (k) =>
         k.startsWith(ATTESTATION_STORAGE_KEYS.ATTESTATIONS) ||
         k.startsWith(ATTESTATION_STORAGE_KEYS.ATTESTATION_INDEX)
     );
 
-    await AsyncStorage.multiRemove(attestationKeys);
+    await Promise.all(attestationKeys.map((key) => migratingSecureStorage.removeItem(key)));
+    await migratingSecureStorage.removeItem(ATTESTATION_WALLET_INDEX_KEY);
   } catch (error) {
     console.error('Failed to clear all attestations:', error);
     throw error;

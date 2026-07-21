@@ -18,19 +18,34 @@ vi.mock("@react-native-async-storage/async-storage", () => ({
   },
 }));
 
-// Mock SecureStore
-vi.mock("expo-secure-store", () => ({
-  getItemAsync: vi.fn(),
-  setItemAsync: vi.fn(),
-  deleteItemAsync: vi.fn(),
-  WHEN_UNLOCKED: "WHEN_UNLOCKED",
-  AFTER_FIRST_UNLOCK: "AFTER_FIRST_UNLOCK",
-  ALWAYS: "ALWAYS",
-  WHEN_PASSCODE_SET_THIS_DEVICE_ONLY: "WHEN_PASSCODE_SET_THIS_DEVICE_ONLY",
-  WHEN_UNLOCKED_THIS_DEVICE_ONLY: "WHEN_UNLOCKED_THIS_DEVICE_ONLY",
-  AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY: "AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY",
-  ALWAYS_THIS_DEVICE_ONLY: "ALWAYS_THIS_DEVICE_ONLY",
-}));
+// Mock SecureStore while preserving its production key/value constraints.
+vi.mock("expo-secure-store", () => {
+  const validateKey = (key: string) => {
+    if (!/^[\w.-]+$/.test(key)) throw new Error(`Invalid SecureStore key: ${key}`);
+  };
+  return {
+    getItemAsync: vi.fn(async (key: string) => {
+      validateKey(key);
+      return null;
+    }),
+    setItemAsync: vi.fn(async (key: string, value: string) => {
+      validateKey(key);
+      if (new TextEncoder().encode(value).length > 2_048) {
+        throw new Error(`SecureStore value exceeds 2048 bytes: ${key}`);
+      }
+    }),
+    deleteItemAsync: vi.fn(async (key: string) => {
+      validateKey(key);
+    }),
+    WHEN_UNLOCKED: "WHEN_UNLOCKED",
+    AFTER_FIRST_UNLOCK: "AFTER_FIRST_UNLOCK",
+    ALWAYS: "ALWAYS",
+    WHEN_PASSCODE_SET_THIS_DEVICE_ONLY: "WHEN_PASSCODE_SET_THIS_DEVICE_ONLY",
+    WHEN_UNLOCKED_THIS_DEVICE_ONLY: "WHEN_UNLOCKED_THIS_DEVICE_ONLY",
+    AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY: "AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY",
+    ALWAYS_THIS_DEVICE_ONLY: "ALWAYS_THIS_DEVICE_ONLY",
+  };
+});
 
 // Mock expo-clipboard
 vi.mock("expo-clipboard", () => ({

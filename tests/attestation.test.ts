@@ -8,20 +8,20 @@ import {
   validateAttestation,
   checkAttestationExpiry,
   getAttestationValidityStatus,
-} from '../verifySignature';
+} from '../src/features/attestation/verifySignature';
 import {
   cacheAttestation,
   getCachedAttestation,
   removeCachedAttestation,
-  getAllAttestationsForWallet,
   clearAttestationsForWallet,
-} from '../attestationStorage';
+} from '../src/features/attestation/attestationStorage';
 import {
   cacheIssuerKey,
   getCachedIssuerKey,
   invalidateIssuerKeyCache,
-} from '../issuerKeyRegistry';
-import { type RoleAttestation, type GuildIssuerKey } from '../types';
+} from '../src/features/attestation/issuerKeyRegistry';
+import { type RoleAttestation, type GuildIssuerKey } from '../src/features/attestation/types';
+import * as SecureStore from 'expo-secure-store';
 
 // Mock AsyncStorage
 vi.mock('@react-native-async-storage/async-storage', () => ({
@@ -35,12 +35,16 @@ vi.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 // Mock viem
-vi.mock('viem', () => ({
-  verifyTypedData: vi.fn(async (params) => {
-    // Simple mock: accept valid signatures, reject tampered ones
-    return !params.signature.includes('tampered');
-  }),
-}));
+vi.mock('viem', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('viem')>();
+  return {
+    ...actual,
+    verifyTypedData: vi.fn(async (params) => {
+      // Simple mock: accept valid signatures, reject tampered ones
+      return !params.signature.includes('tampered');
+    }),
+  };
+});
 
 describe('Attestation System', () => {
   const mockWalletAddress = '0x1234567890123456789012345678901234567890';
@@ -138,17 +142,16 @@ describe('Attestation System', () => {
       const attestation = createMockAttestation();
       await cacheAttestation(mockWalletAddress, attestation);
 
-      // Verify AsyncStorage.setItem was called
+      expect(SecureStore.setItemAsync).toHaveBeenCalled();
       const AsyncStorage = await import('@react-native-async-storage/async-storage');
-      expect(AsyncStorage.default.setItem).toHaveBeenCalled();
+      expect(AsyncStorage.default.setItem).not.toHaveBeenCalled();
     });
 
     it('should retrieve cached attestations', async () => {
       const attestation = createMockAttestation();
 
       // Mock the storage retrieve
-      const AsyncStorage = await import('@react-native-async-storage/async-storage');
-      vi.mocked(AsyncStorage.default.getItem).mockResolvedValueOnce(
+      vi.mocked(SecureStore.getItemAsync).mockResolvedValueOnce(
         JSON.stringify({
           ...attestation,
           cachedAt: Date.now(),
@@ -163,6 +166,7 @@ describe('Attestation System', () => {
     });
 
     it('should return null for missing attestations', async () => {
+      vi.mocked(SecureStore.getItemAsync).mockResolvedValueOnce(null);
       const AsyncStorage = await import('@react-native-async-storage/async-storage');
       vi.mocked(AsyncStorage.default.getItem).mockResolvedValueOnce(null);
 
@@ -172,21 +176,19 @@ describe('Attestation System', () => {
     });
 
     it('should remove cached attestations', async () => {
-      const AsyncStorage = await import('@react-native-async-storage/async-storage');
-      vi.mocked(AsyncStorage.default.getItem).mockResolvedValueOnce(JSON.stringify([]));
+      vi.mocked(SecureStore.getItemAsync).mockResolvedValueOnce(JSON.stringify([]));
 
       await removeCachedAttestation(mockWalletAddress, mockGuildId, mockRoleId);
 
-      expect(AsyncStorage.default.removeItem).toHaveBeenCalled();
+      expect(SecureStore.deleteItemAsync).toHaveBeenCalled();
     });
 
     it('should clear all attestations for a wallet', async () => {
-      const AsyncStorage = await import('@react-native-async-storage/async-storage');
-      vi.mocked(AsyncStorage.default.getItem).mockResolvedValueOnce(null);
+      vi.mocked(SecureStore.getItemAsync).mockResolvedValueOnce(JSON.stringify([]));
 
       await clearAttestationsForWallet(mockWalletAddress);
 
-      expect(AsyncStorage.default.multiRemove).toHaveBeenCalled();
+      expect(SecureStore.deleteItemAsync).toHaveBeenCalled();
     });
   });
 
@@ -205,8 +207,7 @@ describe('Attestation System', () => {
 
       await cacheIssuerKey(issuerKey);
 
-      const AsyncStorage = await import('@react-native-async-storage/async-storage');
-      expect(AsyncStorage.default.setItem).toHaveBeenCalled();
+      expect(SecureStore.setItemAsync).toHaveBeenCalled();
     });
 
     it('should retrieve cached issuer keys', async () => {
@@ -217,8 +218,7 @@ describe('Attestation System', () => {
         cachedAt: Date.now(),
       };
 
-      const AsyncStorage = await import('@react-native-async-storage/async-storage');
-      vi.mocked(AsyncStorage.default.getItem).mockResolvedValueOnce(JSON.stringify(issuerKey));
+      vi.mocked(SecureStore.getItemAsync).mockResolvedValueOnce(JSON.stringify(issuerKey));
 
       const cached = await getCachedIssuerKey(mockGuildId);
 
@@ -234,23 +234,20 @@ describe('Attestation System', () => {
         cachedAt: Date.now() - 8 * 24 * 60 * 60 * 1000, // 8 days old
       };
 
-      const AsyncStorage = await import('@react-native-async-storage/async-storage');
-      vi.mocked(AsyncStorage.default.getItem).mockResolvedValueOnce(
+      vi.mocked(SecureStore.getItemAsync).mockResolvedValueOnce(
         JSON.stringify(staleIssuerKey)
       );
 
       const cached = await getCachedIssuerKey(mockGuildId, 7); // Max 7 days
 
       expect(cached).toBeNull();
-      expect(AsyncStorage.default.removeItem).toHaveBeenCalled();
+      expect(SecureStore.deleteItemAsync).toHaveBeenCalled();
     });
 
     it('should invalidate issuer key cache on demand', async () => {
-      const AsyncStorage = await import('@react-native-async-storage/async-storage');
-
       await invalidateIssuerKeyCache(mockGuildId);
 
-      expect(AsyncStorage.default.removeItem).toHaveBeenCalled();
+      expect(SecureStore.deleteItemAsync).toHaveBeenCalled();
     });
   });
 
@@ -321,17 +318,13 @@ describe('Attestation System', () => {
   describe('Attestation Data Integrity', () => {
     it('should preserve all attestation fields through storage cycle', async () => {
       const original = createMockAttestation();
-      const AsyncStorage = await import('@react-native-async-storage/async-storage');
-
-      // Mock successful storage and retrieval
-      vi.mocked(AsyncStorage.default.getItem).mockResolvedValueOnce(
+      await cacheAttestation(mockWalletAddress, original);
+      vi.mocked(SecureStore.getItemAsync).mockResolvedValueOnce(
         JSON.stringify({
           ...original,
           cachedAt: Date.now(),
         })
       );
-
-      await cacheAttestation(mockWalletAddress, original);
       const retrieved = await getCachedAttestation(mockWalletAddress, mockGuildId, mockRoleId);
 
       expect(retrieved?.guildId).toBe(original.guildId);

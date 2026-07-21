@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { Session, SessionAdapter, SessionStatus } from "./session.types";
 import { noopSessionAdapter } from "./session.adapter";
-import { secureStorage } from "../../lib/storage";
+import { migratingSecureStorage } from "../../lib/storage";
 
 interface SessionStore extends Session {
   adapter: SessionAdapter;
@@ -78,7 +78,7 @@ export const useSessionStore = create<SessionStore>()(
     }),
     {
       name: "session-storage",
-      storage: createJSONStorage(() => secureStorage),
+      storage: createJSONStorage(() => migratingSecureStorage),
       partialize: (state) => ({
         status: state.status,
         walletAddress: state.walletAddress,

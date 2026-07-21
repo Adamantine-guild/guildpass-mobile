@@ -10,7 +10,7 @@
 
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import { asyncStorage } from "../../lib/storage";
+import { migratingSecureStorage } from "../../lib/storage";
 import type {
   SyncCorrection,
   SyncEntityMeta,
@@ -107,7 +107,7 @@ export const useSyncStore = create<SyncStoreState>()(
     }),
     {
       name: "sync-storage",
-      storage: createJSONStorage(() => asyncStorage),
+      storage: createJSONStorage(() => migratingSecureStorage),
       partialize: (state) => ({
         entityMeta: state.entityMeta,
         corrections: state.corrections,
