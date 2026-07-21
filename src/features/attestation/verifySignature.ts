@@ -1,6 +1,30 @@
 /**
  * EIP-712 signature verification for role attestations
  * Enables cryptographic proof of role membership
+ *
+ * Revocation-aware validation pipeline
+ * -------------------------------------
+ * validateAttestation() runs checks in the following order, deliberately
+ * chosen to minimise work before rejecting an invalid attestation:
+ *
+ *   1. Expiry check  (O(1), no I/O)
+ *   2. Revocation check  (in-memory Map lookup, no network).
+ *      If revocation data is unavailable (offline with no cached data)
+ *      the policy is **FAIL CLOSED**: the attestation is rejected with
+ *      a "revocation_data_unavailable" result.  See
+ *      issuerKeyRegistry.checkIssuerKeyRevoked() for the caching/trust-
+ *      window logic.
+ *   3. Cryptographic signature verification (asymmetric crypto, most
+ *      expensive) — performed last.
+ *
+ * Offline / revocation-data-unavailable policy: FAIL CLOSED
+ * ----------------------------------------------------------
+ * Because attestations are designed as portable, long-lived proofs that
+ * may be verified months after issuance by third parties with no
+ * connection to the GuildPass backend, the conservative default is to
+ * **reject** when revocation status cannot be confirmed.  A verifier
+ * that cannot check whether the issuer key was revoked must not accept
+ * a proof that might have been signed by a compromised key.
  */
 
 import { verifyTypedData } from 'viem';
@@ -10,7 +34,9 @@ import {
   type GuildIssuerKey,
   EIP712_TYPES,
   createEIP712Domain,
+  ATTESTATION_REVOCATION_REASONS,
 } from './types';
+import { checkIssuerKeyRevoked } from './issuerKeyRegistry';
 
 /**
  * Verifies an attestation signature against a known issuer public key
@@ -81,8 +107,38 @@ export function checkAttestationExpiry(
 }
 
 /**
+ * Checks whether the attestation's issuer key has been revoked.
+ *
+ * Returns one of three outcomes via the result object:
+ *  - `{ revoked: false }`  — key is definitively NOT revoked
+ *  - `{ revoked: true }`   — key IS revoked, attestation should be rejected
+ *  - `{ revoked: true, unavailable: true }` — revocation status could not be
+ *    determined (offline and no cached data).  The caller should reject.
+ *
+ * This check is performed **before** cryptographic signature verification
+ * because it is faster (in-memory lookup) and even if the signature is valid,
+ * a revoked key invalidates the attestation regardless.
+ *
+ * @param guildId       Guild to check against.
+ * @param issuerAddress Issuer address that signed the attestation.
+ */
+export async function checkAttestationRevocation(
+  guildId: string,
+  issuerAddress: `0x${string}`
+): Promise<{ revoked: boolean; unavailable?: boolean }> {
+  const isRevoked = await checkIssuerKeyRevoked(guildId, issuerAddress);
+
+  if (isRevoked === null) {
+    // Revocation data unavailable — fail closed
+    return { revoked: true, unavailable: true };
+  }
+
+  return { revoked: isRevoked };
+}
+
+/**
  * Comprehensive validation of an attestation
- * Checks signature validity and expiration
+ * Checks: expiry → revocation → signature validity
  *
  * @param attestation The attestation to validate
  * @param issuerAddress The expected issuer address
@@ -94,7 +150,7 @@ export async function validateAttestation(
   issuerAddress: `0x${string}`,
   chainId: number
 ): Promise<AttestationValidationResult> {
-  // Check expiry first (cheaper than signature verification)
+  // ── 1. Expiry check (O(1), no I/O) ──
   const expiryCheck = checkAttestationExpiry(attestation);
 
   if (expiryCheck.expired) {
@@ -106,7 +162,34 @@ export async function validateAttestation(
     };
   }
 
-  // Verify signature
+  // ── 2. Revocation check (in-memory lookup) ──
+  const revocationResult = await checkAttestationRevocation(
+    attestation.guildId,
+    issuerAddress
+  );
+
+  if (revocationResult.revoked) {
+    if (revocationResult.unavailable) {
+      // Revocation data could not be obtained (offline, no cache).
+      // FAIL CLOSED — reject rather than accept an unverifiable attestation.
+      return {
+        valid: false,
+        reason: ATTESTATION_REVOCATION_REASONS.REVOCATION_DATA_UNAVAILABLE,
+        issuerKeyRevoked: false,
+        revocationCheckSkipped: true,
+      };
+    }
+
+    // Key is definitively revoked
+    return {
+      valid: false,
+      reason: ATTESTATION_REVOCATION_REASONS.KEY_REVOKED,
+      issuerKeyRevoked: true,
+      revocationCheckSkipped: false,
+    };
+  }
+
+  // ── 3. Cryptographic signature verification (most expensive) ──
   const signatureResult = await verifyAttestationSignature(
     attestation,
     issuerAddress,
@@ -123,6 +206,8 @@ export async function validateAttestation(
     recoveredSigner: issuerAddress,
     expired: false,
     remainingValidity: expiryCheck.remainingSeconds,
+    issuerKeyRevoked: false,
+    revocationCheckSkipped: false,
   };
 }
 

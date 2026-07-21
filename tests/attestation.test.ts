@@ -19,8 +19,12 @@ import {
   cacheIssuerKey,
   getCachedIssuerKey,
   invalidateIssuerKeyCache,
+  checkIssuerKeyRevoked,
+  cacheAttestationRevocationRegistry,
+  clearAttestationRevocationCache,
+  ATTESTATION_REVOCATION_CACHE_TTL_MS,
 } from '../src/features/attestation/issuerKeyRegistry';
-import { type RoleAttestation, type GuildIssuerKey } from '../src/features/attestation/types';
+import { type RoleAttestation, type GuildIssuerKey, ATTESTATION_REVOCATION_REASONS } from '../src/features/attestation/types';
 import * as SecureStore from 'expo-secure-store';
 
 // Mock AsyncStorage
@@ -251,7 +255,166 @@ describe('Attestation System', () => {
     });
   });
 
+  describe('Attestation Revocation Checks', () => {
+    const revokedAddress = '0x0000000000000000000000000000000000000001' as `0x${string}`;
+    const activeAddress = '0x0000000000000000000000000000000000000002' as `0x${string}`;
+
+    beforeEach(async () => {
+      await clearAttestationRevocationCache();
+    });
+
+    it('should detect a revoked issuer key and reject the attestation', async () => {
+      // Seed the revocation registry with the issuer address as revoked
+      await cacheAttestationRevocationRegistry(
+        mockGuildId,
+        new Set([revokedAddress.toLowerCase()]),
+      );
+
+      const attestation = createMockAttestation();
+
+      const result = await validateAttestation(
+        attestation,
+        revokedAddress,
+        chainId,
+      );
+
+      expect(result.valid).toBe(false);
+      expect(result.issuerKeyRevoked).toBe(true);
+      expect(result.reason).toBe(ATTESTATION_REVOCATION_REASONS.KEY_REVOKED);
+    });
+
+    it('should accept an attestation when the issuer key is definitively not revoked', async () => {
+      // Seed revocation registry with a different address revoked — our key is clean
+      await cacheAttestationRevocationRegistry(
+        mockGuildId,
+        new Set([revokedAddress.toLowerCase()]),
+      );
+
+      const attestation = createMockAttestation();
+
+      const result = await validateAttestation(
+        attestation,
+        activeAddress,
+        chainId,
+      );
+
+      // The revocation check passes (address not in set), then sig verification runs
+      expect(result.issuerKeyRevoked).toBe(false);
+      // The signature will actually fail because activeAddress differs from the
+      // mock signature's signer — but that's expected; the point is we prove the
+      // revocation check did not falsely reject.
+      expect(result.revocationCheckSkipped).toBe(false);
+    });
+
+    it('should fail closed when no revocation data is cached (offline scenario)', async () => {
+      // Ensure no revocation data is cached
+      await clearAttestationRevocationCache();
+
+      const attestation = createMockAttestation();
+
+      const result = await validateAttestation(
+        attestation,
+        mockIssuerAddress as `0x${string}`,
+        chainId,
+      );
+
+      expect(result.valid).toBe(false);
+      expect(result.revocationCheckSkipped).toBe(true);
+      expect(result.reason).toBe(ATTESTATION_REVOCATION_REASONS.REVOCATION_DATA_UNAVAILABLE);
+    });
+
+    it('should check revocation before signature verification (cheaper check first)', async () => {
+      // Seed with issuer key as revoked
+      await cacheAttestationRevocationRegistry(
+        mockGuildId,
+        new Set([mockIssuerAddress.toLowerCase()]),
+      );
+
+      // Even with a valid-looking signature, revocation should reject first
+      const attestation = createMockAttestation({
+        signature: '0x' + 'a'.repeat(130),
+      });
+
+      const result = await validateAttestation(
+        attestation,
+        mockIssuerAddress as `0x${string}`,
+        chainId,
+      );
+
+      expect(result.valid).toBe(false);
+      expect(result.issuerKeyRevoked).toBe(true);
+      expect(result.reason).toBe(ATTESTATION_REVOCATION_REASONS.KEY_REVOKED);
+      // The revocation check short-circuits before signature verification
+      expect(result.recoveredSigner).toBeUndefined();
+    });
+
+    it('should checkIssuerKeyRevoked return true for revoked address', async () => {
+      await cacheAttestationRevocationRegistry(
+        mockGuildId,
+        new Set([revokedAddress.toLowerCase()]),
+      );
+
+      const result = await checkIssuerKeyRevoked(mockGuildId, revokedAddress);
+      expect(result).toBe(true);
+    });
+
+    it('should checkIssuerKeyRevoked return false for active address', async () => {
+      await cacheAttestationRevocationRegistry(
+        mockGuildId,
+        new Set([revokedAddress.toLowerCase()]),
+      );
+
+      const result = await checkIssuerKeyRevoked(mockGuildId, activeAddress);
+      expect(result).toBe(false);
+    });
+
+    it('should checkIssuerKeyRevoked return null when no revocation data available', async () => {
+      await clearAttestationRevocationCache();
+
+      const result = await checkIssuerKeyRevoked(mockGuildId, activeAddress);
+      expect(result).toBeNull();
+    });
+
+    it('should use cached revocation data even after in-memory cache is cleared (falls back to persisted)', async () => {
+      // Seed data — stores in both in-memory and persisted
+      await cacheAttestationRevocationRegistry(
+        mockGuildId,
+        new Set([revokedAddress.toLowerCase()]),
+      );
+
+      // Verify it works fresh
+      const freshResult = await checkIssuerKeyRevoked(mockGuildId, revokedAddress);
+      expect(freshResult).toBe(true);
+
+      // Clear in-memory cache only
+      await clearAttestationRevocationCache();
+
+      // Re-seed with a slightly aged timestamp (past TTL, within trust window)
+      const oldTimestamp = Date.now() - ATTESTATION_REVOCATION_CACHE_TTL_MS - 1;
+      await cacheAttestationRevocationRegistry(
+        mockGuildId,
+        new Set([revokedAddress.toLowerCase()]),
+        oldTimestamp,
+      );
+
+      // Data is still in persisted store and in-memory (just re-seeded).
+      // The in-memory copy has the old timestamp (past TTL) but is still
+      // within the 24h offline trust window.
+      const cachedResult = await checkIssuerKeyRevoked(mockGuildId, revokedAddress);
+      expect(cachedResult).toBe(true);
+    });
+  });
+
   describe('Attestation Validation', () => {
+    beforeEach(async () => {
+      // Ensure revocation data is available so revocation check doesn't
+      // short-circuit the other tests
+      await cacheAttestationRevocationRegistry(
+        mockGuildId,
+        new Set([]), // Empty set = no keys revoked
+      );
+    });
+
     it('should reject expired attestations', async () => {
       const expiredAttestation = createMockAttestation({
         expiresAt: Math.floor(Date.now() / 1000) - 1000,

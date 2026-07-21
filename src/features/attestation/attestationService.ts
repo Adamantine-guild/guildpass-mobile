@@ -9,6 +9,7 @@ import {
   getCachedIssuerKey,
   cacheIssuerKey,
   invalidateIssuerKeyCache,
+  cacheAttestationRevocationRegistry,
 } from './issuerKeyRegistry';
 import {
   cacheAttestation,
@@ -16,6 +17,12 @@ import {
   removeCachedAttestation,
   getAttestationsForGuild,
 } from './attestationStorage';
+
+/**
+ * Callback for fetching revocation registry from the backend.
+ * Returns the set of revoked issuer addresses (0x-prefixed hex) for the guild.
+ */
+export type FetchRevocationRegistry = (guildId: string) => Promise<string[]>;
 
 /**
  * Attestation service configuration
@@ -30,6 +37,16 @@ export interface AttestationServiceConfig {
     guildId: string;
     roleId: string;
   }) => Promise<RoleAttestation>;
+  /**
+   * Optional callback to fetch the set of revoked issuer addresses for a guild.
+   * When provided, the service populates the revocation cache during online
+   * verification, enabling offline revocation checks later.
+   *
+   * If omitted, revocation data must be seeded via
+   * `cacheAttestationRevocationRegistry()` externally, or else
+   * `validateAttestation()` will fail closed (rejecting unverifiable attestations).
+   */
+  fetchRevocationRegistry?: FetchRevocationRegistry;
 }
 
 /**
@@ -43,11 +60,13 @@ export class AttestationService {
     guildId: string;
     roleId: string;
   }) => Promise<RoleAttestation>;
+  private fetchRevocationRegistry?: FetchRevocationRegistry;
 
   constructor(config: AttestationServiceConfig) {
     this.chainId = config.chainId;
     this.fetchIssuerKey = config.fetchIssuerKey;
     this.fetchAttestation = config.fetchAttestation;
+    this.fetchRevocationRegistry = config.fetchRevocationRegistry;
   }
 
   /**
@@ -79,6 +98,9 @@ export class AttestationService {
 
       // Get issuer key (cached or fresh)
       const issuerAddress = await this.getIssuerKey(guildId);
+
+      // Populate revocation cache if a fetch callback is configured
+      await this.maybeRefreshRevocationCache(guildId);
 
       // Verify the attestation
       const validationResult = await validateAttestation(
@@ -158,6 +180,33 @@ export class AttestationService {
         valid: false,
         reason: error instanceof Error ? error.message : 'Verification failed',
       };
+    }
+  }
+
+  /**
+   * Optionally refresh the revocation cache from the backend.
+   * No-op if no fetchRevocationRegistry callback is configured.
+   * This is called during online verification so that offline checks
+   * have recent revocation data within the trust window.
+   */
+  private async maybeRefreshRevocationCache(guildId: string): Promise<void> {
+    if (!this.fetchRevocationRegistry) {
+      return;
+    }
+
+    try {
+      const revokedAddresses = await this.fetchRevocationRegistry(guildId);
+      if (Array.isArray(revokedAddresses)) {
+        await cacheAttestationRevocationRegistry(
+          guildId,
+          new Set(revokedAddresses.map((a) => a.toLowerCase())),
+        );
+      }
+    } catch (error) {
+      // Non-fatal: revocation data is best-effort during online fetch.
+      // If the fetch fails, existing cached data (if any) will be used
+      // for the trust-window check, or the next validation will fail closed.
+      console.warn(`Failed to refresh revocation registry for guild ${guildId}:`, error);
     }
   }
 
