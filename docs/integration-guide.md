@@ -18,6 +18,18 @@ import { guildPassClient } from "@/lib/guildpassClient";
 const data = await guildPassClient.guilds.getGuild({ guildId: "123" });
 ```
 
+### Attestation integration
+
+The current GuildPass SDK does not provide an `attestation` service or
+attestation retrieval APIs. Attestation verification can be wired through an
+application-provided backend adapter that supplies the issuer key and issued
+attestation to the mobile attestation service.
+
+Recovery of attestations would require a backend API that retains and lists
+previously issued attestations. The current mobile app and SDK do not expose
+such an API, so an empty local attestation collection must not be treated as
+proof of a new device or as a recoverable state.
+
 <!-- GuildPass Mobile: Documentation section layout header reference. -->
 
 ## Environment Configuration
