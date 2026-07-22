@@ -112,7 +112,7 @@ export default function AccessScanner() {
 
   if (isProcessingScan) {
     return (
-      <View className="flex-1 bg-background justify-center items-center">
+      <View accessibilityLabel="Processing access QR code" accessibilityState={{ busy: true }} className="flex-1 bg-background justify-center items-center">
         <AppHeader title="Scan Access QR" showBack />
         <ActivityIndicator size="large" accessibilityLabel="Processing access QR code" accessibilityLiveRegion="polite" />
         <Text accessibilityLiveRegion="polite" className="mt-4 text-text">Processing...</Text>
