@@ -415,6 +415,61 @@ const onGuildKeyRotation = async (guildId: string) => {
 - Replace signatures with ZK proofs for privacy
 - Hide guild membership while proving eligibility
 
+### Device Co-Signing (Exploratory)
+
+**Status**: Feasibility investigation complete, prototype available. See `docs/device-signing-feasibility.md` for full analysis.
+
+**Concept**: Enable device-bound cryptographic proofs that strengthen presentation-time trust by having the user's device co-sign attestations with a hardware-backed key.
+
+**Motivation**:
+- Current attestations prove "the issuer said this wallet has this role"
+- Device co-signing would prove "the person physically presenting this device attests to it right now"
+- Strengthens offline/portable verification with device possession proof
+- Hardware-backed keys (iOS Secure Enclave, Android StrongBox) provide non-extractable private keys
+
+**Feasibility Findings**:
+- ✅ Hardware-backed asymmetric key generation is possible via `expo-hardware-key` or `expo-device-crypto`
+- ✅ iOS Secure Enclave and Android StrongBox/TEE integration is feasible
+- ✅ Biometric authentication can be required for signing operations
+- ❌ Direct EIP-712 signing not possible due to curve incompatibility (P-256 vs secp256k1)
+- ❌ `expo-secure-store` does not support asymmetric key operations
+
+**Proposed Approaches**:
+
+1. **Hybrid Device Attestation** (Recommended)
+   - Device signs attestation hash with P-256 hardware key
+   - Combined proof: { issuerSignature (secp256k1), deviceSignature (P-256), devicePublicKey }
+   - Verifier validates both signatures independently
+   - Requires protocol extension but doesn't break existing attestations
+
+2. **Hardware-Protected secp256k1 Key**
+   - Use hardware key to encrypt/protect a software-based secp256k1 key
+   - Enables EIP-712 signing with hardware protection
+   - Private key exists in memory during signing (vulnerability window)
+
+3. **Alternative Attestation Format**
+   - Separate EIP-712-like format for device attestations using P-256
+   - Clean separation but requires new protocol specification
+
+**Prototype Status**:
+- Isolated prototype module: `src/features/attestation/experimental/deviceSigning.ts`
+- Co-signing flow prototype: `src/features/attestation/experimental/deviceCoSigning.ts`
+- NOT integrated with production attestation flow
+- Requires physical device testing (iOS 15.1+, Android API 23+)
+
+**Next Steps** (If approved):
+1. Install `expo-hardware-key` dependency
+2. Test prototype on physical devices
+3. Choose integration approach (Hybrid recommended)
+4. Design protocol extension for co-signed attestations
+5. Update verification pipeline to handle device signatures
+6. Add UI for device key management
+
+**Blockers**:
+- Curve incompatibility requires protocol-level workaround
+- External library dependency adds maintenance burden
+- Platform differences require careful testing
+
 ## References
 
 - [EIP-712: Typed structured data hashing and signing](https://eips.ethereum.org/EIPS/eip-712)
