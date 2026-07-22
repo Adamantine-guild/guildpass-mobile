@@ -23,7 +23,10 @@ import {
 } from "../features/security/deviceIntegrity";
 import { useSessionStore } from "../features/session/session.store";
 import { useIntegrityWarningStore } from "../features/security/integrityWarning.store";
-import { logPinningStatus } from "../features/security/certificatePinning";
+import {
+  enforcePinConfigurationAtStartup,
+  logPinningStatus,
+} from "../features/security/certificatePinning";
 import { appConfig } from "../config/appConfig";
 
 /**
@@ -66,7 +69,10 @@ export function useSecurityInit(): void {
       console.log("[GuildPass Security] Device integrity check PASSED.");
     }
 
-    // -- Initialize secure fetch --
+    // -- Initialize secure fetch + certificate pinning gate --
+    // Preview/production builds fail loudly on placeholder or empty pins so
+    // pinning cannot silently ship disabled. Development keeps placeholders.
+    enforcePinConfigurationAtStartup(appConfig.appEnv);
     initializeSecureFetch();
     logPinningStatus();
 

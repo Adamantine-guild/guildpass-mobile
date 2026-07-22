@@ -211,3 +211,39 @@ export function logPinningStatus(): void {
     );
   }
 }
+
+/**
+ * Startup gate for certificate pinning configuration.
+ *
+ * Development builds may keep placeholder pins for local iteration.
+ * Preview and production builds must not ship with placeholders or an empty
+ * pin set — throw a loud, actionable error so the misconfiguration cannot
+ * silently reach users.
+ *
+ * Pure with respect to the provided `appEnv` and optional precomputed
+ * validation result so unit tests can cover both paths without mounting
+ * the React hook.
+ */
+export function enforcePinConfigurationAtStartup(
+  appEnv: "development" | "preview" | "production",
+  validation: { valid: boolean; errors: string[] } = validatePinConfiguration(),
+): void {
+  if (validation.valid) {
+    return;
+  }
+
+  if (appEnv === "development") {
+    console.warn(
+      "[GuildPass Security] Certificate pinning misconfigured (allowed in development):",
+      validation.errors.join("; "),
+    );
+    return;
+  }
+
+  throw new Error(
+    "[GuildPass Security] Certificate pinning is misconfigured for a " +
+      `${appEnv} build and cannot start:\n` +
+      validation.errors.map((e) => `  - ${e}`).join("\n") +
+      "\nReplace placeholder SPKI hashes in certificatePinning.ts before shipping.",
+  );
+}

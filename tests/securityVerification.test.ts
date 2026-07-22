@@ -18,6 +18,7 @@ import { createEncryptedAsyncStoragePersister } from "../src/lib/encryptedPersis
 import { EncryptionService } from "../src/lib/encryptionService";
 import { KeyManager } from "../src/lib/keyManager";
 import { PERSISTED_QUERY_CACHE_KEY } from "../src/lib/offlineCache";
+import { enforcePinConfigurationAtStartup } from "../src/features/security/certificatePinning";
 import {
   TEST_WALLET_ADDRESS,
   MEMBERSHIP_ACTIVE_FIXTURE,
@@ -154,5 +155,48 @@ describe("Security verification – tamper resistance (Req 1.6 / 6.2)", () => {
 
     // Verify the corrupted entry was proactively cleared.
     expect(await storage.getItem(PERSISTED_QUERY_CACHE_KEY)).toBeNull();
+  });
+});
+
+describe("Security verification – certificate pin startup gate (issue #164)", () => {
+  const placeholderValidation = {
+    valid: false as const,
+    errors: [
+      'Pin "guildpass-primary-2026" is a placeholder. Replace with an actual SPKI SHA-256 hash.',
+    ],
+  };
+
+  const healthyValidation = {
+    valid: true as const,
+    errors: [] as string[],
+  };
+
+  it("blocks production builds when pin configuration is invalid", () => {
+    expect(() =>
+      enforcePinConfigurationAtStartup("production", placeholderValidation),
+    ).toThrow(/Certificate pinning is misconfigured for a production build/);
+  });
+
+  it("blocks preview builds when pin configuration is invalid", () => {
+    expect(() =>
+      enforcePinConfigurationAtStartup("preview", placeholderValidation),
+    ).toThrow(/Certificate pinning is misconfigured for a preview build/);
+  });
+
+  it("does not block development builds when pins are placeholders", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(() =>
+      enforcePinConfigurationAtStartup("development", placeholderValidation),
+    ).not.toThrow();
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it("is a no-op when pin configuration is valid in any environment", () => {
+    for (const env of ["development", "preview", "production"] as const) {
+      expect(() =>
+        enforcePinConfigurationAtStartup(env, healthyValidation),
+      ).not.toThrow();
+    }
   });
 });
