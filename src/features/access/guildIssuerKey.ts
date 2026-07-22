@@ -1,4 +1,6 @@
+import { sha256, toHex } from "viem";
 import { guildPassClient } from "../../lib/guildpassClient";
+import { migratingSecureStorage } from "../../lib/storage";
 import { QrSignatureError, QR_SIGNATURE_ERROR_CODES } from "./qrSignature";
 
 /**
@@ -47,6 +49,143 @@ let currentCacheTtlMs = DEFAULT_KEY_REGISTRY_CACHE_TTL_MS;
 let currentOfflineTrustWindowMs = DEFAULT_KEY_REGISTRY_OFFLINE_TRUST_WINDOW_MS;
 
 const registryCache = new Map<string, GuildKeyRegistry>();
+
+type SerializedGuildKeyRegistry = {
+  version: 1;
+  guildId: string;
+  keys: Array<[string, string]>;
+  revokedKids: string[];
+  fetchedAt: number;
+  legacyPublicKey?: string;
+  checksum: string;
+};
+
+type RegistryChecksumPayload = Omit<SerializedGuildKeyRegistry, "checksum">;
+
+const GUILD_KEY_REGISTRY_STORAGE_PREFIX = "guildpass:access-key-registry:v1:";
+
+const getPersistentRegistryStorageKey = (guildId: string): string =>
+  `${GUILD_KEY_REGISTRY_STORAGE_PREFIX}${guildId}`;
+
+const buildRegistryChecksumPayload = (
+  registry: GuildKeyRegistry,
+): RegistryChecksumPayload => ({
+  version: 1,
+  guildId: registry.guildId,
+  keys: Array.from(registry.keys.entries()).sort(([left], [right]) => left.localeCompare(right)),
+  revokedKids: Array.from(registry.revokedKids.values()).sort(),
+  fetchedAt: registry.fetchedAt,
+  ...(registry.legacyPublicKey ? { legacyPublicKey: registry.legacyPublicKey } : {}),
+});
+
+const createRegistryChecksum = (payload: RegistryChecksumPayload): string =>
+  sha256(toHex(JSON.stringify(payload)));
+
+const serializeRegistry = (registry: GuildKeyRegistry): string => {
+  const payload = buildRegistryChecksumPayload(registry);
+  const serialized: SerializedGuildKeyRegistry = {
+    ...payload,
+    checksum: createRegistryChecksum(payload),
+  };
+  return JSON.stringify(serialized);
+};
+
+const deserializeRegistry = (raw: string, expectedGuildId: string): GuildKeyRegistry | null => {
+  try {
+    const parsed = JSON.parse(raw) as Partial<SerializedGuildKeyRegistry>;
+    if (
+      parsed.version !== 1 ||
+      parsed.guildId !== expectedGuildId ||
+      !Number.isFinite(parsed.fetchedAt) ||
+      !Array.isArray(parsed.keys) ||
+      !Array.isArray(parsed.revokedKids) ||
+      typeof parsed.checksum !== "string"
+    ) {
+      return null;
+    }
+
+    const keys = new Map<string, string>();
+    for (const entry of parsed.keys) {
+      if (
+        !Array.isArray(entry) ||
+        entry.length !== 2 ||
+        typeof entry[0] !== "string" ||
+        typeof entry[1] !== "string"
+      ) {
+        return null;
+      }
+      keys.set(entry[0], entry[1]);
+    }
+
+    const revokedKids = new Set<string>();
+    for (const kid of parsed.revokedKids) {
+      if (typeof kid !== "string") return null;
+      revokedKids.add(kid);
+      keys.delete(kid);
+    }
+
+    const payload: RegistryChecksumPayload = {
+      version: 1,
+      guildId: parsed.guildId,
+      keys: Array.from(keys.entries()).sort(([left], [right]) => left.localeCompare(right)),
+      revokedKids: Array.from(revokedKids.values()).sort(),
+      fetchedAt: parsed.fetchedAt,
+      ...(typeof parsed.legacyPublicKey === "string"
+        ? { legacyPublicKey: parsed.legacyPublicKey }
+        : {}),
+    };
+
+    if (createRegistryChecksum(payload) !== parsed.checksum) {
+      return null;
+    }
+
+    return {
+      guildId: parsed.guildId,
+      keys,
+      revokedKids,
+      fetchedAt: parsed.fetchedAt,
+      ...(typeof parsed.legacyPublicKey === "string"
+        ? { legacyPublicKey: parsed.legacyPublicKey }
+        : {}),
+    };
+  } catch {
+    return null;
+  }
+};
+
+const loadPersistedRegistry = async (guildId: string): Promise<GuildKeyRegistry | null> => {
+  const storageKey = getPersistentRegistryStorageKey(guildId);
+  try {
+    const raw = await migratingSecureStorage.getItem(storageKey);
+    if (raw === null) return null;
+
+    const registry = deserializeRegistry(raw, guildId);
+    if (registry === null) {
+      await migratingSecureStorage.removeItem(storageKey);
+    }
+    return registry;
+  } catch (error) {
+    console.warn(`Failed to load persisted key registry for guild ${guildId}:`, error);
+    return null;
+  }
+};
+
+const persistRegistry = async (registry: GuildKeyRegistry): Promise<void> => {
+  try {
+    await migratingSecureStorage.setItem(
+      getPersistentRegistryStorageKey(registry.guildId),
+      serializeRegistry(registry),
+    );
+  } catch (error) {
+    console.warn(`Failed to persist key registry for guild ${registry.guildId}:`, error);
+  }
+};
+
+const cacheRegistry = async (registry: GuildKeyRegistry): Promise<GuildKeyRegistry> => {
+  registryCache.set(registry.guildId, registry);
+  await persistRegistry(registry);
+  return registry;
+};
 
 export const clearIssuerKeyCache = (): void => {
   registryCache.clear();
@@ -168,8 +307,7 @@ export const getGuildKeyRegistry = async (
     // Cache expired: try to refresh
     try {
       const freshRegistry = await fetchGuildKeyRegistry(guildId, now);
-      registryCache.set(guildId, freshRegistry);
-      return freshRegistry;
+      return cacheRegistry(freshRegistry);
     } catch (error) {
       // Refresh failed (e.g. offline)
       if (age <= currentOfflineTrustWindowMs) {
@@ -184,10 +322,33 @@ export const getGuildKeyRegistry = async (
     }
   }
 
-  // No cached entry: must fetch online
+  const persisted = await loadPersistedRegistry(guildId);
+  if (persisted !== null) {
+    registryCache.set(guildId, persisted);
+    const age = nowMs - persisted.fetchedAt;
+
+    if (age < currentCacheTtlMs) {
+      return persisted;
+    }
+
+    try {
+      const freshRegistry = await fetchGuildKeyRegistry(guildId, now);
+      return cacheRegistry(freshRegistry);
+    } catch (error) {
+      if (age <= currentOfflineTrustWindowMs) {
+        return persisted;
+      }
+
+      throw new QrSignatureError(
+        QR_SIGNATURE_ERROR_CODES.KEY_REGISTRY_EXPIRED,
+        "Persisted guild key registry cache expired and could not be refreshed offline.",
+      );
+    }
+  }
+
+  // No memory or persisted entry: must fetch online
   const freshRegistry = await fetchGuildKeyRegistry(guildId, now);
-  registryCache.set(guildId, freshRegistry);
-  return freshRegistry;
+  return cacheRegistry(freshRegistry);
 };
 
 /**
