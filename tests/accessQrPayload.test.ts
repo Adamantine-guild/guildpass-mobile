@@ -148,3 +148,45 @@ describe("parseAccessQrPayload", () => {
     );
   });
 });
+
+describe("parseAccessQrPayload - Delimiter Injection Prevention (Property-based tests)", () => {
+  it("rejects randomly generated colliding payloads", () => {
+    // A lightweight custom generator for delimiter injection fuzzing
+    const generateCollidingPayloads = (numPairs: number) => {
+      const payloads = [];
+      const safeChars = "abcdefghijklmnopqrstuvwxyz0123456789";
+      for (let i = 0; i < numPairs; i++) {
+        // e.g. guild="foo", resource="bar\nbaz" -> canonicalizes to foo\nbar\nbaz
+        // collides with guild="foo\nbar", resource="baz" -> canonicalizes to foo\nbar\nbaz
+        const p1 = `part1_${Math.random()}`;
+        const p2 = `part2_${Math.random()}`;
+        const p3 = `part3_${Math.random()}`;
+        
+        payloads.push({
+          guildId: p1,
+          resourceId: `${p2}\n${p3}`,
+        });
+        payloads.push({
+          guildId: `${p1}\n${p2}`,
+          resourceId: p3,
+        });
+      }
+      return payloads;
+    };
+
+    const maliciousPayloads = generateCollidingPayloads(50);
+    let rejectedCount = 0;
+
+    for (const fields of maliciousPayloads) {
+      try {
+        parseAccessQrPayload(buildPayload(fields), now);
+      } catch (e) {
+        expect(e).toBeInstanceOf(QrPayloadError);
+        rejectedCount++;
+      }
+    }
+
+    // Ensure EVERY generated attempt with \n was rejected
+    expect(rejectedCount).toBe(maliciousPayloads.length);
+  });
+});
