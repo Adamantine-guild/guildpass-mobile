@@ -81,6 +81,12 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === "string" && value.trim().length > 0;
 
+const isValidIdentifier = (value: unknown): value is string =>
+  typeof value === "string" && /^[a-zA-Z0-9\-_.:]+$/.test(value);
+
+const hasNoControlChars = (value: string): boolean =>
+  !/[\x00-\x1F\x7F]/.test(value);
+
 export const parseAccessQrPayload = (
   rawPayload: string,
   now: Date = new Date(),
@@ -117,14 +123,14 @@ export const parseAccessQrPayload = (
     );
   }
 
-  if (!isNonEmptyString(decodedPayload.guildId)) {
+  if (!isValidIdentifier(decodedPayload.guildId)) {
     throw new QrPayloadError(
       QR_PAYLOAD_ERROR_CODES.MISSING_GUILD_ID,
       "QR code is missing a valid guild ID.",
     );
   }
 
-  if (!isNonEmptyString(decodedPayload.resourceId)) {
+  if (!isValidIdentifier(decodedPayload.resourceId)) {
     throw new QrPayloadError(
       QR_PAYLOAD_ERROR_CODES.MISSING_RESOURCE_ID,
       "QR code is missing a valid resource ID.",
@@ -143,7 +149,7 @@ export const parseAccessQrPayload = (
   }
 
   if (decodedPayload.expiresAt !== undefined) {
-    if (!isNonEmptyString(decodedPayload.expiresAt)) {
+    if (!isNonEmptyString(decodedPayload.expiresAt) || !hasNoControlChars(decodedPayload.expiresAt)) {
       throw new QrPayloadError(
         QR_PAYLOAD_ERROR_CODES.INVALID_EXPIRATION,
         "QR code contains an invalid expiration time.",
@@ -172,7 +178,7 @@ export const parseAccessQrPayload = (
   // verifyAndParseAccessQrPayload when the feature flag is enabled.
   if (
     decodedPayload.signature !== undefined &&
-    !isNonEmptyString(decodedPayload.signature)
+    (!isNonEmptyString(decodedPayload.signature) || !hasNoControlChars(decodedPayload.signature))
   ) {
     throw new QrPayloadError(
       QR_PAYLOAD_ERROR_CODES.INVALID_SIGNATURE,
@@ -183,14 +189,17 @@ export const parseAccessQrPayload = (
   // Nonce is optional at the structural layer for the same migration-window
   // reason as signature above; replay enforcement in verifyAndParseAccessQrPayload
   // only runs when a payload actually carries one.
-  if (decodedPayload.nonce !== undefined && !isNonEmptyString(decodedPayload.nonce)) {
+  if (
+    decodedPayload.nonce !== undefined &&
+    (!isNonEmptyString(decodedPayload.nonce) || !hasNoControlChars(decodedPayload.nonce))
+  ) {
     throw new QrPayloadError(
       QR_PAYLOAD_ERROR_CODES.INVALID_NONCE,
       "QR code contains an invalid nonce.",
     );
   }
 
-  if (decodedPayload.kid !== undefined && !isNonEmptyString(decodedPayload.kid)) {
+  if (decodedPayload.kid !== undefined && !isValidIdentifier(decodedPayload.kid)) {
     throw new QrPayloadError(
       QR_PAYLOAD_ERROR_CODES.INVALID_KID,
       "QR code contains an invalid key ID.",
