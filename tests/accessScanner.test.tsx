@@ -3,7 +3,7 @@ import TestRenderer, { act, type ReactTestRenderer } from "react-test-renderer";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useCameraPermissions, type PermissionResponse } from "expo-camera/next";
 import AccessScanner from "../app/access-scanner";
-import { useAccessHistoryStore } from "../src/features/access/accessHistory.store";
+import { useAccessHistoryStore } from "../src/features/access/accessHistory.store";`n`nconst accessibilityInfoMock = vi.hoisted(() => ({`n  announceForAccessibility: vi.fn(),`n}));
 
 vi.mock("react-native", () => ({
   View: "View",
@@ -13,7 +13,7 @@ vi.mock("react-native", () => ({
   TouchableOpacity: "TouchableOpacity",
   ActivityIndicator: "ActivityIndicator",
   SafeAreaView: "SafeAreaView",
-  StyleSheet: { create: (styles: Record<string, unknown>) => styles },
+  StyleSheet: { create: (styles: Record<string, unknown>) => styles },`n  AccessibilityInfo: accessibilityInfoMock,
 }));
 
 type MockCameraViewProps = {
@@ -84,7 +84,7 @@ describe("AccessScanner", () => {
 
     const renderer = TestRenderer.create(<AccessScanner />);
 
-    expect(screenText(renderer)).toContain("Checking camera permission...");
+    expect(screenText(renderer)).toContain("Checking camera permission...");`n    expect(screenText(renderer)).toContain("accessibilityLiveRegion");
   });
 
   it("shows permission request when camera not granted and can ask again", () => {
@@ -92,7 +92,7 @@ describe("AccessScanner", () => {
 
     const renderer = TestRenderer.create(<AccessScanner />);
 
-    expect(screenText(renderer)).toContain("Allow Camera Access");
+    expect(screenText(renderer)).toContain("Allow Camera Access");`n    expect(screenText(renderer)).toContain("Camera access needed");`n    expect(screenText(renderer)).toContain("accessibilityRole");
   });
 
   it("shows permanent denial message when camera denied and cannot ask again", () => {
@@ -110,9 +110,62 @@ describe("AccessScanner", () => {
 
     const renderer = TestRenderer.create(<AccessScanner />);
 
-    expect(screenText(renderer)).toContain("Point your camera at a GuildPass access QR code.");
+    expect(screenText(renderer)).toContain("Point your camera at a GuildPass access QR code.");`n    expect(cameraViewMock.mock.calls.at(-1)?.[0]).toMatchObject({`n      accessibilityLabel: "Scanning for GuildPass access QR code",`n      accessibilityHint: "Point the camera at a GuildPass QR code to start access verification",`n      accessibilityLiveRegion: "polite",`n    });
   });
 
+
+  it("announces processing and success during a valid scan", async () => {
+    mockCameraPermission(createPermissionResponse(true, true));
+    verifyAndParseAccessQrPayloadMock.mockResolvedValue({
+      guildId: "guild-alpha",
+      resourceId: "vip-door",
+      walletAddress: "0xabc",
+      expiresAt: "2099-01-01T00:00:00.000Z",
+    });
+
+    TestRenderer.create(<AccessScanner />);
+
+    await act(async () => {
+      const cameraProps = cameraViewMock.mock.calls.at(-1)?.[0];
+
+      if (!cameraProps) {
+        throw new Error("CameraView did not render");
+      }
+
+      await cameraProps.onBarcodeScanned?.({ data: "payload" });
+    });
+
+    expect(accessibilityInfoMock.announceForAccessibility).toHaveBeenCalledWith(
+      "Processing access QR code.",
+    );
+    expect(accessibilityInfoMock.announceForAccessibility).toHaveBeenCalledWith(
+      "QR code accepted. Opening access check.",
+    );
+  });
+
+  it("marks scan errors as assertive live-region alerts", async () => {
+    mockCameraPermission(createPermissionResponse(true, true));
+    verifyAndParseAccessQrPayloadMock.mockRejectedValue(new Error("forged"));
+
+    const renderer = TestRenderer.create(<AccessScanner />);
+
+    await act(async () => {
+      const cameraProps = cameraViewMock.mock.calls.at(-1)?.[0];
+
+      if (!cameraProps) {
+        throw new Error("CameraView did not render");
+      }
+
+      await cameraProps.onBarcodeScanned?.({ data: "payload" });
+    });
+
+    const output = screenText(renderer);
+    expect(output).toContain("QR code rejected");
+    expect(output).toContain("assertive");
+    expect(accessibilityInfoMock.announceForAccessibility).toHaveBeenCalledWith(
+      "QR code rejected. Unable to read QR payload.",
+    );
+  });
   it("shows the recent-history section", () => {
     mockCameraPermission(createPermissionResponse(true, true));
 
