@@ -3,7 +3,11 @@ import TestRenderer, { act, type ReactTestRenderer } from "react-test-renderer";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useCameraPermissions, type PermissionResponse } from "expo-camera/next";
 import AccessScanner from "../app/access-scanner";
-import { useAccessHistoryStore } from "../src/features/access/accessHistory.store";`n`nconst accessibilityInfoMock = vi.hoisted(() => ({`n  announceForAccessibility: vi.fn(),`n}));
+import { useAccessHistoryStore } from "../src/features/access/accessHistory.store";
+
+const accessibilityInfoMock = vi.hoisted(() => ({
+  announceForAccessibility: vi.fn(),
+}));
 
 vi.mock("react-native", () => ({
   View: "View",
@@ -13,7 +17,8 @@ vi.mock("react-native", () => ({
   TouchableOpacity: "TouchableOpacity",
   ActivityIndicator: "ActivityIndicator",
   SafeAreaView: "SafeAreaView",
-  StyleSheet: { create: (styles: Record<string, unknown>) => styles },`n  AccessibilityInfo: accessibilityInfoMock,
+  StyleSheet: { create: (styles: Record<string, unknown>) => styles },
+  AccessibilityInfo: accessibilityInfoMock,
 }));
 
 type MockCameraViewProps = {
@@ -84,7 +89,8 @@ describe("AccessScanner", () => {
 
     const renderer = TestRenderer.create(<AccessScanner />);
 
-    expect(screenText(renderer)).toContain("Checking camera permission...");`n    expect(screenText(renderer)).toContain("accessibilityLiveRegion");
+    expect(screenText(renderer)).toContain("Checking camera permission...");
+    expect(screenText(renderer)).toContain("accessibilityLiveRegion");
   });
 
   it("shows permission request when camera not granted and can ask again", () => {
@@ -92,7 +98,9 @@ describe("AccessScanner", () => {
 
     const renderer = TestRenderer.create(<AccessScanner />);
 
-    expect(screenText(renderer)).toContain("Allow Camera Access");`n    expect(screenText(renderer)).toContain("Camera access needed");`n    expect(screenText(renderer)).toContain("accessibilityRole");
+    expect(screenText(renderer)).toContain("Allow Camera Access");
+    expect(screenText(renderer)).toContain("Camera access needed");
+    expect(screenText(renderer)).toContain("accessibilityRole");
   });
 
   it("shows permanent denial message when camera denied and cannot ask again", () => {
@@ -110,7 +118,12 @@ describe("AccessScanner", () => {
 
     const renderer = TestRenderer.create(<AccessScanner />);
 
-    expect(screenText(renderer)).toContain("Point your camera at a GuildPass access QR code.");`n    expect(cameraViewMock.mock.calls.at(-1)?.[0]).toMatchObject({`n      accessibilityLabel: "Scanning for GuildPass access QR code",`n      accessibilityHint: "Point the camera at a GuildPass QR code to start access verification",`n      accessibilityLiveRegion: "polite",`n    });
+    expect(screenText(renderer)).toContain("Point your camera at a GuildPass access QR code.");
+    expect(cameraViewMock.mock.calls.at(-1)?.[0]).toMatchObject({
+      accessibilityLabel: "Scanning for GuildPass access QR code",
+      accessibilityHint: "Point the camera at a GuildPass QR code to start access verification",
+      accessibilityLiveRegion: "polite",
+    });
   });
 
 
