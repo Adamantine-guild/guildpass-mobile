@@ -93,19 +93,27 @@ const serializeRegistry = (registry: GuildKeyRegistry): string => {
 const deserializeRegistry = (raw: string, expectedGuildId: string): GuildKeyRegistry | null => {
   try {
     const parsed = JSON.parse(raw) as Partial<SerializedGuildKeyRegistry>;
+    const guildId = parsed.guildId;
+    const fetchedAt = parsed.fetchedAt;
+    const serializedKeys = parsed.keys;
+    const serializedRevokedKids = parsed.revokedKids;
+    const checksum = parsed.checksum;
+
     if (
       parsed.version !== 1 ||
-      parsed.guildId !== expectedGuildId ||
-      !Number.isFinite(parsed.fetchedAt) ||
-      !Array.isArray(parsed.keys) ||
-      !Array.isArray(parsed.revokedKids) ||
-      typeof parsed.checksum !== "string"
+      typeof guildId !== "string" ||
+      guildId !== expectedGuildId ||
+      typeof fetchedAt !== "number" ||
+      !Number.isFinite(fetchedAt) ||
+      !Array.isArray(serializedKeys) ||
+      !Array.isArray(serializedRevokedKids) ||
+      typeof checksum !== "string"
     ) {
       return null;
     }
 
     const keys = new Map<string, string>();
-    for (const entry of parsed.keys) {
+    for (const entry of serializedKeys) {
       if (
         !Array.isArray(entry) ||
         entry.length !== 2 ||
@@ -118,7 +126,7 @@ const deserializeRegistry = (raw: string, expectedGuildId: string): GuildKeyRegi
     }
 
     const revokedKids = new Set<string>();
-    for (const kid of parsed.revokedKids) {
+    for (const kid of serializedRevokedKids) {
       if (typeof kid !== "string") return null;
       revokedKids.add(kid);
       keys.delete(kid);
@@ -126,24 +134,24 @@ const deserializeRegistry = (raw: string, expectedGuildId: string): GuildKeyRegi
 
     const payload: RegistryChecksumPayload = {
       version: 1,
-      guildId: parsed.guildId,
+      guildId,
       keys: Array.from(keys.entries()).sort(([left], [right]) => left.localeCompare(right)),
       revokedKids: Array.from(revokedKids.values()).sort(),
-      fetchedAt: parsed.fetchedAt,
+      fetchedAt,
       ...(typeof parsed.legacyPublicKey === "string"
         ? { legacyPublicKey: parsed.legacyPublicKey }
         : {}),
     };
 
-    if (createRegistryChecksum(payload) !== parsed.checksum) {
+    if (createRegistryChecksum(payload) !== checksum) {
       return null;
     }
 
     return {
-      guildId: parsed.guildId,
+      guildId,
       keys,
       revokedKids,
-      fetchedAt: parsed.fetchedAt,
+      fetchedAt,
       ...(typeof parsed.legacyPublicKey === "string"
         ? { legacyPublicKey: parsed.legacyPublicKey }
         : {}),
