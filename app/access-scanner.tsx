@@ -1,4 +1,4 @@
-import { View, Text, ActivityIndicator } from "react-native";
+import { View, Text, ActivityIndicator, AccessibilityInfo } from "react-native";
 import React, { useRef, useState } from "react";
 import { useRouter } from "expo-router";
 import { CameraView, useCameraPermissions } from "expo-camera/next";
@@ -32,19 +32,19 @@ export default function AccessScanner() {
     setScanError(null);
 
     try {
-      await verifyAndParseAccessQrPayload(data);
-      router.replace({ pathname: "/access-check", params: { qrPayload: data } });
+      AccessibilityInfo.announceForAccessibility("Processing access QR code.");`n      await verifyAndParseAccessQrPayload(data);
+      AccessibilityInfo.announceForAccessibility("QR code accepted. Opening access check.");`n      router.replace({ pathname: "/access-check", params: { qrPayload: data } });
       return;
     } catch (scanError) {
       if (scanError instanceof QrSignatureError) {
-        setScanError("QR code signature is invalid or missing.");
+        setScanError("QR code signature is invalid or missing.");`n        AccessibilityInfo.announceForAccessibility("QR code rejected. QR code signature is invalid or missing.");
       } else if (
         scanError instanceof QrPayloadError &&
         scanError.code === QR_PAYLOAD_ERROR_CODES.ALREADY_USED
       ) {
-        setScanError("This QR code has already been used.");
+        setScanError("This QR code has already been used.");`n        AccessibilityInfo.announceForAccessibility("QR code rejected. This QR code has already been used.");
       } else {
-        setScanError("Unable to read QR payload.");
+        setScanError("Unable to read QR payload.");`n        AccessibilityInfo.announceForAccessibility("QR code rejected. Unable to read QR payload.");
       }
     }
 
@@ -64,7 +64,7 @@ export default function AccessScanner() {
         <AppHeader title="Scan Access QR" showBack />
         <View className="flex-1 px-4 py-6">
           <Card>
-            <Text className="text-text-muted">Checking camera permission...</Text>
+            <Text accessibilityLiveRegion="polite" className="text-text-muted">Checking camera permission...</Text>
           </Card>
         </View>
       </View>
@@ -77,7 +77,7 @@ export default function AccessScanner() {
         <AppHeader title="Scan Access QR" showBack />
         <View className="flex-1 px-4 py-6">
           <Card>
-            <Text className="text-xl font-bold text-text mb-2">Camera access needed</Text>
+            <Text accessibilityRole="header" className="text-xl font-bold text-text mb-2">Camera access needed</Text>
             <Text className="text-text-muted mb-6">
               GuildPass needs camera permission to scan access check QR codes.
             </Text>
@@ -109,8 +109,8 @@ export default function AccessScanner() {
     return (
       <View className="flex-1 bg-background justify-center items-center">
         <AppHeader title="Scan Access QR" showBack />
-        <ActivityIndicator size="large" />
-        <Text className="mt-4 text-text">Processing...</Text>
+        <ActivityIndicator size="large" accessibilityLabel="Processing access QR code" accessibilityLiveRegion="polite" />
+        <Text accessibilityLiveRegion="polite" className="mt-4 text-text">Processing...</Text>
       </View>
     );
   }
@@ -121,8 +121,8 @@ export default function AccessScanner() {
         <AppHeader title="Scan Access QR" showBack />
         <View className="flex-1 px-4 py-6">
           <Card className="border-error bg-error/5">
-            <Text className="text-error font-bold">QR code rejected</Text>
-            <Text className="text-error/80 text-sm mt-1 mb-4">{scanError}</Text>
+            <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" className="text-error font-bold">QR code rejected</Text>
+            <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" className="text-error/80 text-sm mt-1 mb-4">{scanError}</Text>
             <Button title="Scan Again" onPress={handleScanAgain} variant="outline" />
           </Card>
         </View>
