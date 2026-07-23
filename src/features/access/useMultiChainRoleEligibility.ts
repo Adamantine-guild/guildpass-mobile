@@ -1,11 +1,11 @@
 import { useCallback, useMemo, useState } from "react";
 import { guildPassClient } from "../../lib/guildpassClient";
 import { getRpcsForChain, rpcConfig } from "../../config/rpcConfig";
-
 import {
   resolveRoleEligibilityForChains,
   type AccessRequirement,
   type PerChainRoleEligibilityResolution,
+  type RoleRequirementOnChain,
 } from "./roleEligibilityResolver";
 
 export type MultiChainRoleEligibilityStatusState = {
@@ -14,87 +14,100 @@ export type MultiChainRoleEligibilityStatusState = {
   error?: string;
 };
 
+type GuildRoleWithRequirements = {
+  id?: string;
+  name?: string;
+  chainId?: number | null;
+  requirements?: AccessRequirement[];
+};
+
+export type RoleEligibilityResolutionPlan = {
+  requirements: RoleRequirementOnChain[];
+  configurationErrors: PerChainRoleEligibilityResolution[];
+};
+
+function describeRole(role: GuildRoleWithRequirements): string {
+  const name = role.name?.trim();
+  const id = role.id?.trim();
+
+  if (name && id) return `"${name}" (${id})`;
+  if (name) return `"${name}"`;
+  if (id) return id;
+  return "Unnamed role";
+}
+
+export function buildRoleEligibilityResolutionPlan(
+  roles: GuildRoleWithRequirements[],
+): RoleEligibilityResolutionPlan {
+  const requirements: RoleRequirementOnChain[] = [];
+  const configurationErrors: PerChainRoleEligibilityResolution[] = [];
+
+  for (const role of roles) {
+    const roleRequirements = role.requirements ?? [];
+    if (roleRequirements.length === 0) continue;
+
+    const chainId = role.chainId;
+    if (typeof chainId !== "number" || !Number.isSafeInteger(chainId) || chainId <= 0) {
+      configurationErrors.push({
+        chainId: -configurationErrors.length - 1,
+        status: "error",
+        errorMessage: `Role ${describeRole(role)} is missing a valid chain configuration`,
+      });
+      continue;
+    }
+
+    for (const requirement of roleRequirements) {
+      requirements.push({ chainId, requirement });
+    }
+  }
+
+  return { requirements, configurationErrors };
+}
+
 export const useMultiChainRoleEligibility = () => {
   const [state, setState] = useState<MultiChainRoleEligibilityStatusState>({
     isResolving: false,
     perChain: [],
   });
 
-  const resolve = useCallback(
-    async (guildId: string, walletAddress: string) => {
-      setState({ isResolving: true, perChain: [] });
+  const resolve = useCallback(async (guildId: string, walletAddress: string) => {
+    setState({ isResolving: true, perChain: [] });
 
-      // Start with an eager “shape” check: if there are no RPC endpoints
-      // configured at all, avoid making network calls.
-      // (We still allow backend-only access checks to succeed.)
-      if (Object.keys(rpcConfig.chainRpcUrls ?? {}).length === 0) {
-        setState({ isResolving: false, perChain: [] });
+    try {
+      const roles = (await guildPassClient.roles.getRoles({
+        guildId,
+      })) as GuildRoleWithRequirements[];
+      const { requirements, configurationErrors } = buildRoleEligibilityResolutionPlan(roles);
+
+      if (requirements.length === 0) {
+        setState({ isResolving: false, perChain: configurationErrors });
         return;
       }
 
-
-
-
-
-      try {
-
-        // Fetch roles including their on-chain requirements.
-        const roles = (await guildPassClient.roles.getRoles({ guildId })) as Array<{
-          id?: string;
-          name?: string;
-          chainId?: number;
-          requirements?: AccessRequirement[];
-        }>;
-
-        // Build (chainId, requirement) pairs.
-        // If role doesn't specify chainId, fall back to the guild's chainId.
-        // We don't have guild.chainId here, so we use appConfig default chainIds
-        // indirectly via rpcConfig lookups; if the requirement doesn't specify
-        // a chainId, we treat it as unknown and skip.
-        const pairs: Array<{ chainId: number; requirement: AccessRequirement }> = [];
-
-        for (const role of roles) {
-          const chainId = role.chainId;
-          if (!chainId) continue;
-
-          const reqs = role.requirements ?? [];
-          for (const req of reqs) {
-            pairs.push({ chainId, requirement: req });
-          }
-        }
-
-        if (pairs.length === 0) {
-          setState({ isResolving: false, perChain: [] });
-          return;
-        }
-
-        const rpcsByChain: Record<number, string[]> = {};
-        for (const p of pairs) {
-          rpcsByChain[p.chainId] = getRpcsForChain(p.chainId);
-        }
-
-        const perChain = await resolveRoleEligibilityForChains({
-          walletAddress,
-          requirements: pairs,
-          rpcsByChain,
-          timeouts: rpcConfig.timeouts,
-        });
-
-        setState({ isResolving: false, perChain });
-      } catch (e: any) {
-        setState({
-          isResolving: false,
-          perChain: [],
-          error: e instanceof Error ? e.message : String(e),
-        });
+      const rpcsByChain: Record<number, string[]> = {};
+      for (const { chainId } of requirements) {
+        rpcsByChain[chainId] = getRpcsForChain(chainId);
       }
-    },
-    [],
-  );
 
-  return useMemo(
-    () => ({ ...state, resolve }),
-    [resolve, state.isResolving, state.perChain, state.error],
-  );
+      const resolvedPerChain = await resolveRoleEligibilityForChains({
+        walletAddress,
+        requirements,
+        rpcsByChain,
+        timeouts: rpcConfig.timeouts,
+      });
+
+      setState({
+        isResolving: false,
+        perChain: [...configurationErrors, ...resolvedPerChain],
+      });
+    } catch (e: any) {
+      setState({
+        isResolving: false,
+        perChain: [],
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }, []);
+
+  return useMemo(() => ({ ...state, resolve }), [resolve, state]);
 };
-
