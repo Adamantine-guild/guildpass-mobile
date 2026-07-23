@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseAccessQrPayload, ACCESS_QR_TYPE, ACCESS_QR_VERSION } from "./qrPayload";
+import { parseAccessQrPayload, ACCESS_QR_TYPE, ACCESS_QR_VERSION, QrPayloadError } from "./qrPayload";
 
 describe("parseAccessQrPayload edge cases", () => {
   const basePayload = {
@@ -7,7 +7,7 @@ describe("parseAccessQrPayload edge cases", () => {
     version: ACCESS_QR_VERSION,
     guildId: "guild-123",
     resourceId: "resource-abc",
-    walletAddress: "0x1234567890123456789012345678901234567890",
+    walletAddress: "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed",
     expiresAt: "2026-07-20T00:00:00.000Z",
   };
 
@@ -63,7 +63,7 @@ describe("parseAccessQrPayload edge cases", () => {
     expect(result).toEqual({
       guildId: "guild-123",
       resourceId: "resource-abc",
-      walletAddress: "0x1234567890123456789012345678901234567890",
+      walletAddress: "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed",
       expiresAt: "2026-07-20T00:00:00.000Z",
     });
   });
@@ -74,5 +74,69 @@ describe("parseAccessQrPayload edge cases", () => {
       mockNow,
     );
     expect(result.nonce).toBe("nonce-abc-123");
+  });
+
+  describe("wallet address checksum validation", () => {
+    it("accepts a correctly EIP-55 checksummed address", () => {
+      const result = parseAccessQrPayload(
+        JSON.stringify({
+          ...basePayload,
+          walletAddress: "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed",
+        }),
+        mockNow,
+      );
+      expect(result.walletAddress).toBe("0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed");
+    });
+
+    it("accepts a valid all-lowercase address (checksum-agnostic per EIP-55)", () => {
+      const result = parseAccessQrPayload(
+        JSON.stringify({
+          ...basePayload,
+          walletAddress: "0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed",
+        }),
+        mockNow,
+      );
+      expect(result.walletAddress).toBe("0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed");
+    });
+
+    it("rejects a mixed-case address with an incorrect checksum, distinct from the format error", () => {
+      // Same address as the valid checksummed case above, with one letter's
+      // case flipped (5aAeb -> 5AAeb) — still correct 0x + 40 hex format,
+      // so the regex check alone would let this through.
+      const invalidChecksumAddress = "0x5AAeb6053F3E94C9b9A09f33669435E7Ef1BeAed";
+      expect(() =>
+        parseAccessQrPayload(
+          JSON.stringify({ ...basePayload, walletAddress: invalidChecksumAddress }),
+          mockNow,
+        ),
+      ).toThrowError(
+        "QR code contains a wallet address with an invalid checksum. Please rescan the code or contact the guild issuer.",
+      );
+    });
+
+    it("surfaces a distinct error code for checksum failures vs. malformed-format failures", () => {
+      const invalidChecksumAddress = "0x5AAeb6053F3E94C9b9A09f33669435E7Ef1BeAed";
+      try {
+        parseAccessQrPayload(
+          JSON.stringify({ ...basePayload, walletAddress: invalidChecksumAddress }),
+          mockNow,
+        );
+        expect.unreachable("expected parseAccessQrPayload to throw");
+      } catch (err) {
+        expect(err).toBeInstanceOf(QrPayloadError);
+        expect((err as QrPayloadError).code).toBe("QR_PAYLOAD_INVALID_WALLET_CHECKSUM");
+      }
+
+      try {
+        parseAccessQrPayload(
+          JSON.stringify({ ...basePayload, walletAddress: "0xInvalidAddress" }),
+          mockNow,
+        );
+        expect.unreachable("expected parseAccessQrPayload to throw");
+      } catch (err) {
+        expect(err).toBeInstanceOf(QrPayloadError);
+        expect((err as QrPayloadError).code).toBe("QR_PAYLOAD_INVALID_WALLET_ADDRESS");
+      }
+    });
   });
 });
