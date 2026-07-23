@@ -31,6 +31,18 @@ const guildPassClientMock = vi.hoisted(() => ({
   checkAccess: vi.fn(),
 }));
 
+const multiChainState = vi.hoisted(() => ({
+  perChain: [] as Array<{
+    chainId: number;
+    status: "resolved" | "timed-out" | "error";
+    resolvedRoles?: string[];
+    errorMessage?: string;
+  }>,
+  isResolving: false,
+  error: undefined as string | undefined,
+  resolve: vi.fn(async () => undefined),
+}));
+
 const guildQueryMock = vi.hoisted(() => ({
   data: { name: "Guild Alpha" } as { name: string } | undefined,
 }));
@@ -96,6 +108,10 @@ vi.mock("../src/features/guilds/useGuilds", () => ({
   }),
 }));
 
+vi.mock("../src/features/access/useMultiChainRoleEligibility", () => ({
+  useMultiChainRoleEligibility: () => multiChainState,
+}));
+
 vi.mock("expo-local-authentication", () => ({
   hasHardwareAsync: biometricAuthMocks.hasHardwareAsync,
   isEnrolledAsync: biometricAuthMocks.isEnrolledAsync,
@@ -133,6 +149,10 @@ describe("AccessCheck screen", () => {
     biometricAuthMocks.isEnrolledAsync.mockReset().mockResolvedValue(true);
     biometricAuthMocks.authenticateAsync.mockReset().mockResolvedValue({ success: true });
     guildPassClientMock.checkAccess.mockReset().mockResolvedValue(ACCESS_GRANTED_FIXTURE);
+    multiChainState.perChain = [];
+    multiChainState.isResolving = false;
+    multiChainState.error = undefined;
+    multiChainState.resolve.mockReset().mockResolvedValue(undefined);
     guildQueryMock.data = { name: "Guild Alpha" };
     useAccessHistoryStore.setState({ entries: [] });
     useNetworkStore.setState({ isOnline: true, isOffline: false });
@@ -324,6 +344,51 @@ describe("AccessCheck screen", () => {
 
     expect(guildPassClientMock.checkAccess).toHaveBeenCalledTimes(2);
     expect(outputText(screen!)).toContain("Access Granted");
+  });
+
+  it("renders per-chain role eligibility status details after an access check", async () => {
+    multiChainState.perChain = [
+      { chainId: 1, status: "resolved", resolvedRoles: ["admin", "member"] },
+      { chainId: 10, status: "timed-out", errorMessage: "RPC attempt timed out after 500ms" },
+      { chainId: 137, status: "error", errorMessage: "RPC provider error" },
+    ];
+    multiChainState.isResolving = true;
+    multiChainState.error = "Some chains could not be fully resolved.";
+
+    let screen: ReactTestRenderer;
+
+    await act(async () => {
+      screen = renderScreen();
+    });
+
+    await act(async () => {
+      screen.root
+        .findByProps({ testID: "access-check-guild-id-input" })
+        .props.onChangeText("guild-alpha");
+      screen.root
+        .findByProps({ testID: "access-check-resource-id-input" })
+        .props.onChangeText("vip-door");
+      await flush();
+    });
+
+    await act(async () => {
+      screen.root.findByProps({ accessibilityLabel: "Check Access" }).props.onPress();
+      await flush();
+    });
+
+    const screenText = outputText(screen!);
+    expect(screenText).toContain("Per-chain role eligibility");
+    expect(screenText).toContain("Chain 1");
+    expect(screenText).toContain("Resolved");
+    expect(screenText).toContain("Roles: admin, member");
+    expect(screenText).toContain("Chain 10");
+    expect(screenText).toContain("Timed out");
+    expect(screenText).toContain("RPC attempt timed out after 500ms");
+    expect(screenText).toContain("Chain 137");
+    expect(screenText).toContain("Error");
+    expect(screenText).toContain("RPC provider error");
+    expect(screenText).toContain("Resolving");
+    expect(screenText).toContain("Some chains could not be fully resolved.");
   });
 
   it("renders the offline banner and disables the check button when offline", async () => {
