@@ -32,12 +32,45 @@ const routerMocks = vi.hoisted(() => ({
 
 const cameraViewMock = vi.hoisted(() => vi.fn((_props: MockCameraViewProps) => null));
 const verifyAndParseAccessQrPayloadMock = vi.hoisted(() => vi.fn());
+const QR_SIGNATURE_ERROR_CODES_MOCK = vi.hoisted(() => ({
+  MISSING_SIGNATURE: "QR_SIGNATURE_MISSING",
+  INVALID_SIGNATURE_FORMAT: "QR_SIGNATURE_FORMAT_INVALID",
+  VERIFICATION_FAILED: "QR_SIGNATURE_VERIFICATION_FAILED",
+  PUBLIC_KEY_UNAVAILABLE: "QR_SIGNATURE_PUBLIC_KEY_UNAVAILABLE",
+  REVOKED_KEY: "QR_KEY_REVOKED",
+  UNKNOWN_KEY: "QR_KEY_UNKNOWN",
+  MISSING_KID: "QR_KID_MISSING",
+  KEY_REGISTRY_EXPIRED: "QR_KEY_REGISTRY_EXPIRED",
+}));
+const qrSignatureMessagesMock = vi.hoisted(() => ({
+  [QR_SIGNATURE_ERROR_CODES_MOCK.REVOKED_KEY]:
+    "This QR code was signed with a revoked guild key. Contact the guild admin for a new code.",
+  [QR_SIGNATURE_ERROR_CODES_MOCK.KEY_REGISTRY_EXPIRED]:
+    "The guild key registry is stale. Reconnect to the internet and scan again.",
+  [QR_SIGNATURE_ERROR_CODES_MOCK.INVALID_SIGNATURE_FORMAT]:
+    "The QR code signature is malformed. Re-scan the code or ask the guild admin for a fresh one.",
+  [QR_SIGNATURE_ERROR_CODES_MOCK.VERIFICATION_FAILED]:
+    "The QR code signature could not be verified. Do not use this code; ask the guild admin for a fresh one.",
+}));
+const describeQrSignatureErrorMock = vi.hoisted(() =>
+  vi.fn(
+    (code: string) =>
+      qrSignatureMessagesMock[code] ??
+      qrSignatureMessagesMock[QR_SIGNATURE_ERROR_CODES_MOCK.VERIFICATION_FAILED],
+  ),
+);
 const QrSignatureErrorMock = vi.hoisted(
   () =>
     class QrSignatureError extends Error {
-      constructor(message = "Invalid QR signature") {
+      readonly code: string;
+
+      constructor(
+        code = QR_SIGNATURE_ERROR_CODES_MOCK.VERIFICATION_FAILED,
+        message = "Invalid QR signature",
+      ) {
         super(message);
         this.name = "QrSignatureError";
+        this.code = code;
       }
     },
 );
@@ -73,6 +106,8 @@ vi.mock("../src/features/access/verifyQrPayload", () => ({
 
 vi.mock("../src/features/access/qrSignature", () => ({
   QrSignatureError: QrSignatureErrorMock,
+  QR_SIGNATURE_ERROR_CODES: QR_SIGNATURE_ERROR_CODES_MOCK,
+  describeQrSignatureError: describeQrSignatureErrorMock,
 }));
 
 const screenText = (renderer: ReactTestRenderer) => JSON.stringify(renderer.toJSON());
@@ -89,8 +124,9 @@ describe("AccessScanner", () => {
 
     const renderer = TestRenderer.create(<AccessScanner />);
 
-    expect(screenText(renderer)).toContain("Checking camera permission...");
-    expect(screenText(renderer)).toContain("accessibilityLiveRegion");
+    const output = screenText(renderer);
+    expect(output).toContain("Checking camera permission...");
+    expect(output).toContain("accessibilityLiveRegion");
   });
 
   it("shows permission request when camera not granted and can ask again", () => {
@@ -98,9 +134,10 @@ describe("AccessScanner", () => {
 
     const renderer = TestRenderer.create(<AccessScanner />);
 
-    expect(screenText(renderer)).toContain("Allow Camera Access");
-    expect(screenText(renderer)).toContain("Camera access needed");
-    expect(screenText(renderer)).toContain("accessibilityRole");
+    const output = screenText(renderer);
+    expect(output).toContain("Allow Camera Access");
+    expect(output).toContain("Camera access needed");
+    expect(output).toContain("accessibilityRole");
   });
 
   it("shows permanent denial message when camera denied and cannot ask again", () => {
@@ -125,7 +162,6 @@ describe("AccessScanner", () => {
       accessibilityLiveRegion: "polite",
     });
   });
-
 
   it("announces processing and success during a valid scan", async () => {
     mockCameraPermission(createPermissionResponse(true, true));
@@ -179,6 +215,7 @@ describe("AccessScanner", () => {
       "QR code rejected. Unable to read QR payload.",
     );
   });
+
   it("shows the recent-history section", () => {
     mockCameraPermission(createPermissionResponse(true, true));
 
@@ -257,9 +294,13 @@ describe("AccessScanner", () => {
     });
   });
 
-  it("shows a signature error message for invalid QR signatures", async () => {
+  it.each([
+    [QR_SIGNATURE_ERROR_CODES_MOCK.REVOKED_KEY, qrSignatureMessagesMock[QR_SIGNATURE_ERROR_CODES_MOCK.REVOKED_KEY]],
+    [QR_SIGNATURE_ERROR_CODES_MOCK.KEY_REGISTRY_EXPIRED, qrSignatureMessagesMock[QR_SIGNATURE_ERROR_CODES_MOCK.KEY_REGISTRY_EXPIRED]],
+    [QR_SIGNATURE_ERROR_CODES_MOCK.INVALID_SIGNATURE_FORMAT, qrSignatureMessagesMock[QR_SIGNATURE_ERROR_CODES_MOCK.INVALID_SIGNATURE_FORMAT]],
+  ])("shows a specific signature error message for %s", async (code, expectedMessage) => {
     mockCameraPermission(createPermissionResponse(true, true));
-    verifyAndParseAccessQrPayloadMock.mockRejectedValueOnce(new QrSignatureErrorMock());
+    verifyAndParseAccessQrPayloadMock.mockRejectedValueOnce(new QrSignatureErrorMock(code));
 
     const renderer = TestRenderer.create(<AccessScanner />);
 
@@ -274,7 +315,11 @@ describe("AccessScanner", () => {
     });
 
     const output = screenText(renderer);
-    expect(output).toContain("QR code signature is invalid or missing.");
+    expect(describeQrSignatureErrorMock).toHaveBeenCalledWith(code);
+    expect(output).toContain(expectedMessage);
+    expect(accessibilityInfoMock.announceForAccessibility).toHaveBeenCalledWith(
+      `QR code rejected. ${expectedMessage}`,
+    );
   });
 
   it("shows a safe rejection message for invalid or forged QR payloads", async () => {
