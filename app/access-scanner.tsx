@@ -1,4 +1,4 @@
-import { View, Text, ActivityIndicator } from "react-native";
+import { View, Text, ActivityIndicator, AccessibilityInfo } from "react-native";
 import React, { useRef, useState } from "react";
 import { useRouter } from "expo-router";
 import { CameraView, useCameraPermissions } from "expo-camera/next";
@@ -32,20 +32,25 @@ export default function AccessScanner() {
     setScanError(null);
 
     try {
+      AccessibilityInfo.announceForAccessibility("Processing access QR code.");
       await verifyAndParseAccessQrPayload(data);
+      AccessibilityInfo.announceForAccessibility("QR code accepted. Opening access check.");
       router.replace({ pathname: "/access-check", params: { qrPayload: data } });
       return;
     } catch (scanError) {
+      let errorMessage = "Unable to read QR payload.";
+
       if (scanError instanceof QrSignatureError) {
-        setScanError(describeQrSignatureError(scanError.code));
+        errorMessage = describeQrSignatureError(scanError.code);
       } else if (
         scanError instanceof QrPayloadError &&
         scanError.code === QR_PAYLOAD_ERROR_CODES.ALREADY_USED
       ) {
-        setScanError("This QR code has already been used.");
-      } else {
-        setScanError("Unable to read QR payload.");
+        errorMessage = "This QR code has already been used.";
       }
+
+      setScanError(errorMessage);
+      AccessibilityInfo.announceForAccessibility(`QR code rejected. ${errorMessage}`);
     }
 
     setIsProcessingScan(false);
@@ -64,7 +69,7 @@ export default function AccessScanner() {
         <AppHeader title="Scan Access QR" showBack />
         <View className="flex-1 px-4 py-6">
           <Card>
-            <Text className="text-text-muted">Checking camera permission...</Text>
+            <Text accessibilityLiveRegion="polite" className="text-text-muted">Checking camera permission...</Text>
           </Card>
         </View>
       </View>
@@ -77,19 +82,19 @@ export default function AccessScanner() {
         <AppHeader title="Scan Access QR" showBack />
         <View className="flex-1 px-4 py-6">
           <Card>
-            <Text className="text-xl font-bold text-text mb-2">Camera access needed</Text>
-            <Text className="text-text-muted mb-6">
+            <Text accessibilityRole="header" className="text-xl font-bold text-text mb-2">Camera access needed</Text>
+            <Text accessibilityLiveRegion="polite" className="text-text-muted mb-6">
               GuildPass needs camera permission to scan access check QR codes.
             </Text>
             {permission.canAskAgain ? (
               <Button title="Allow Camera Access" onPress={requestPermission} />
             ) : (
               <>
-                <Text className="text-error">
+                <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" className="text-error">
                   Camera permission was denied. Enable camera access in your device settings to scan
                   QR codes.
                 </Text>
-                <Text className="text-error mb-6">
+                <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" className="text-error mb-6">
                   Camera permission was denied. Open Settings to enable camera access for GuildPass.
                 </Text>
                 <Button
@@ -107,10 +112,10 @@ export default function AccessScanner() {
 
   if (isProcessingScan) {
     return (
-      <View className="flex-1 bg-background justify-center items-center">
+      <View accessibilityLabel="Processing access QR code" accessibilityState={{ busy: true }} className="flex-1 bg-background justify-center items-center">
         <AppHeader title="Scan Access QR" showBack />
-        <ActivityIndicator size="large" />
-        <Text className="mt-4 text-text">Processing...</Text>
+        <ActivityIndicator size="large" accessibilityLabel="Processing access QR code" accessibilityLiveRegion="polite" />
+        <Text accessibilityLiveRegion="polite" className="mt-4 text-text">Processing...</Text>
       </View>
     );
   }
@@ -121,8 +126,8 @@ export default function AccessScanner() {
         <AppHeader title="Scan Access QR" showBack />
         <View className="flex-1 px-4 py-6">
           <Card className="border-error bg-error/5">
-            <Text className="text-error font-bold">QR code rejected</Text>
-            <Text className="text-error/80 text-sm mt-1 mb-4">{scanError}</Text>
+            <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" className="text-error font-bold">QR code rejected</Text>
+            <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" className="text-error/80 text-sm mt-1 mb-4">{scanError}</Text>
             <Button title="Scan Again" onPress={handleScanAgain} variant="outline" />
           </Card>
         </View>
@@ -135,6 +140,9 @@ export default function AccessScanner() {
       <AppHeader title="Scan Access QR" showBack />
       <View className="flex-1">
         <CameraView
+          accessibilityLabel="Scanning for GuildPass access QR code"
+          accessibilityHint="Point the camera at a GuildPass QR code to start access verification"
+          accessibilityLiveRegion="polite"
           style={{ flex: 1 }}
           facing="back"
           onBarcodeScanned={handleBarcodeScanned}
@@ -142,7 +150,7 @@ export default function AccessScanner() {
         />
         <View className="absolute left-4 right-4 bottom-4">
           <Card className="mb-4">
-            <Text className="text-text font-medium text-center">
+            <Text accessibilityLiveRegion="polite" className="text-text font-medium text-center">
               Point your camera at a GuildPass access QR code.
             </Text>
           </Card>
