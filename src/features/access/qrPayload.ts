@@ -1,3 +1,4 @@
+import { isAddress } from "viem";
 import {
   ACCESS_QR_TYPE,
   ACCESS_QR_VERSION,
@@ -16,6 +17,7 @@ export const QR_PAYLOAD_ERROR_CODES = {
   MISSING_GUILD_ID: "QR_PAYLOAD_MISSING_GUILD_ID",
   MISSING_RESOURCE_ID: "QR_PAYLOAD_MISSING_RESOURCE_ID",
   INVALID_WALLET_ADDRESS: "QR_PAYLOAD_INVALID_WALLET_ADDRESS",
+  INVALID_WALLET_CHECKSUM: "QR_PAYLOAD_INVALID_WALLET_CHECKSUM",
   INVALID_EXPIRATION: "QR_PAYLOAD_INVALID_EXPIRATION",
   EXPIRED: "QR_PAYLOAD_EXPIRED",
   INVALID_SIGNATURE: "QR_PAYLOAD_INVALID_SIGNATURE",
@@ -145,6 +147,23 @@ export const parseAccessQrPayload = (
     throw new QrPayloadError(
       QR_PAYLOAD_ERROR_CODES.INVALID_WALLET_ADDRESS,
       "QR code contains an invalid wallet address.",
+    );
+  }
+
+  // Format is well-formed 0x + 40 hex chars at this point. Separately
+  // enforce EIP-55 checksum casing so a visually-similar/typo'd address
+  // (correct length and hex chars, wrong letter casing) fails fast here
+  // with a specific message instead of reaching the access-check
+  // submission step and producing a confusing downstream error. All-
+  // lowercase addresses are checksum-agnostic per EIP-55 and still valid.
+  if (
+    decodedPayload.walletAddress !== undefined &&
+    isNonEmptyString(decodedPayload.walletAddress) &&
+    !isAddress(decodedPayload.walletAddress, { strict: true })
+  ) {
+    throw new QrPayloadError(
+      QR_PAYLOAD_ERROR_CODES.INVALID_WALLET_CHECKSUM,
+      "QR code contains a wallet address with an invalid checksum. Please rescan the code or contact the guild issuer.",
     );
   }
 
