@@ -102,6 +102,12 @@ To balance scanner performance, network efficiency, and security, key registries
 - **Bounded Cache TTL**: `15 minutes` (`15 * 60 * 1000 ms`).
 - **Offline Trust Window**: `24 hours` (`24 * 60 * 60 * 1000 ms`).
 
+### Persistent Cold-Start Cache
+
+After a successful online fetch, the client writes the serialized guild key registry to the existing SecureStore-backed sensitive storage under a per-guild key. The stored payload contains the active key list, revoked key IDs, optional legacy public key, `fetchedAt` timestamp, and a SHA-256 checksum over the canonical JSON payload. On a cold app start, `getGuildKeyRegistry()` reads this persisted copy before attempting the network. If the checksum, guild ID, schema version, or field shapes do not match, the entry is discarded and the verifier falls back to a fresh online fetch.
+
+The cache is tamper-evident against corruption or partial local writes and is stored in the platform keychain/keystore path already used for sensitive GuildPass state. It is not treated as a new authority: the 15-minute refresh TTL and 24-hour offline trust window still apply, and a registry beyond that window fails closed if it cannot be refreshed. A fully compromised device could alter both data and checksum, so the security boundary remains the authenticated, pinned GuildPass API plus the bounded offline trust window.
+
 ### Resolution & Refresh Workflow
 
 ```

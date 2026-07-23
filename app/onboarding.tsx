@@ -22,6 +22,9 @@ export default function Onboarding() {
           <Text className="text-lg text-text-muted text-center px-4" testID="onboarding-subtitle">
             The decentralized gateway to your favorite Web3 communities and gated content.
           </Text>
+          <Text className="text-sm text-text-muted text-center px-4 mt-4" testID="onboarding-attestation-warning">
+            Offline role attestations are stored only on this device. If the app or device is lost, reset, or replaced, those local proofs cannot currently be restored and must be reissued by the guild when connectivity is available.
+          </Text>
         </View>
 
         <View className="space-y-4">

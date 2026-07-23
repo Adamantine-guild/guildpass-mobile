@@ -55,6 +55,29 @@ export class QrSignatureError extends Error {
   }
 }
 
+
+const QR_SIGNATURE_ERROR_MESSAGES: Record<QrSignatureErrorCode, string> = {
+  [QR_SIGNATURE_ERROR_CODES.MISSING_SIGNATURE]:
+    "This QR code is missing its security signature. Ask the guild admin to issue a new code.",
+  [QR_SIGNATURE_ERROR_CODES.INVALID_SIGNATURE_FORMAT]:
+    "The QR code signature is malformed. Re-scan the code or ask the guild admin for a fresh one.",
+  [QR_SIGNATURE_ERROR_CODES.VERIFICATION_FAILED]:
+    "The QR code signature could not be verified. Do not use this code; ask the guild admin for a fresh one.",
+  [QR_SIGNATURE_ERROR_CODES.PUBLIC_KEY_UNAVAILABLE]:
+    "The guild issuer key is unavailable. Try again later or contact the guild admin.",
+  [QR_SIGNATURE_ERROR_CODES.REVOKED_KEY]:
+    "This QR code was signed with a revoked guild key. Contact the guild admin for a new code.",
+  [QR_SIGNATURE_ERROR_CODES.UNKNOWN_KEY]:
+    "This QR code was signed by an unknown guild key. Contact the guild admin before using it.",
+  [QR_SIGNATURE_ERROR_CODES.MISSING_KID]:
+    "This QR code is missing its key identifier. Ask the guild admin to reissue it.",
+  [QR_SIGNATURE_ERROR_CODES.KEY_REGISTRY_EXPIRED]:
+    "The guild key registry is stale. Reconnect to the internet and scan again.",
+};
+
+export const describeQrSignatureError = (code: QrSignatureErrorCode): string =>
+  QR_SIGNATURE_ERROR_MESSAGES[code];
+
 const ec = new EC("secp256k1");
 
 export type SignableQrPayload = {
