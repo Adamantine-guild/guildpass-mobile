@@ -8,7 +8,7 @@ import { AppHeader } from "../src/components/AppHeader";
 import { Button } from "../src/components/Button";
 import { Card } from "../src/components/Card";
 import { verifyAndParseAccessQrPayload } from "../src/features/access/verifyQrPayload";
-import { QrSignatureError } from "../src/features/access/qrSignature";
+import { QrSignatureError, describeQrSignatureError } from "../src/features/access/qrSignature";
 import { QrPayloadError, QR_PAYLOAD_ERROR_CODES } from "../src/features/access/qrPayload";
 import { AccessHistoryList } from "../src/components/AccessHistoryList";
 import { useAccessHistoryStore } from "../src/features/access/accessHistory.store";
@@ -38,19 +38,19 @@ export default function AccessScanner() {
       router.replace({ pathname: "/access-check", params: { qrPayload: data } });
       return;
     } catch (scanError) {
+      let errorMessage = "Unable to read QR payload.";
+
       if (scanError instanceof QrSignatureError) {
-        setScanError("QR code signature is invalid or missing.");
-        AccessibilityInfo.announceForAccessibility("QR code rejected. QR code signature is invalid or missing.");
+        errorMessage = describeQrSignatureError(scanError.code);
       } else if (
         scanError instanceof QrPayloadError &&
         scanError.code === QR_PAYLOAD_ERROR_CODES.ALREADY_USED
       ) {
-        setScanError("This QR code has already been used.");
-        AccessibilityInfo.announceForAccessibility("QR code rejected. This QR code has already been used.");
-      } else {
-        setScanError("Unable to read QR payload.");
-        AccessibilityInfo.announceForAccessibility("QR code rejected. Unable to read QR payload.");
+        errorMessage = "This QR code has already been used.";
       }
+
+      setScanError(errorMessage);
+      AccessibilityInfo.announceForAccessibility(`QR code rejected. ${errorMessage}`);
     }
 
     setIsProcessingScan(false);
