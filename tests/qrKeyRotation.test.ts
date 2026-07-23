@@ -26,6 +26,19 @@ import {
 
 const { mockGetGuildConfig } = vi.hoisted(() => ({ mockGetGuildConfig: vi.fn() }));
 const flagState = vi.hoisted(() => ({ qrSignatureVerification: true }));
+const storageState = vi.hoisted(() => {
+  const items = new Map<string, string>();
+  return {
+    items,
+    getItem: vi.fn(async (name: string) => items.get(name) ?? null),
+    setItem: vi.fn(async (name: string, value: string) => {
+      items.set(name, value);
+    }),
+    removeItem: vi.fn(async (name: string) => {
+      items.delete(name);
+    }),
+  };
+});
 
 vi.mock("../src/lib/guildpassClient", () => ({
   guildPassClient: {
@@ -35,6 +48,14 @@ vi.mock("../src/lib/guildpassClient", () => ({
 
 vi.mock("../src/config/appConfig", () => ({
   appConfig: flagState,
+}));
+
+vi.mock("../src/lib/storage", () => ({
+  migratingSecureStorage: {
+    getItem: storageState.getItem,
+    setItem: storageState.setItem,
+    removeItem: storageState.removeItem,
+  },
 }));
 
 const now = new Date("2026-07-20T12:00:00.000Z");
@@ -51,6 +72,7 @@ describe("QR Key Rotation & Revocation Protocol", () => {
     clearIssuerKeyCache();
     clearNonceCache();
     resetKeyRegistryTimeouts();
+    storageState.items.clear();
     mockGetGuildConfig.mockReset();
     flagState.qrSignatureVerification = true;
   });
@@ -288,6 +310,57 @@ describe("QR Key Rotation & Revocation Protocol", () => {
       ).rejects.toMatchObject({
         code: QR_SIGNATURE_ERROR_CODES.KEY_REGISTRY_EXPIRED,
       });
+    });
+
+    it("loads a persisted registry after a simulated restart and uses it while offline", async () => {
+      mockGetGuildConfig.mockResolvedValueOnce({
+        guildId: "guild_abc",
+        issuerKeys: { "key-v1": TEST_ISSUER_PUBLIC_KEY },
+      });
+
+      setKeyRegistryCacheTtlMs(15 * 60 * 1000);
+      setKeyRegistryOfflineTrustWindowMs(24 * 60 * 60 * 1000);
+
+      const t0 = new Date("2026-07-20T12:00:00.000Z");
+      await getGuildIssuerPublicKey("guild_abc", "key-v1", t0);
+
+      clearIssuerKeyCache(); // Simulates an app restart while SecureStore survives.
+      mockGetGuildConfig.mockRejectedValueOnce(new Error("Network Error / Offline"));
+
+      const tAfterRestart = new Date("2026-07-20T13:00:00.000Z");
+      const key = await getGuildIssuerPublicKey("guild_abc", "key-v1", tAfterRestart);
+
+      expect(key).toBe(TEST_ISSUER_PUBLIC_KEY);
+      expect(storageState.setItem).toHaveBeenCalledWith(
+        "guildpass:access-key-registry:v1:guild_abc",
+        expect.stringContaining('"checksum"'),
+      );
+      expect(mockGetGuildConfig).toHaveBeenCalledTimes(2);
+    });
+
+    it("ignores tampered persisted registries and fetches a fresh copy", async () => {
+      storageState.items.set(
+        "guildpass:access-key-registry:v1:guild_abc",
+        JSON.stringify({
+          version: 1,
+          guildId: "guild_abc",
+          keys: [["key-v1", TEST_REVOKED_PUBLIC_KEY]],
+          revokedKids: [],
+          fetchedAt: now.getTime(),
+          checksum: "0xinvalid",
+        }),
+      );
+      mockGetGuildConfig.mockResolvedValueOnce({
+        guildId: "guild_abc",
+        issuerKeys: { "key-v1": TEST_ISSUER_PUBLIC_KEY },
+      });
+
+      const key = await getGuildIssuerPublicKey("guild_abc", "key-v1", now);
+
+      expect(key).toBe(TEST_ISSUER_PUBLIC_KEY);
+      expect(storageState.removeItem).toHaveBeenCalledWith(
+        "guildpass:access-key-registry:v1:guild_abc",
+      );
     });
 
     it("does not silently accept unverifiable payloads when no cache exists and offline", async () => {
