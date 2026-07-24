@@ -11,7 +11,7 @@ import { Card } from "../src/components/Card";
 import { Button } from "../src/components/Button";
 import { WalletInput } from "../src/components/WalletInput";
 import { AccessStatusCard } from "../src/components/AccessStatusCard";
-import { LoadingState } from "../src/components/LoadingState";
+import { AccessStatusCardSkeleton } from "../src/components/AccessStatusCardSkeleton";
 import { areWalletAddressesEqual, validateAndNormalizeAddress } from "../src/lib/walletValidation";
 import { useAccessHistoryStore } from "../src/features/access/accessHistory.store";
 import { useNetworkStatus } from "../src/features/offline/useNetworkStatus";
@@ -446,7 +446,7 @@ export default function AccessCheck() {
           </Card>
         )}
 
-        {isPending && <LoadingState message="Checking protocol permissions..." />}
+        {isPending && <AccessStatusCardSkeleton />}
 
         {(result || error) && (
           <BiometricGate
