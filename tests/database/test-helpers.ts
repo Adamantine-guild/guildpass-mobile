@@ -37,10 +37,7 @@ export function getRawDb(wrapper: ReturnType<typeof _createMockDb>): MockDb {
 /**
  * Run a query directly on the mock DB and return a single row.
  */
-export function rawQueryOne<T = Record<string, unknown>>(
-  mock: MockDb,
-  sql: string,
-): T | undefined {
+export function rawQueryOne<T = Record<string, unknown>>(mock: MockDb, sql: string): T | undefined {
   const result = mock._exec(sql);
   return result.rows.length > 0 ? (result.rows.item(0) as unknown as T) : undefined;
 }
@@ -48,10 +45,7 @@ export function rawQueryOne<T = Record<string, unknown>>(
 /**
  * Run a query directly on the mock DB and return all rows.
  */
-export function rawQueryAll<T = Record<string, unknown>>(
-  mock: MockDb,
-  sql: string,
-): T[] {
+export function rawQueryAll<T = Record<string, unknown>>(mock: MockDb, sql: string): T[] {
   const result = mock._exec(sql);
   const rows: T[] = [];
   for (let i = 0; i < result.rows.length; i++) {

@@ -5,6 +5,7 @@ Use this checklist when adding new features or modifying existing screens.
 ## ✅ Adding a New Screen
 
 - [ ] Add `testID` prop to screen container
+
   ```tsx
   <View testID="my-new-screen">
   ```
@@ -44,6 +45,7 @@ Use this checklist when adding new features or modifying existing screens.
   - [ ] If yes, update test steps
 
 - [ ] Run affected tests
+
   ```bash
   maestro test .maestro/
   ```
@@ -56,6 +58,7 @@ Use this checklist when adding new features or modifying existing screens.
 When creating a new reusable component:
 
 - [ ] Add `testID` prop to component interface
+
   ```tsx
   interface MyComponentProps {
     testID?: string;
@@ -64,6 +67,7 @@ When creating a new reusable component:
   ```
 
 - [ ] Pass `testID` to root element
+
   ```tsx
   <TouchableOpacity testID={testID}>
   ```
@@ -87,6 +91,7 @@ Before opening PR:
 - [ ] Added E2E test coverage note in PR description
 
 In PR description, include:
+
 ```markdown
 ## E2E Test Coverage
 
@@ -108,39 +113,43 @@ When reviewing PRs:
 
 ## Test ID Naming Reference
 
-| Element Type | Pattern | Example |
-|--------------|---------|---------|
-| Screen | `{name}-screen` | `profile-screen` |
-| Button | `{action}-button` | `submit-button` |
-| Input | `{field}-input` | `email-input` |
-| Navigation | `navigate-{dest}-button` | `navigate-settings-button` |
-| Status | `{feature}-{state}` | `loading-indicator` |
-| Error | `{feature}-error` | `login-error` |
-| Success | `{feature}-success` | `payment-success` |
+| Element Type | Pattern                  | Example                    |
+| ------------ | ------------------------ | -------------------------- |
+| Screen       | `{name}-screen`          | `profile-screen`           |
+| Button       | `{action}-button`        | `submit-button`            |
+| Input        | `{field}-input`          | `email-input`              |
+| Navigation   | `navigate-{dest}-button` | `navigate-settings-button` |
+| Status       | `{feature}-{state}`      | `loading-indicator`        |
+| Error        | `{feature}-error`        | `login-error`              |
+| Success      | `{feature}-success`      | `payment-success`          |
 
 ## Common Mistakes to Avoid
 
 ❌ **Don't**: Use generic IDs
+
 ```tsx
-testID="button1"
-testID="input"
+testID = "button1";
+testID = "input";
 ```
 
 ✅ **Do**: Use descriptive IDs
+
 ```tsx
-testID="wallet-connect-button"
-testID="email-input"
+testID = "wallet-connect-button";
+testID = "email-input";
 ```
 
 ❌ **Don't**: Reuse IDs across screens
+
 ```tsx
 // Screen A
 <Button testID="submit-button" />
-// Screen B  
+// Screen B
 <Button testID="submit-button" />
 ```
 
 ✅ **Do**: Make IDs unique per screen
+
 ```tsx
 // Login Screen
 <Button testID="login-submit-button" />
@@ -149,12 +158,14 @@ testID="email-input"
 ```
 
 ❌ **Don't**: Test implementation details
+
 ```yaml
 - tapOn:
     id: "internal-api-call-trigger"
 ```
 
 ✅ **Do**: Test user-facing behavior
+
 ```yaml
 - tapOn:
     id: "submit-button"

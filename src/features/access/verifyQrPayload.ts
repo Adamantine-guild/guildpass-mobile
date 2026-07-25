@@ -1,7 +1,8 @@
 import { appConfig } from "../../config/appConfig";
 import { getGuildIssuerPublicKey } from "./guildIssuerKey";
-import { QrSignatureError, QrSignatureErrorCode, verifyQrSignature } from "./qrSignature";
-import { parseAccessQrPayload, QrPayloadError, QrPayloadErrorCode, type ParsedAccessQrPayload } from "./qrPayload";
+import { verifyQrSignature } from "./qrSignature";
+import { parseAccessQrPayload } from "./qrPayload";
+import type { ParsedAccessQrPayload } from "./qrPayload";
 import { checkAndRecordNonce } from "./qrReplayGuard";
 
 export type QrValidationResult =
@@ -88,15 +89,8 @@ export const verifyAndParseAccessQrPayload = async (
     }
   }
 
-  try {
-    if (parsed.nonce !== undefined) {
-      checkAndRecordNonce(parsed.nonce, parsed.expiresAt, now);
-    }
-  } catch (error) {
-    if (error instanceof QrPayloadError) {
-      return { success: false, reason: error.code, message: error.message };
-    }
-    return { success: false, reason: "UNKNOWN_ERROR", message: String(error) };
+  if (parsed.nonce !== undefined) {
+    await checkAndRecordNonce(parsed.nonce, parsed.expiresAt, now);
   }
 
   return { success: true, payload: parsed };

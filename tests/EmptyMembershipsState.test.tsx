@@ -14,16 +14,16 @@ describe("EmptyMembershipsState Component", () => {
   it("renders the empty state copy and accessible text correctly", () => {
     const onConnectDifferentWallet = vi.fn();
     const renderer = TestRenderer.create(
-      <EmptyMembershipsState onConnectDifferentWallet={onConnectDifferentWallet} />
+      <EmptyMembershipsState onConnectDifferentWallet={onConnectDifferentWallet} />,
     );
 
     const root = renderer.root;
     const container = root.findByProps({ testID: "empty-memberships-state" });
     expect(container).toBeDefined();
 
-    const titleText = root.findAllByType("Text").find(
-      (node) => node.props.children === "No Memberships Found"
-    );
+    const titleText = root
+      .findAllByType("Text")
+      .find((node) => node.props.children === "No Memberships Found");
     expect(titleText).toBeDefined();
 
     const ctaButton = root.findByProps({ testID: "connect-different-wallet-button" });
@@ -34,7 +34,7 @@ describe("EmptyMembershipsState Component", () => {
   it("calls the CTA callback onConnectDifferentWallet when pressed", () => {
     const onConnectDifferentWallet = vi.fn();
     const renderer = TestRenderer.create(
-      <EmptyMembershipsState onConnectDifferentWallet={onConnectDifferentWallet} />
+      <EmptyMembershipsState onConnectDifferentWallet={onConnectDifferentWallet} />,
     );
 
     const root = renderer.root;

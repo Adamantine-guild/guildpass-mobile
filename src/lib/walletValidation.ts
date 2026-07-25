@@ -13,11 +13,10 @@ const INVALID_ADDRESS_ERROR =
   "Please enter a valid Ethereum address (0x followed by 40 hex characters).";
 
 export type ValidateAddressResult =
-  | { valid: true; address: string }
-  | { valid: false; error: string };
+  { valid: true; address: string } | { valid: false; error: string };
 
 export function validateAndNormalizeAddress(
-  address: string | null | undefined
+  address: string | null | undefined,
 ): ValidateAddressResult {
   if (!address || !ETH_ADDRESS_REGEX.test(address)) {
     return { valid: false, error: INVALID_ADDRESS_ERROR };
@@ -32,9 +31,7 @@ export function validateAndNormalizeAddress(
  * Returns `null` error for empty or valid input so the UI can
  * decide whether to surface the message based on touch state.
  */
-export function validateAddressInput(
-  address: string,
-): { valid: boolean; error: string | null } {
+export function validateAddressInput(address: string): { valid: boolean; error: string | null } {
   const trimmed = address.trim();
 
   // Empty — no error until the user blurs or submits
@@ -75,5 +72,9 @@ export function areWalletAddressesEqual(
   const leftValidation = validateAndNormalizeAddress(left);
   const rightValidation = validateAndNormalizeAddress(right);
 
-  return leftValidation.valid && rightValidation.valid && leftValidation.address === rightValidation.address;
+  return (
+    leftValidation.valid &&
+    rightValidation.valid &&
+    leftValidation.address === rightValidation.address
+  );
 }

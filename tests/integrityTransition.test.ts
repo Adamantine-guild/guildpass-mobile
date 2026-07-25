@@ -13,7 +13,9 @@
  */
 
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { AppState, type AppStateStatus } from "react-native";
+import { AppState, Platform } from "react-native";
+import type { AppStateStatus } from "react-native";
+import Constants from "expo-constants";
 import {
   configureDeviceIntegrity,
   assessDeviceIntegrity,
@@ -32,7 +34,6 @@ import { useIntegrityWarningStore } from "../src/features/security/integrityWarn
  */
 
 function setPlatform(os: "android" | "ios") {
-  const Platform = require("react-native").Platform;
   const orig = Platform.OS;
   Object.defineProperty(Platform, "OS", { get: () => os, configurable: true });
   return () => {
@@ -48,16 +49,14 @@ function makeAllChecksPass(): void {
   // always return passed: true. The only check that can fail is the
   // development-environment check (env:expo_go), which we can control by
   // mocking Constants.executionEnvironment.
-  const Constants = require("expo-constants");
-  Constants.executionEnvironment = "standalone";
+  (Constants as any).executionEnvironment = "standalone";
 }
 
 /**
  * Mark the development-environment check as failed → device appears compromised.
  */
 function makeExpoGoCheckFail(): void {
-  const Constants = require("expo-constants");
-  Constants.executionEnvironment = "storeClient";
+  (Constants as any).executionEnvironment = "storeClient";
 }
 
 // ---------------------------------------------------------------------------
@@ -224,9 +223,9 @@ describe("warn policy — warning surface on secure→compromised", () => {
     expect(transition).toBe("secure_to_compromised");
 
     // Under warn policy we set a warning message instead of logging out
-    useIntegrityWarningStore.getState().setWarning(
-      "Device integrity has changed since the last check.",
-    );
+    useIntegrityWarningStore
+      .getState()
+      .setWarning("Device integrity has changed since the last check.");
     expect(useIntegrityWarningStore.getState().message).not.toBeNull();
     // Session should remain authenticated
     expect(useSessionStore.getState().status).toBe("authenticated");

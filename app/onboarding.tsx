@@ -35,7 +35,9 @@ export default function Onboarding() {
             />
           ) : (
             <>
-              <Text className="text-text font-semibold text-center">How would you like to continue?</Text>
+              <Text className="text-text font-semibold text-center">
+                How would you like to continue?
+              </Text>
               {isEmbeddedWalletEnabled ? (
                 <Button
                   title="Get started without a wallet"

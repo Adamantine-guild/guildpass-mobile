@@ -72,11 +72,12 @@ The app uses a **three-layer state architecture** to avoid denormalization and s
    ```
 4. **Add React Query hook** in `src/features/events/useEvents.ts`:
    ```ts
-   export const useEvent = (eventId: string) => useQuery({
-     queryKey: queryKeys.events.byId(eventId),
-     queryFn: () => guildPassClient.events.getEvent({ eventId }),
-     networkMode: "offlineFirst",
-   });
+   export const useEvent = (eventId: string) =>
+     useQuery({
+       queryKey: queryKeys.events.byId(eventId),
+       queryFn: () => guildPassClient.events.getEvent({ eventId }),
+       networkMode: "offlineFirst",
+     });
    ```
 5. **Add DAL-backed resolution** in `src/database/queryAdapter.ts`:
    ```ts
@@ -123,14 +124,17 @@ The app uses a **three-layer state architecture** to avoid denormalization and s
 ## Normalization Rules
 
 ### DO embed in a query result:
+
 - Resource-specific data that has no entity cache (e.g., `resourceName` in access history)
 - Server response data that is not a cached entity reference (e.g., `matchedRoles` string array)
 
 ### DO NOT embed in a query result:
+
 - Entity names that have a dedicated entity cache (e.g., guild names — use `["guild", guildId]` instead)
 - Data from a different entity type (e.g., guild info in a memberships query)
 
 ### Reference, don't copy:
+
 - Store entity `id`s, not entity snapshots
 - Resolve display names at render time using selectors like `useResolvedGuildName(guildId)`
 - Use `useQueries` to batch-resolve multiple entities efficiently
@@ -145,15 +149,16 @@ All query keys go through `src/lib/queryKeys.ts`:
 import { queryKeys } from "../../lib/queryKeys";
 
 // Creating keys
-queryKeys.guild.byId("abc")          // → ["guild", "abc"]
-queryKeys.membership.byWalletAndGuild("0x...", "abc") // → ["membership", "0x...", "abc"]
+queryKeys.guild.byId("abc"); // → ["guild", "abc"]
+queryKeys.membership.byWalletAndGuild("0x...", "abc"); // → ["membership", "0x...", "abc"]
 
 // Root-level matching (for invalidations, sync engine)
-queryKeys.membership.all              // → ["membership"]
-queryKeys.guildRoles.all              // → ["guild-roles"]
+queryKeys.membership.all; // → ["membership"]
+queryKeys.guildRoles.all; // → ["guild-roles"]
 ```
 
 This ensures consistency across:
+
 - Query hooks (`useGuilds.ts`, `useMembership.ts`)
 - Cache invalidation (`focusManager.ts`)
 - Cache clearing (`walletScopedCache.ts`)
@@ -164,13 +169,13 @@ This ensures consistency across:
 
 ## Cache Coherence Mechanisms
 
-| Mechanism | Trigger | What Happens |
-|-----------|---------|-------------|
-| **staleTime** | 5 min after last fetch | Queries auto-refetch on next mount |
-| **Foreground refetch** | App comes to foreground | Invalidates `["membership"]` and `["user-roles"]` |
-| **Sync Engine** | Offline→online transition | Refetches all cached entities, overwrites with server data, generates corrections |
-| **Wallet disconnect** | User disconnects wallet | `clearWalletScopedCache()` removes all wallet-scoped queries |
-| **Structural sharing** | React Query default | Preserves object identity when data hasn't changed |
+| Mechanism              | Trigger                   | What Happens                                                                      |
+| ---------------------- | ------------------------- | --------------------------------------------------------------------------------- |
+| **staleTime**          | 5 min after last fetch    | Queries auto-refetch on next mount                                                |
+| **Foreground refetch** | App comes to foreground   | Invalidates `["membership"]` and `["user-roles"]`                                 |
+| **Sync Engine**        | Offline→online transition | Refetches all cached entities, overwrites with server data, generates corrections |
+| **Wallet disconnect**  | User disconnects wallet   | `clearWalletScopedCache()` removes all wallet-scoped queries                      |
+| **Structural sharing** | React Query default       | Preserves object identity when data hasn't changed                                |
 
 ---
 
@@ -187,12 +192,14 @@ If converting an existing screen from denormalized to normalized state:
 ### Example: Guild Name in Memberships (already migrated)
 
 **Before:**
+
 ```ts
 // useMembership.ts — query embeds guildName from SQLite
 return { id: row.guild_id, name: guildName, isActive, roleCount };
 ```
 
 **After:**
+
 ```ts
 // useMembership.ts — returns normalized data
 return { guildId: row.guild_id, isActive, roleCount };
@@ -214,12 +221,12 @@ return { guildId: row.guild_id, isActive, roleCount };
 
 ## Key Files
 
-| File | Purpose |
-|------|---------|
-| `src/lib/queryKeys.ts` | Centralized query key factory |
-| `src/lib/offlineCache.ts` | Stale/GC times, re-exports persistable roots |
-| `src/lib/queryClient.ts` | QueryClient singleton |
-| `src/database/dal.ts` | SQLite data access layer |
-| `src/database/queryAdapter.ts` | DAL-backed offline query resolution |
-| `src/features/sync/syncEngine.ts` | Cache coherence engine |
-| `src/features/sync/reconcile.ts` | Entity diffing + correction generation |
+| File                              | Purpose                                      |
+| --------------------------------- | -------------------------------------------- |
+| `src/lib/queryKeys.ts`            | Centralized query key factory                |
+| `src/lib/offlineCache.ts`         | Stale/GC times, re-exports persistable roots |
+| `src/lib/queryClient.ts`          | QueryClient singleton                        |
+| `src/database/dal.ts`             | SQLite data access layer                     |
+| `src/database/queryAdapter.ts`    | DAL-backed offline query resolution          |
+| `src/features/sync/syncEngine.ts` | Cache coherence engine                       |
+| `src/features/sync/reconcile.ts`  | Entity diffing + correction generation       |

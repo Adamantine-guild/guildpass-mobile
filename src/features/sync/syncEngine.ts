@@ -16,7 +16,8 @@
  * network, NetInfo, or any UI.
  */
 
-import { hashKey, type QueryClient } from "@tanstack/react-query";
+import { hashKey } from "@tanstack/react-query";
+import type { QueryClient } from "@tanstack/react-query";
 import { computeEntityVersion, describeSyncableQuery, diffEntity } from "./reconcile";
 import { prioritizeDescriptors } from "./syncPriority";
 import {
@@ -36,7 +37,7 @@ import type {
 import type { SyncStoreState } from "./sync.store";
 
 export type SyncEntityFetcher = (descriptor: SyncEntityDescriptor) => Promise<unknown>;
-export type SyncEntityFetchers = Record<SyncEntityKind, SyncEntityFetcher>;
+export type SyncEntityFetchers = Partial<Record<SyncEntityKind, SyncEntityFetcher>>;
 
 /** Minimal store surface the engine needs; satisfied by useSyncStore. */
 export type SyncStoreLike = {
@@ -126,15 +127,12 @@ export function createSyncEngine(deps: SyncEngineDeps): SyncEngine {
     descriptor: SyncEntityDescriptor,
     detectedAtMs: number,
   ): Promise<EntityOutcome> {
-    // Transient failures (flaky radio right after reconnect) are retried with
-    // backoff; a RetryAborted propagates so the pass can distinguish "network
-    // went away" from "this entity genuinely failed".
-    const fresh = await runWithRetry(() => fetchers[descriptor.kind](descriptor), {
-      config: retryConfig,
-      sleep: deps.sleep,
-      random: deps.random,
-      isOnline,
-    });
+    const fetcher = fetchers[descriptor.kind];
+    if (!fetcher) {
+      // No fetcher registered for this entity kind — skip silently.
+      return null;
+    }
+    const fresh = await fetcher(descriptor);
     if (fresh === undefined) {
       throw new Error(`Server returned no data for ${descriptor.kind}`);
     }
@@ -210,8 +208,7 @@ export function createSyncEngine(deps: SyncEngineDeps): SyncEngine {
       } else {
         errors.push({
           queryKey: descriptors[index].queryKey,
-          message:
-            result.reason instanceof Error ? result.reason.message : String(result.reason),
+          message: result.reason instanceof Error ? result.reason.message : String(result.reason),
         });
       }
     });

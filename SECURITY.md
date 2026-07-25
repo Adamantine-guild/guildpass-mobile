@@ -97,11 +97,11 @@ legacy entry is **cleared** rather than left as plaintext on disk.
 
 ### Threat model
 
-| Threat | Mitigation |
-| ------ | ---------- |
-| Attacker gains filesystem access to a lost/stolen/rooted device | Data on disk is ciphertext; the key resides in the secure enclave and is not exportable. |
-| Attacker analyses app memory for keys | The key is only loaded from `expo-secure-store` while the app is actively rendering; it is never written to AsyncStorage, logs, or crash reports. |
-| Attacker tampers with cached data to forge membership/role state | AES-GCM authentication tag is verified on every read; tampered ciphertext is rejected and the entry cleared. No forged payload ever reaches TanStack Query. |
+| Threat                                                                             | Mitigation                                                                                                                                                                                                 |
+| ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Attacker gains filesystem access to a lost/stolen/rooted device                    | Data on disk is ciphertext; the key resides in the secure enclave and is not exportable.                                                                                                                   |
+| Attacker analyses app memory for keys                                              | The key is only loaded from `expo-secure-store` while the app is actively rendering; it is never written to AsyncStorage, logs, or crash reports.                                                          |
+| Attacker tampers with cached data to forge membership/role state                   | AES-GCM authentication tag is verified on every read; tampered ciphertext is rejected and the entry cleared. No forged payload ever reaches TanStack Query.                                                |
 | Downgrade attack — attacker swaps an encrypted entry with a pre-#22 plaintext blob | The migration path is one-way: legacy plaintext is migrated on first read and the next write is always encrypted. Persistent failure to re-encrypt clears the entry rather than leaving plaintext on disk. |
 
 ### Performance impact
@@ -214,12 +214,12 @@ or reversible SecureStore entry names.
 
 GuildPass Mobile implements a defense-in-depth security hardening layer:
 
-| Control | Description | Document |
-|---------|-------------|----------|
-| **Device Integrity** | Best-effort root/jailbreak detection with configurable response (warn vs. block) | [Source](./src/features/security/deviceIntegrity.ts) |
-| **Certificate Pinning** | TLS public-key pinning for all traffic to GuildPass API domains | [Source](./src/features/security/certificatePinning.ts) |
-| **Secure Fetch** | Fetch wrapper enforcing domain validation and device integrity gates | [Source](./src/lib/secureFetch.ts) |
-| **QR Key Rotation** | Versioned secp256k1 key verification with revocation list checks & bounded TTL | [Source](./src/features/access/guildIssuerKey.ts) |
+| Control                 | Description                                                                      | Document                                                |
+| ----------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| **Device Integrity**    | Best-effort root/jailbreak detection with configurable response (warn vs. block) | [Source](./src/features/security/deviceIntegrity.ts)    |
+| **Certificate Pinning** | TLS public-key pinning for all traffic to GuildPass API domains                  | [Source](./src/features/security/certificatePinning.ts) |
+| **Secure Fetch**        | Fetch wrapper enforcing domain validation and device integrity gates             | [Source](./src/lib/secureFetch.ts)                      |
+| **QR Key Rotation**     | Versioned secp256k1 key verification with revocation list checks & bounded TTL   | [Source](./src/features/access/guildIssuerKey.ts)       |
 
 ### Supporting Documentation
 

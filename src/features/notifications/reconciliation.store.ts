@@ -96,12 +96,13 @@ export const useReconciliationStore = create<ReconciliationStore>()(
           walletAddress: snapshot.walletAddress,
         };
         const composite = entityCompositeKey(key);
+        const hasBeenSeen = composite in get().versions;
         const previousSeq = get().versions[composite] ?? 0;
         const fetchedSeq = snapshot.roleChangeSeq;
 
-        const isDuplicate = fetchedSeq === previousSeq;
-        const isStale = fetchedSeq < previousSeq;
-        const isUpdate = fetchedSeq > previousSeq;
+        const isDuplicate = hasBeenSeen && fetchedSeq === previousSeq;
+        const isStale = hasBeenSeen && fetchedSeq < previousSeq;
+        const isUpdate = !hasBeenSeen || fetchedSeq > previousSeq;
 
         const result: ReconciliationResult = {
           entityKey: key,
@@ -113,7 +114,7 @@ export const useReconciliationStore = create<ReconciliationStore>()(
           snapshot,
         };
 
-        // Only update stored version when we have genuinely newer data.
+        // Only update stored version when we have genuinely newer data or first time seeing key.
         // This guarantees monotonicity — we NEVER regress.
         if (isUpdate) {
           set((state) => ({

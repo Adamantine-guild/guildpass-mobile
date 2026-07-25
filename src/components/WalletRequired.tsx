@@ -9,10 +9,7 @@ interface WalletRequiredProps {
   redirect?: boolean;
 }
 
-export function WalletRequired({
-  children,
-  redirect = true,
-}: WalletRequiredProps) {
+export function WalletRequired({ children, redirect = true }: WalletRequiredProps) {
   const { isConnected, isHydrated } = useWallet();
   const router = useRouter();
 

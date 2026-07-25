@@ -1,8 +1,11 @@
 import { useReducer, useCallback, useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
+import type { MutateOptions } from "@tanstack/react-query";
 import { guildPassClient } from "../../lib/guildpassClient";
 import { useMultiChainRoleEligibility } from "./useMultiChainRoleEligibility";
 import type { PerChainRoleEligibilityResolution } from "./roleEligibilityResolver";
+
+type AccessCheckMutateOptions = MutateOptions<AccessCheckResult, Error, AccessCheckParams, unknown>;
 
 export type AccessCheckParams = {
   walletAddress: string;
@@ -55,7 +58,8 @@ export const useAccessCheck = () => {
 
   const mutation = useMutation<AccessCheckResult, Error, AccessCheckParams>({
     mutationKey: ["access-check"],
-    mutationFn: (params) => guildPassClient.access.checkAccess(params) as Promise<AccessCheckResult>,
+    mutationFn: (params) =>
+      guildPassClient.access.checkAccess(params) as Promise<AccessCheckResult>,
     onSuccess: (result) => {
       dispatch({ type: "SUBMIT_SUCCESS", result });
     },
@@ -69,7 +73,7 @@ export const useAccessCheck = () => {
   }, []);
 
   const checkAccess = useCallback(
-    (params: AccessCheckParams, options?: Parameters<typeof mutation.mutate>[1]) => {
+    (params: AccessCheckParams, options?: AccessCheckMutateOptions) => {
       lastParamsRef.current = params;
       dispatch({ type: "SCANNED", payload: params });
       mutation.mutate(params, options);
@@ -82,7 +86,7 @@ export const useAccessCheck = () => {
   );
 
   const retry = useCallback(
-    (options?: Parameters<typeof mutation.mutate>[1]) => {
+    (options?: AccessCheckMutateOptions) => {
       const params = lastParamsRef.current;
       if (!params) {
         return;
@@ -122,4 +126,3 @@ export const useAccessCheck = () => {
     roleEligibilityError: multiChain.error,
   };
 };
-

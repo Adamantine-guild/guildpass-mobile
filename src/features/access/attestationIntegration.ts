@@ -3,10 +3,10 @@
  * Augments access check results with cryptographic proof validation
  */
 
-import { useMutation } from '@tanstack/react-query';
-import { guildPassClient } from '../../lib/guildpassClient';
-import type { AccessCheckParams, AccessCheckResult } from './useAccessCheck';
-import type { AttestationService } from '../attestation/attestationService';
+import { useMutation } from "@tanstack/react-query";
+import { guildPassClient } from "../../lib/guildpassClient";
+import type { AccessCheckParams, AccessCheckResult } from "./useAccessCheck";
+import type { AttestationService } from "../attestation/attestationService";
 
 /**
  * Enhanced access check result with attestation verification
@@ -28,20 +28,20 @@ export interface AttestationAugmentedAccessCheck extends AccessCheckResult {
  */
 export function useAccessCheckWithAttestations(attestationService: AttestationService | null) {
   return useMutation<AttestationAugmentedAccessCheck, Error, AccessCheckParams>({
-    mutationKey: ['access-check-with-attestations'],
+    mutationKey: ["access-check-with-attestations"],
     mutationFn: async (params: AccessCheckParams) => {
       // First, try to verify using cached attestation
       if (attestationService) {
         const cachedAttestation = await attestationService.hasCachedAttestation(
           params.walletAddress,
           params.guildId,
-          'access-' + params.resourceId // Use resource-specific role key
+          "access-" + params.resourceId, // Use resource-specific role key
         );
 
         if (cachedAttestation) {
           return {
             hasAccess: true,
-            matchedRoles: ['attestation-verified'],
+            matchedRoles: ["attestation-verified"],
             requiredRoles: [],
             verifiedViaAttestation: true,
             backedByBackend: false,
@@ -58,7 +58,7 @@ export function useAccessCheckWithAttestations(attestationService: AttestationSe
         backedByBackend: true,
       };
     },
-    networkMode: 'offlineFirst',
+    networkMode: "offlineFirst",
   });
 }
 
@@ -77,7 +77,7 @@ export function useCacheAccessAttestationsMutation(attestationService: Attestati
       resourceIds: string[];
     }) => {
       if (!attestationService) {
-        throw new Error('Attestation service not initialized');
+        throw new Error("Attestation service not initialized");
       }
 
       const results = [];
@@ -87,14 +87,14 @@ export function useCacheAccessAttestationsMutation(attestationService: Attestati
           const result = await attestationService.fetchAndVerifyAttestation(
             params.walletAddress,
             params.guildId,
-            'access-' + resourceId
+            "access-" + resourceId,
           );
           results.push({ resourceId, ...result });
         } catch (error) {
           results.push({
             resourceId,
             valid: false,
-            error: error instanceof Error ? error.message : 'Unknown error',
+            error: error instanceof Error ? error.message : "Unknown error",
           });
         }
       }

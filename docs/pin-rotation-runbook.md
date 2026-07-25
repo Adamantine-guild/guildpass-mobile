@@ -16,10 +16,10 @@ This runbook describes the safe rotation procedure to avoid bricking connectivit
 
 The app ships with a set of **SubjectPublicKeyInfo (SPKI) SHA-256 hashes** (base64-encoded). At connection time:
 
-| Platform | Mechanism |
-|----------|-----------|
-| **Android** | `network_security_config.xml` (via `android:networkSecurityConfig` in the manifest) |
-| **iOS** | `NSAppTransportSecurity` with `NSPinnedDomains` in `Info.plist` |
+| Platform     | Mechanism                                                                                                            |
+| ------------ | -------------------------------------------------------------------------------------------------------------------- |
+| **Android**  | `network_security_config.xml` (via `android:networkSecurityConfig` in the manifest)                                  |
+| **iOS**      | `NSAppTransportSecurity` with `NSPinnedDomains` in `Info.plist`                                                      |
 | **JS layer** | `src/features/security/certificatePinning.ts` — defines the canonical pin set; native config is generated from this. |
 
 The pin set is defined in `src/features/security/certificatePinning.ts` under the `CURRENT_PINS` constant.
@@ -145,27 +145,27 @@ If pins are not rotated in time and clients lose connectivity:
 
 ## Validation Checklist
 
-| Step | Description | ✅ |
-|------|-------------|-----|
-| 1 | New pin hash obtained via OpenSSL | |
-| 2 | New pin entry added to `CURRENT_PINS` (old pin retained) | |
-| 3 | `validatePinConfiguration()` returns `{ valid: true }` | |
-| 4 | Build succeeds on both platforms | |
-| 5 | App connects to API with old certificate (backward compat) | |
-| 6 | App connects to API with new certificate (forward compat) | |
-| 7 | MITM proxy with non-pinned cert is correctly rejected | |
-| 8 | Old pin removed only after >95% user adoption | |
-| 9 | New backup pin added for next rotation cycle | |
+| Step | Description                                                | ✅  |
+| ---- | ---------------------------------------------------------- | --- |
+| 1    | New pin hash obtained via OpenSSL                          |     |
+| 2    | New pin entry added to `CURRENT_PINS` (old pin retained)   |     |
+| 3    | `validatePinConfiguration()` returns `{ valid: true }`     |     |
+| 4    | Build succeeds on both platforms                           |     |
+| 5    | App connects to API with old certificate (backward compat) |     |
+| 6    | App connects to API with new certificate (forward compat)  |     |
+| 7    | MITM proxy with non-pinned cert is correctly rejected      |     |
+| 8    | Old pin removed only after >95% user adoption              |     |
+| 9    | New backup pin added for next rotation cycle               |     |
 
 ---
 
 ## Schedule
 
-| Frequency | Action |
-|-----------|--------|
-| **Annually** | Primary pin rotation (aligned with certificate renewal) |
+| Frequency          | Action                                                  |
+| ------------------ | ------------------------------------------------------- |
+| **Annually**       | Primary pin rotation (aligned with certificate renewal) |
 | **Every 6 months** | Review pin set validity, check certificate expiry dates |
-| **On incident** | Emergency rotation per Phase 1-2 (expedited) |
+| **On incident**    | Emergency rotation per Phase 1-2 (expedited)            |
 
 ---
 

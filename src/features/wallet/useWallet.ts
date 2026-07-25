@@ -1,11 +1,7 @@
 import { useCallback } from "react";
 import { useWalletStore } from "./wallet.store";
 import { validateAndNormalizeAddress } from "../../lib/walletValidation";
-import {
-  createEmbeddedConnector,
-  createManualConnector,
-  createWalletConnectConnector,
-} from "./walletConnector.service";
+import { createManualConnector, createWalletConnectConnector } from "./walletConnector.service";
 import { WalletConnector } from "./walletConnector.types";
 import { getWalletConnectProvider } from "./walletConnectSession";
 import { endWalletSession, startWalletSession } from "../../lib/walletLifecycle";
@@ -18,7 +14,9 @@ export const useWallet = (): {
   connectManually: (address: string) => { success: boolean; error?: string };
   /** Store an EVM address created by an embedded wallet provider. */
   connectEmbeddedWallet: (address: string) => Promise<{ success: boolean; error?: string }>;
-  connectWithConnector: (connector: WalletConnector) => Promise<{ success: boolean; error?: string }>;
+  connectWithConnector: (
+    connector: WalletConnector,
+  ) => Promise<{ success: boolean; error?: string }>;
   /** Connect using WalletConnect — requires the WC provider from useWalletConnectModal */
   connectWalletConnect: (provider: {
     request(args: { method: string }): Promise<unknown>;

@@ -33,15 +33,11 @@ export function IntegrityWarningBanner() {
       >
         <View className="flex-row items-start">
           <View className="flex-1">
-            <Text className="text-amber-800 font-bold text-sm mb-1">
-              ⚠ Device Security Warning
-            </Text>
-            <Text className="text-amber-900 text-sm leading-5">
-              {message}
-            </Text>
+            <Text className="text-amber-800 font-bold text-sm mb-1">⚠ Device Security Warning</Text>
+            <Text className="text-amber-900 text-sm leading-5">{message}</Text>
             <Text className="text-amber-700 text-xs mt-2">
-              Your device may be rooted or jailbroken. Some features may be
-              restricted. Contact support if you believe this is an error.
+              Your device may be rooted or jailbroken. Some features may be restricted. Contact
+              support if you believe this is an error.
             </Text>
           </View>
         </View>

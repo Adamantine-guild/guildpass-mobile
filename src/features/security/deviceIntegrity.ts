@@ -38,9 +38,7 @@ const DEFAULT_CONFIG: DeviceIntegrityConfig = {
 let _config: DeviceIntegrityConfig = { ...DEFAULT_CONFIG };
 
 /** Override default integrity config at boot. */
-export function configureDeviceIntegrity(
-  partial: Partial<DeviceIntegrityConfig>,
-): void {
+export function configureDeviceIntegrity(partial: Partial<DeviceIntegrityConfig>): void {
   _config = { ..._config, ...partial };
 }
 
@@ -209,11 +207,7 @@ let _lastCheckTime = 0;
  */
 export function assessDeviceIntegrity(force = false): DeviceIntegrityResult {
   const now = Date.now();
-  if (
-    !force &&
-    _lastResult &&
-    now - _lastCheckTime < _config.minCheckIntervalMs
-  ) {
+  if (!force && _lastResult && now - _lastCheckTime < _config.minCheckIntervalMs) {
     return _lastResult;
   }
 
@@ -267,10 +261,7 @@ export function getLastIntegrityResult(): DeviceIntegrityResult | null {
  * - `"secure_to_compromised"`: device WAS secure and is NOW compromised.
  * - `"compromised_to_secure"`: device WAS compromised and is NOW secure.
  */
-export type IntegrityTransition =
-  | "no_change"
-  | "secure_to_compromised"
-  | "compromised_to_secure";
+export type IntegrityTransition = "no_change" | "secure_to_compromised" | "compromised_to_secure";
 
 /**
  * Force a fresh integrity assessment, compare against the previous result,
