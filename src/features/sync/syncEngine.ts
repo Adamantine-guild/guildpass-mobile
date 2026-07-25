@@ -18,6 +18,13 @@
 
 import { hashKey, type QueryClient } from "@tanstack/react-query";
 import { computeEntityVersion, describeSyncableQuery, diffEntity } from "./reconcile";
+import { prioritizeDescriptors } from "./syncPriority";
+import {
+  DEFAULT_RETRY_CONFIG,
+  RetryAborted,
+  runWithRetry,
+  type RetryConfig,
+} from "./retryPolicy";
 import type {
   SyncCorrection,
   SyncEntityDescriptor,
@@ -35,7 +42,13 @@ export type SyncEntityFetchers = Record<SyncEntityKind, SyncEntityFetcher>;
 export type SyncStoreLike = {
   getState: () => Pick<
     SyncStoreState,
-    "beginSync" | "completeSync" | "failSync" | "recordEntityMetaBatch" | "addCorrections"
+    | "beginSync"
+    | "completeSync"
+    | "failSync"
+    | "recordEntityMetaBatch"
+    | "addCorrections"
+    // Read for staleness-ordering within a priority tier.
+    | "entityMeta"
   >;
 };
 
@@ -45,6 +58,11 @@ export type SyncEngineDeps = {
   syncStore: SyncStoreLike;
   isOnline: () => boolean;
   now?: () => number;
+  /** Per-entity retry behaviour; defaults to DEFAULT_RETRY_CONFIG. */
+  retryConfig?: RetryConfig;
+  /** Injected so tests can drive backoff on a fake clock. */
+  sleep?: (ms: number) => Promise<void>;
+  random?: () => number;
 };
 
 export type SyncEngine = {
@@ -84,6 +102,7 @@ async function mapWithConcurrency<T, R>(
 export function createSyncEngine(deps: SyncEngineDeps): SyncEngine {
   const { queryClient, fetchers, syncStore, isOnline } = deps;
   const now = deps.now ?? Date.now;
+  const retryConfig = deps.retryConfig ?? DEFAULT_RETRY_CONFIG;
 
   let inFlight: Promise<SyncRunSummary> | null = null;
 
@@ -107,7 +126,15 @@ export function createSyncEngine(deps: SyncEngineDeps): SyncEngine {
     descriptor: SyncEntityDescriptor,
     detectedAtMs: number,
   ): Promise<EntityOutcome> {
-    const fresh = await fetchers[descriptor.kind](descriptor);
+    // Transient failures (flaky radio right after reconnect) are retried with
+    // backoff; a RetryAborted propagates so the pass can distinguish "network
+    // went away" from "this entity genuinely failed".
+    const fresh = await runWithRetry(() => fetchers[descriptor.kind](descriptor), {
+      config: retryConfig,
+      sleep: deps.sleep,
+      random: deps.random,
+      isOnline,
+    });
     if (fresh === undefined) {
       throw new Error(`Server returned no data for ${descriptor.kind}`);
     }
@@ -152,7 +179,12 @@ export function createSyncEngine(deps: SyncEngineDeps): SyncEngine {
 
     syncStore.getState().beginSync(startedAt);
 
-    const descriptors = collectDescriptors();
+    // Access-gating entities first, most-stale-first within a tier, so a
+    // capped pool spends its slots on the entities that can be unsafe.
+    const descriptors = prioritizeDescriptors(collectDescriptors(), {
+      entityMeta: syncStore.getState().entityMeta,
+      serializeQueryKey,
+    });
     const detectedAtMs = startedAt;
     const results = await mapWithConcurrency(descriptors, MAX_CONCURRENT_FETCHES, (descriptor) =>
       reconcileEntity(descriptor, detectedAtMs),
@@ -162,6 +194,7 @@ export function createSyncEngine(deps: SyncEngineDeps): SyncEngine {
     const errors: SyncRunError[] = [];
     const metaEntries: Record<string, SyncEntityMeta> = {};
     let entitiesUpdated = 0;
+    let abortedOffline = false;
 
     results.forEach((result, index) => {
       if (result.status === "fulfilled") {
@@ -169,6 +202,11 @@ export function createSyncEngine(deps: SyncEngineDeps): SyncEngine {
         corrections.push(...result.value.corrections);
         metaEntries[result.value.metaKey] = result.value.meta;
         if (result.value.updated) entitiesUpdated += 1;
+      } else if (result.reason instanceof RetryAborted) {
+        // Connectivity vanished mid-pass. Not an entity error: the entity was
+        // never disproven, so it keeps its existing meta and is left for the
+        // next pass rather than being recorded as a failure.
+        abortedOffline = true;
       } else {
         errors.push({
           queryKey: descriptors[index].queryKey,
@@ -178,6 +216,9 @@ export function createSyncEngine(deps: SyncEngineDeps): SyncEngine {
       }
     });
 
+    // Partial success: entities that did reconcile keep their confirmed meta
+    // and corrections even when siblings failed, so a flaky pass still makes
+    // forward progress instead of being discarded wholesale.
     syncStore.getState().recordEntityMetaBatch(metaEntries);
     syncStore.getState().addCorrections(corrections);
 
@@ -186,12 +227,21 @@ export function createSyncEngine(deps: SyncEngineDeps): SyncEngine {
       syncStore
         .getState()
         .failSync(`${errors.length} of ${descriptors.length} entities failed to sync`, finishedAt);
+    } else if (abortedOffline) {
+      syncStore.getState().failSync("Sync interrupted — connection lost", finishedAt);
     } else {
       syncStore.getState().completeSync(finishedAt);
     }
 
+    const status: SyncRunSummary["status"] =
+      errors.length > 0
+        ? "completed_with_errors"
+        : abortedOffline
+          ? "interrupted_offline"
+          : "completed";
+
     return {
-      status: errors.length > 0 ? "completed_with_errors" : "completed",
+      status,
       startedAt,
       finishedAt,
       entitiesChecked: descriptors.length,
