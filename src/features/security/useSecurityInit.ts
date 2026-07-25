@@ -21,7 +21,7 @@ import {
   getIntegrityResponsePolicy,
   checkIntegrityTransition,
 } from "../features/security/deviceIntegrity";
-import { useSessionStore } from "../features/session/session.store";
+import { invalidateSessionForCompromise } from "../../lib/walletLifecycle";
 import { useIntegrityWarningStore } from "../features/security/integrityWarning.store";
 import {
   enforcePinConfigurationAtStartup,
@@ -109,7 +109,7 @@ export function useSecurityInit(): void {
         );
 
         // Invalidate the active session — forces the user to re-authenticate.
-        useSessionStore.getState().endSession().catch(() => {
+        invalidateSessionForCompromise().catch(() => {
           console.error(
             "[GuildPass Security] Failed to end session after compromise detection.",
           );

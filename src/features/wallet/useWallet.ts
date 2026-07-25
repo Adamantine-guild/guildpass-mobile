@@ -6,10 +6,8 @@ import {
   createWalletConnectConnector,
 } from "./walletConnector.service";
 import { WalletConnector } from "./walletConnector.types";
-import { useSessionStore } from "../session/session.store";
-import { queryClient } from "../../lib/queryClient";
-import { clearWalletScopedCache } from "../../lib/walletScopedCache";
-import { useSyncStore } from "../sync/sync.store";
+import { getWalletConnectProvider } from "./walletConnectSession";
+import { endWalletSession, startWalletSession } from "../../lib/walletLifecycle";
 
 export const useWallet = (): {
   walletAddress: string | null;
@@ -27,21 +25,18 @@ export const useWallet = (): {
   }) => Promise<{ success: boolean; error?: string }>;
   disconnect: () => Promise<void>;
 } => {
-  const {
-    walletAddress,
-    isConnected,
-    connectionKind,
-    _hasHydrated: isHydrated,
-    setWalletAddress,
-    disconnect: storeDisconnect,
-  } = useWalletStore();
-  const { startSession, endSession } = useSessionStore.getState();
+  const walletAddress = useWalletStore((s) => s.walletAddress);
+  const isConnected = useWalletStore((s) => s.isConnected);
+  const connectionKind = useWalletStore((s) => s.connectionKind);
+  const isHydrated = useWalletStore((s) => s._hasHydrated);
+  const setWalletAddress = useWalletStore((s) => s.setWalletAddress);
+  const storeDisconnect = useWalletStore((s) => s.disconnect);
 
   const connectManually = (address: string): { success: boolean; error?: string } => {
     const result = validateAndNormalizeAddress(address);
     if (!result.valid) return { success: false, error: result.error };
     setWalletAddress(result.address, "manual");
-    void startSession(result.address!);
+    void startWalletSession(result.address!);
     return { success: true };
   };
 
@@ -53,7 +48,7 @@ export const useWallet = (): {
     // This intentionally writes to the normal wallet store. Downstream code
     // only sees a validated EVM address, never provider-specific user data.
     setWalletAddress(result.address, "embedded");
-    await startSession(result.address!);
+    await startWalletSession(result.address!);
     return { success: true };
   };
 
@@ -66,7 +61,7 @@ export const useWallet = (): {
       const result = validateAndNormalizeAddress(accounts[0]);
       if (!result.valid) return { success: false, error: result.error };
       setWalletAddress(result.address, connector.type);
-      await startSession(result.address!);
+      await startWalletSession(result.address!);
       return { success: true };
     } catch (e) {
       return { success: false, error: e instanceof Error ? e.message : "Connection failed" };
@@ -82,25 +77,22 @@ export const useWallet = (): {
       return connectWithConnector(connector);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [setWalletAddress, startSession],
+    [setWalletAddress],
   );
 
   const disconnect = useCallback(async () => {
     // If connected via WalletConnect, tear down the WC session first
     if (connectionKind === "walletconnect") {
-      const { getWalletConnectProvider } = require("./WalletConnectProvider");
       const wcProvider = getWalletConnectProvider();
       if (wcProvider) {
         await wcProvider.disconnect().catch(() => {});
       }
     }
-    clearWalletScopedCache(queryClient);
-    // Sync corrections/metadata are wallet-scoped state too — a new wallet
-    // must not see the previous wallet's "your access changed" notices.
-    useSyncStore.getState().clearSyncState();
+    // Clear this feature's own state before the cross-feature teardown, so a
+    // screen re-rendering mid-disconnect cannot refetch for the outgoing wallet.
     storeDisconnect();
-    void endSession();
-  }, [connectionKind, storeDisconnect, endSession]);
+    await endWalletSession();
+  }, [connectionKind, storeDisconnect]);
 
   return {
     walletAddress,
