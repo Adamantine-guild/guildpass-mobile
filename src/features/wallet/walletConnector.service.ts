@@ -1,4 +1,4 @@
-import { WalletConnector, WalletConnectorType } from "./walletConnector.types";
+import { WalletConnector } from "./walletConnector.types";
 
 /**
  * Manual connector — wraps a pre-validated address so the connector interface
@@ -61,14 +61,31 @@ export function createWalletConnectConnector(provider: {
   };
 }
 
-/** Registry of available connector factories */
-const connectorFactories: Record<WalletConnectorType, boolean> = {
-  manual: true,
-  walletconnect: true,
-  coinbase: false,
-  metamask: false,
-};
-
-export function isConnectorTypeSupported(type: WalletConnectorType): boolean {
-  return connectorFactories[type] === true;
+/**
+ * Embedded-wallet connector — wraps the EVM address the embedded-wallet provider
+ * has already provisioned, so the embedded path joins the same connector flow as
+ * every other wallet instead of writing to the store on its own.
+ *
+ * Shaped like the manual connector because the address is likewise already known:
+ * the provider's sign-in happens in `EmbeddedWalletOnboarding`, and its only
+ * application output is that address.
+ */
+export function createEmbeddedConnector(address: string): WalletConnector {
+  return {
+    type: "embedded",
+    async connect() {
+      return [address];
+    },
+    async disconnect() {},
+    async reconnect() {
+      return [address];
+    },
+    async getAccounts() {
+      return [address];
+    },
+  };
 }
+
+// Connector support is answered by the registry — see walletConnectorRegistry.ts.
+// Re-exported here so existing importers of this module keep working.
+export { isConnectorTypeSupported } from "./walletConnectorRegistry";
