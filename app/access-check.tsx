@@ -11,7 +11,7 @@ import { Card } from "../src/components/Card";
 import { Button } from "../src/components/Button";
 import { WalletInput } from "../src/components/WalletInput";
 import { AccessStatusCard } from "../src/components/AccessStatusCard";
-import { LoadingState } from "../src/components/LoadingState";
+import { AccessStatusCardSkeleton } from "../src/components/AccessStatusCardSkeleton";
 import { areWalletAddressesEqual, validateAndNormalizeAddress } from "../src/lib/walletValidation";
 import { useAccessHistoryStore } from "../src/features/access/accessHistory.store";
 import { useNetworkStatus } from "../src/features/offline/useNetworkStatus";
@@ -19,6 +19,81 @@ import { StaleDataBanner } from "../src/components/StaleDataBanner";
 import { ErrorState } from "../src/components/ErrorState";
 import { BiometricGate } from "../src/features/security/BiometricGate";
 import { useGuilds } from "../src/features/guilds/useGuilds";
+import type { PerChainRoleEligibilityResolution } from "../src/features/access/roleEligibilityResolver";
+
+const statusCopy: Record<PerChainRoleEligibilityResolution["status"], string> = {
+  resolved: "Resolved",
+  "timed-out": "Timed out",
+  error: "Error",
+};
+
+const statusClassName: Record<PerChainRoleEligibilityResolution["status"], string> = {
+  resolved: "bg-success/10 text-success border-success/30",
+  "timed-out": "bg-amber-100 text-amber-700 border-amber-300",
+  error: "bg-error/10 text-error border-error/30",
+};
+
+function PerChainEligibilityList({
+  perChainRoleEligibility,
+  isResolvingRoleEligibility,
+  roleEligibilityError,
+}: {
+  perChainRoleEligibility: PerChainRoleEligibilityResolution[];
+  isResolvingRoleEligibility: boolean;
+  roleEligibilityError?: string;
+}) {
+  if (
+    perChainRoleEligibility.length === 0 &&
+    !isResolvingRoleEligibility &&
+    !roleEligibilityError
+  ) {
+    return null;
+  }
+
+  return (
+    <Card className="mt-4 border-border" testID="per-chain-eligibility-list">
+      <View className="flex-row items-center justify-between mb-3">
+        <Text className="text-text font-bold">Per-chain role eligibility</Text>
+        {isResolvingRoleEligibility ? (
+          <Text className="text-primary text-xs font-semibold" testID="per-chain-eligibility-loading">
+            Resolving
+          </Text>
+        ) : null}
+      </View>
+
+      {roleEligibilityError ? (
+        <Text className="text-error text-sm mb-3" testID="per-chain-eligibility-error">
+          {roleEligibilityError}
+        </Text>
+      ) : null}
+
+      {perChainRoleEligibility.map((chain) => (
+        <View
+          key={`${chain.chainId}-${chain.status}`}
+          className="border border-border rounded-xl p-3 mb-2"
+          testID={`per-chain-eligibility-row-${chain.chainId}`}
+        >
+          <View className="flex-row items-center justify-between">
+            <Text className="text-text font-semibold">Chain {chain.chainId}</Text>
+            <Text
+              className={`px-2 py-1 rounded-full border text-xs font-semibold ${statusClassName[chain.status]}`}
+            >
+              {statusCopy[chain.status]}
+            </Text>
+          </View>
+          {chain.resolvedRoles && chain.resolvedRoles.length > 0 ? (
+            <Text className="text-text-muted text-xs mt-2">
+              Roles: {chain.resolvedRoles.join(", ")}
+            </Text>
+          ) : null}
+          {chain.errorMessage ? (
+            <Text className="text-error text-xs mt-2">{chain.errorMessage}</Text>
+          ) : null}
+        </View>
+      ))}
+    </Card>
+  );
+}
 
 export default function AccessCheck() {
   const router = useRouter();
@@ -47,6 +122,9 @@ export default function AccessCheck() {
     isPending,
     mutate: runAccessCheck,
     reset: resetAccessCheck,
+    perChainRoleEligibility,
+    isResolvingRoleEligibility,
+    roleEligibilityError,
   } = accessCheck;
   const recordCheck = useAccessHistoryStore((state) => state.recordCheck);
 
@@ -366,7 +444,7 @@ export default function AccessCheck() {
           </Card>
         )}
 
-        {isPending && <LoadingState message="Checking protocol permissions..." />}
+        {isPending && <AccessStatusCardSkeleton />}
 
         {(result || error) && (
           <BiometricGate
@@ -397,6 +475,11 @@ export default function AccessCheck() {
                   matchedRoles={result.matchedRoles}
                   requiredRoles={result.requiredRoles}
                 />
+                <PerChainEligibilityList
+                  perChainRoleEligibility={perChainRoleEligibility}
+                  isResolvingRoleEligibility={isResolvingRoleEligibility}
+                  roleEligibilityError={roleEligibilityError}
+                />
               </View>
             )}
 
@@ -410,6 +493,11 @@ export default function AccessCheck() {
                   }
                   onRetry={handleRetryAccessCheck}
                   isRetrying={isPending}
+                />
+                <PerChainEligibilityList
+                  perChainRoleEligibility={perChainRoleEligibility}
+                  isResolvingRoleEligibility={isResolvingRoleEligibility}
+                  roleEligibilityError={roleEligibilityError}
                 />
               </View>
             )}

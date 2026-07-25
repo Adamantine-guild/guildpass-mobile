@@ -6,7 +6,7 @@
  * ## Quick Start
  *
  * ```ts
- * import { useReconciliation, useBackgroundSync } from "src/features/notifications";
+ * import { useReconciliation } from "src/features/notifications";
  *
  * // In your push notification handler:
  * const { reconcile } = useReconciliation({
@@ -18,12 +18,12 @@
  *
  * // On push receipt:
  * await reconcile({ guildId: "...", walletAddress: "..." });
- *
- * // In your root component — enables foreground/background catch-up:
- * useBackgroundSync({
- *   onRoleChangeApplied: (result) => { ... },
- * });
  * ```
+ *
+ * Foreground/background catch-up is NOT handled here. `useBackgroundSync` was
+ * removed in Issue #225: it was a second, never-mounted reconciliation engine
+ * with its own scheduling and its own notion of "reconciled". Periodic and
+ * foreground catch-up now belong to features/sync/syncCoordinator.
  */
 
 export { useReconciliation } from "./useReconciliation";

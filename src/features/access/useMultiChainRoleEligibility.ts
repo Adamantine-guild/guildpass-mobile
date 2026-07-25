@@ -14,6 +14,56 @@ export type MultiChainRoleEligibilityStatusState = {
   error?: string;
 };
 
+type GuildRoleWithRequirements = {
+  id?: string;
+  name?: string;
+  chainId?: number | null;
+  requirements?: AccessRequirement[];
+};
+
+export type RoleEligibilityResolutionPlan = {
+  requirements: RoleRequirementOnChain[];
+  configurationErrors: PerChainRoleEligibilityResolution[];
+};
+
+function describeRole(role: GuildRoleWithRequirements): string {
+  const name = role.name?.trim();
+  const id = role.id?.trim();
+
+  if (name && id) return `"${name}" (${id})`;
+  if (name) return `"${name}"`;
+  if (id) return id;
+  return "Unnamed role";
+}
+
+export function buildRoleEligibilityResolutionPlan(
+  roles: GuildRoleWithRequirements[],
+): RoleEligibilityResolutionPlan {
+  const requirements: RoleRequirementOnChain[] = [];
+  const configurationErrors: PerChainRoleEligibilityResolution[] = [];
+
+  for (const role of roles) {
+    const roleRequirements = role.requirements ?? [];
+    if (roleRequirements.length === 0) continue;
+
+    const chainId = role.chainId;
+    if (typeof chainId !== "number" || !Number.isSafeInteger(chainId) || chainId <= 0) {
+      configurationErrors.push({
+        chainId: -configurationErrors.length - 1,
+        status: "error",
+        errorMessage: `Role ${describeRole(role)} is missing a valid chain configuration`,
+      });
+      continue;
+    }
+
+    for (const requirement of roleRequirements) {
+      requirements.push({ chainId, requirement });
+    }
+  }
+
+  return { requirements, configurationErrors };
+}
+
 export const useMultiChainRoleEligibility = () => {
   const [state, setState] = useState<MultiChainRoleEligibilityStatusState>({
     isResolving: false,

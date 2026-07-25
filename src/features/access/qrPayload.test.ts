@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseAccessQrPayload, ACCESS_QR_TYPE, ACCESS_QR_VERSION } from "./qrPayload";
+import { parseAccessQrPayload, ACCESS_QR_TYPE, ACCESS_QR_VERSION, QrPayloadError } from "./qrPayload";
 
 describe("parseAccessQrPayload edge cases", () => {
   const basePayload = {
@@ -7,7 +7,7 @@ describe("parseAccessQrPayload edge cases", () => {
     version: ACCESS_QR_VERSION,
     guildId: "guild-123",
     resourceId: "resource-abc",
-    walletAddress: "0x1234567890123456789012345678901234567890",
+    walletAddress: "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed",
     expiresAt: "2026-07-20T00:00:00.000Z",
   };
 
@@ -63,7 +63,7 @@ describe("parseAccessQrPayload edge cases", () => {
     expect(result).toEqual({
       guildId: "guild-123",
       resourceId: "resource-abc",
-      walletAddress: "0x1234567890123456789012345678901234567890",
+      walletAddress: "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed",
       expiresAt: "2026-07-20T00:00:00.000Z",
     });
   });

@@ -5,7 +5,13 @@ import { Card } from "./Card";
 
 export function GuildDetailSkeleton() {
   return (
-    <View className="flex-1 bg-background" testID="guild-detail-skeleton">
+    <View
+      className="flex-1 bg-background"
+      testID="guild-detail-skeleton"
+      accessibilityRole="progressbar"
+      accessibilityLabel="Loading guild details"
+      accessibilityLiveRegion="polite"
+    >
       {/* Skeleton header matching AppHeader */}
       <SafeAreaView className="bg-white border-b border-border">
         <View className="flex-row items-center px-4 py-3">

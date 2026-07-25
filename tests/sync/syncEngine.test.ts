@@ -73,6 +73,8 @@ describe("sync engine – acceptance scenario: cached grant revoked server-side"
       queryClient,
       fetchers,
       syncStore: useSyncStore,
+      // #225 added per-entity retry; keep these assertions off the real clock.
+      sleep: async () => {},
       isOnline: () => true,
     });
 
@@ -107,6 +109,8 @@ describe("sync engine – acceptance scenario: cached grant revoked server-side"
         "user-roles": vi.fn().mockResolvedValue([]),
       }),
       syncStore: useSyncStore,
+      // #225 added per-entity retry; keep these assertions off the real clock.
+      sleep: async () => {},
       isOnline: () => true,
       now: () => now,
     });
@@ -142,6 +146,8 @@ describe("sync engine – behaviour", () => {
       queryClient,
       fetchers,
       syncStore: useSyncStore,
+      // #225 added per-entity retry; keep these assertions off the real clock.
+      sleep: async () => {},
       isOnline: () => false,
     });
 
@@ -161,6 +167,8 @@ describe("sync engine – behaviour", () => {
         membership: vi.fn().mockResolvedValue({ ...MEMBERSHIP_ACTIVE_FIXTURE }),
       }),
       syncStore: useSyncStore,
+      // #225 added per-entity retry; keep these assertions off the real clock.
+      sleep: async () => {},
       isOnline: () => true,
     });
 
@@ -184,6 +192,8 @@ describe("sync engine – behaviour", () => {
         guild: vi.fn().mockResolvedValue(deactivatedGuild),
       }),
       syncStore: useSyncStore,
+      // #225 added per-entity retry; keep these assertions off the real clock.
+      sleep: async () => {},
       isOnline: () => true,
     });
 
@@ -211,6 +221,8 @@ describe("sync engine – behaviour", () => {
       queryClient,
       fetchers,
       syncStore: useSyncStore,
+      // #225 added per-entity retry; keep these assertions off the real clock.
+      sleep: async () => {},
       isOnline: () => true,
     });
 
@@ -226,6 +238,8 @@ describe("sync engine – behaviour", () => {
       queryClient,
       fetchers: makeFetchers({ membership: vi.fn().mockResolvedValue(undefined) }),
       syncStore: useSyncStore,
+      // #225 added per-entity retry; keep these assertions off the real clock.
+      sleep: async () => {},
       isOnline: () => true,
     });
 
@@ -246,6 +260,8 @@ describe("sync engine – behaviour", () => {
       queryClient,
       fetchers: makeFetchers({ membership }),
       syncStore: useSyncStore,
+      // #225 added per-entity retry; keep these assertions off the real clock.
+      sleep: async () => {},
       isOnline: () => true,
     });
 
@@ -270,6 +286,8 @@ describe("sync engine – behaviour", () => {
       queryClient,
       fetchers: makeFetchers({ membership }),
       syncStore: useSyncStore,
+      // #225 added per-entity retry; keep these assertions off the real clock.
+      sleep: async () => {},
       isOnline: () => true,
     });
 

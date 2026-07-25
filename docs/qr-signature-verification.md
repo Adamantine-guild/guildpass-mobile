@@ -39,6 +39,10 @@ type\nversion\nguildId\nresourceId\nwalletAddress\nexpiresAt
 - `type` and `version` are pinned to the canonical constants
   (`guildpass.access-check`, `1`) by the verifier and are **not** read from the
   payload, so a fabricated payload cannot vary them to dodge verification.
+- **Identifier Constraints**: `guildId`, `resourceId`, and `kid` are strictly 
+  validated to match the `/^[a-zA-Z0-9\-_.:]+$/` character set. All fields are 
+  checked to ensure they do not contain the `\n` delimiter or other control 
+  characters, which prevents delimiter-injection attacks on the canonical message.
 
 **Hash** — `keccak256(message)`. This matches the Web3 convention used across
 the GuildPass stack (ethers / viem / js-sha3).

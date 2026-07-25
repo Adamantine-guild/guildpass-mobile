@@ -5,6 +5,14 @@ import { parseAccessQrPayload } from "./qrPayload";
 import type { ParsedAccessQrPayload } from "./qrPayload";
 import { checkAndRecordNonce } from "./qrReplayGuard";
 
+export type QrValidationResult =
+  | { success: true; payload: ParsedAccessQrPayload }
+  | {
+      success: false;
+      reason: QrSignatureErrorCode | QrPayloadErrorCode | "UNKNOWN_ERROR";
+      message?: string;
+    };
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
@@ -35,8 +43,17 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 export const verifyAndParseAccessQrPayload = async (
   rawPayload: string,
   now: Date = new Date(),
-): Promise<ParsedAccessQrPayload> => {
-  const parsed = parseAccessQrPayload(rawPayload, now);
+): Promise<QrValidationResult> => {
+  let parsed: ParsedAccessQrPayload;
+  
+  try {
+    parsed = parseAccessQrPayload(rawPayload, now);
+  } catch (error) {
+    if (error instanceof QrPayloadError) {
+      return { success: false, reason: error.code, message: error.message };
+    }
+    return { success: false, reason: "UNKNOWN_ERROR", message: String(error) };
+  }
 
   if (appConfig.qrSignatureVerification) {
     let decoded: unknown;
@@ -44,30 +61,37 @@ export const verifyAndParseAccessQrPayload = async (
       decoded = JSON.parse(rawPayload);
     } catch {
       // Already validated by parseAccessQrPayload; unreachable in practice.
-      throw new Error("QR code is not a supported GuildPass access payload.");
+      return { success: false, reason: "UNKNOWN_ERROR", message: "QR code is not a supported GuildPass access payload." };
     }
 
     const signature =
       isRecord(decoded) && typeof decoded.signature === "string" ? decoded.signature : undefined;
 
-    const issuerPublicKey = await getGuildIssuerPublicKey(parsed.guildId, parsed.kid, now);
+    try {
+      const issuerPublicKey = await getGuildIssuerPublicKey(parsed.guildId, parsed.kid, now);
 
-    verifyQrSignature(
-      {
-        guildId: parsed.guildId,
-        resourceId: parsed.resourceId,
-        walletAddress: parsed.walletAddress,
-        expiresAt: parsed.expiresAt,
-        kid: parsed.kid,
-      },
-      signature ?? "",
-      issuerPublicKey,
-    );
+      verifyQrSignature(
+        {
+          guildId: parsed.guildId,
+          resourceId: parsed.resourceId,
+          walletAddress: parsed.walletAddress,
+          expiresAt: parsed.expiresAt,
+          kid: parsed.kid,
+        },
+        signature ?? "",
+        issuerPublicKey,
+      );
+    } catch (error) {
+      if (error instanceof QrSignatureError) {
+        return { success: false, reason: error.code, message: error.message };
+      }
+      return { success: false, reason: "UNKNOWN_ERROR", message: String(error) };
+    }
   }
 
   if (parsed.nonce !== undefined) {
     await checkAndRecordNonce(parsed.nonce, parsed.expiresAt, now);
   }
 
-  return parsed;
+  return { success: true, payload: parsed };
 };

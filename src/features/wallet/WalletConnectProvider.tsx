@@ -2,7 +2,8 @@ import React, { useEffect, useRef } from "react";
 import { WalletConnectModal, useWalletConnectModal } from "@walletconnect/modal-react-native";
 import { appConfig } from "../../config/appConfig";
 import { useWalletStore } from "./wallet.store";
-import { useSessionStore } from "../session/session.store";
+import { setWalletConnectProvider } from "./walletConnectSession";
+import { startWalletSession } from "../../lib/walletLifecycle";
 
 // ── Provider metadata for the WalletConnect modal ──────────────────────
 const providerMetadata = {
@@ -17,16 +18,6 @@ const providerMetadata = {
 
 const projectId = appConfig.walletConnectProjectId;
 
-// ── Module-level ref so disconnect() in useWallet can access the WC provider ──
-let _wcProviderRef: {
-  disconnect(): Promise<void>;
-} | null = null;
-
-/** Exposed for useWallet disconnect to tear down the WC session. */
-export function getWalletConnectProvider() {
-  return _wcProviderRef;
-}
-
 // ── Inner component — bridges WC modal state into Zustand ─────────────
 function WalletConnectBridge({ children }: { children: React.ReactNode }) {
   const { isConnected, address, provider } = useWalletConnectModal();
@@ -37,13 +28,13 @@ function WalletConnectBridge({ children }: { children: React.ReactNode }) {
   const connectionKind = useWalletStore((s) => s.connectionKind);
   const prevConnected = useRef(false);
 
-  // Keep the module-level ref up to date
+  // Keep the out-of-tree provider ref up to date
   useEffect(() => {
     if (provider) {
-      _wcProviderRef = provider;
+      setWalletConnectProvider(provider);
     }
     return () => {
-      _wcProviderRef = null;
+      setWalletConnectProvider(null);
     };
   }, [provider]);
 
@@ -51,9 +42,7 @@ function WalletConnectBridge({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isConnected && address) {
       setWalletAddress(address, "walletconnect");
-      // Also start the session
-      const { startSession } = useSessionStore.getState();
-      void startSession(address);
+      void startWalletSession(address);
     }
     // WC disconnected externally → clear store
     if (!isConnected && prevConnected.current && storeAddress) {

@@ -74,7 +74,8 @@ describe("verifyAndParseAccessQrPayload", () => {
       expiresAt: "2026-06-23T12:05:00.000Z",
     });
     const parsed = await verifyAndParseAccessQrPayload(unsigned, now);
-    expect(parsed.guildId).toBe("guild_abc");
+    if (!parsed.success) throw new Error("Expected success");
+    expect(parsed.payload.guildId).toBe("guild_abc");
     expect(mockGetGuildConfig).not.toHaveBeenCalled();
   });
 
@@ -82,8 +83,9 @@ describe("verifyAndParseAccessQrPayload", () => {
     flagState.qrSignatureVerification = true;
     const signed = buildSignedQrPayloadString(validFields);
     const parsed = await verifyAndParseAccessQrPayload(signed, now);
-    expect(parsed.guildId).toBe("guild_abc");
-    expect(parsed.resourceId).toBe("vip-door");
+    if (!parsed.success) throw new Error("Expected success");
+    expect(parsed.payload.guildId).toBe("guild_abc");
+    expect(parsed.payload.resourceId).toBe("vip-door");
   });
 
   it("rejects an unsigned payload when the feature flag is ON", async () => {
@@ -95,9 +97,10 @@ describe("verifyAndParseAccessQrPayload", () => {
       resourceId: "vip-door",
       expiresAt: "2026-06-23T12:05:00.000Z",
     });
-    await expect(verifyAndParseAccessQrPayload(unsigned, now)).rejects.toBeInstanceOf(
-      QrSignatureError,
-    );
+    await expect(verifyAndParseAccessQrPayload(unsigned, now)).resolves.toMatchObject({
+      success: false,
+      reason: "QR_SIGNATURE_MISSING",
+    });
   });
 
   it("rejects a tampered payload (valid signature, changed field) when the flag is ON", async () => {
@@ -107,8 +110,9 @@ describe("verifyAndParseAccessQrPayload", () => {
     const signed = JSON.parse(buildSignedQrPayloadString(validFields)) as Record<string, unknown>;
     signed.resourceId = "evil-door";
     const tampered = JSON.stringify(signed);
-    await expect(verifyAndParseAccessQrPayload(tampered, now)).rejects.toMatchObject({
-      code: "QR_SIGNATURE_VERIFICATION_FAILED",
+    await expect(verifyAndParseAccessQrPayload(tampered, now)).resolves.toMatchObject({
+      success: false,
+      reason: "QR_SIGNATURE_VERIFICATION_FAILED",
     });
   });
 
@@ -122,7 +126,8 @@ describe("verifyAndParseAccessQrPayload", () => {
       nonce: "nonce-first-use",
     });
     const parsed = await verifyAndParseAccessQrPayload(withNonce, now);
-    expect(parsed.nonce).toBe("nonce-first-use");
+    if (!parsed.success) throw new Error("Expected success");
+    expect(parsed.payload.nonce).toBe("nonce-first-use");
   });
 
   it("rejects a replayed payload (same nonce presented twice) as already used", async () => {
@@ -137,12 +142,10 @@ describe("verifyAndParseAccessQrPayload", () => {
 
     await verifyAndParseAccessQrPayload(withNonce, now);
 
-    await expect(verifyAndParseAccessQrPayload(withNonce, now)).rejects.toMatchObject({
-      code: QR_PAYLOAD_ERROR_CODES.ALREADY_USED,
+    await expect(verifyAndParseAccessQrPayload(withNonce, now)).resolves.toMatchObject({
+      success: false,
+      reason: QR_PAYLOAD_ERROR_CODES.ALREADY_USED,
     });
-    await expect(verifyAndParseAccessQrPayload(withNonce, now)).rejects.toBeInstanceOf(
-      QrPayloadError,
-    );
   });
 
   it("allows two different payloads with distinct nonces", async () => {
@@ -164,10 +167,12 @@ describe("verifyAndParseAccessQrPayload", () => {
     });
 
     await expect(verifyAndParseAccessQrPayload(first, now)).resolves.toMatchObject({
-      nonce: "nonce-a",
+      success: true,
+      payload: { nonce: "nonce-a" },
     });
     await expect(verifyAndParseAccessQrPayload(second, now)).resolves.toMatchObject({
-      nonce: "nonce-b",
+      success: true,
+      payload: { nonce: "nonce-b" },
     });
   });
 });

@@ -33,6 +33,11 @@ export const Skeleton = ({ className = "" }: SkeletonProps) => {
     <Animated.View
       style={{ opacity: shimmerOpacity }}
       className={`bg-border rounded-xl ${className}`}
+      // Purely decorative — screen readers should skip individual shimmer
+      // blocks. The composed skeleton screen that renders these is
+      // responsible for announcing the loading state once, at its root.
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
     />
   );
 };

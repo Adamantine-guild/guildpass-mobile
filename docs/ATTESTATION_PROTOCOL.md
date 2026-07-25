@@ -2,7 +2,25 @@
 
 ## Overview
 
-This document specifies the GuildPass EIP-712 Role Attestation Protocol, which enables cryptographically verifiable, user-portable proofs of role membership. This protocol allows wallet holders to present verifiable evidence of their roles to third parties, without requiring live backend availability.
+This document specifies the GuildPass EIP-712 Role Attestation Protocol, which enables cryptographically verifiable proofs of role membership. An existing proof can be presented to third parties and verified without live backend availability while the required local data remains available.
+
+## Device loss, reinstall, and recovery
+
+Current attestations and their indexes are stored only on the device through
+`migratingSecureStorage`, backed by Expo Secure Store. Secure Store data is
+device-bound and is not transferred to a replacement device. Losing, wiping,
+replacing the device, or reinstalling the app can permanently remove locally
+cached attestations.
+
+The current mobile app and GuildPass SDK do not expose a backend recovery or
+attestation-listing endpoint. A connected wallet and recoverable membership do
+not restore the previously issued attestation itself. When connectivity is
+available, the user must request a newly issued attestation from the guild.
+
+The app must not infer that a device is new merely because the attestation
+collection is empty: an empty collection can also mean that the cache was
+cleared, is unavailable, or is corrupted. The device-bound key must not be
+exported, synchronized, weakened, or backed up.
 
 ## Motivation
 
@@ -10,14 +28,14 @@ Current role verification relies on backend API assertions:
 
 - **Trust Model**: Trusting the backend's honesty at query time
 - **Availability**: Requires live network connectivity to the GuildPass backend
-- **Portability**: Role proofs are not portable - cannot be presented to third parties without backend intervention
+- **Portability**: An existing cryptographic proof can be presented to third parties without backend intervention; the current implementation does not provide cross-device proof storage or recovery
 - **Privacy**: Backend knows when and where roles are being verified
 
 EIP-712 attestations address these limitations by:
 
 - **Cryptographic Verification**: Mathematically proves a guild's issuer approved the role claim
 - **Offline Verification**: Works entirely offline once cached (airplane mode compatible)
-- **Portability**: Can be presented to any verifier with the issuer public key
+- **Cryptographic portability**: Can be presented to any verifier with the issuer public key
 - **Privacy**: Verification requires no backend communication
 
 ## Architecture
@@ -45,7 +63,7 @@ EIP-712 attestations address these limitations by:
 │  └────────────────────────────────────────┘ │
 └─────────────────────────────────────────────┘
          ↑                          ↓
-    SDK API Calls          Cached Data (AsyncStorage)
+    Application adapter     Cached Data (Expo Secure Store)
 ```
 
 ### Data Flow
@@ -158,8 +176,8 @@ to minimise work before rejecting an invalid attestation:
    - Compare to issuer address
 
 6. Cache result
-   - Store attestation in local AsyncStorage
-   - Store validation result
+  - Store attestation in local `migratingSecureStorage` (Expo Secure Store)
+  - Store validation result
 ```
 
 ### Revocation-Aware Offline Verification (cached)
@@ -246,9 +264,10 @@ When the revocation registry data is unavailable (no cached copy and the
 device is offline), `validateAttestation()` **rejects** the attestation with
 `revocationCheckSkipped: true`. This is the deliberate conservative policy:
 
-- Attestations are designed as **portable, long-lived proofs** — they
-  may be verified months after issuance by a third-party verifier with no
-  connection to the GuildPass backend.
+- Attestations are designed as **cryptographically portable, long-lived
+  proofs** — they may be verified months after issuance by a third-party
+  verifier with no connection to the GuildPass backend when the proof and
+  required verification data are available.
 - Accepting a proof whose issuer key status cannot be confirmed would
   allow a compromised key's attestations to be accepted indefinitely.
 - An online verifier can always fetch fresh revocation data; the fail-closed
@@ -275,10 +294,23 @@ behaviour across both verification paths.
 
 ### Cache Security
 
-- Attestations stored in AsyncStorage (Expo Secure Store for sensitive data recommended)
+- Attestations and their indexes are stored through `migratingSecureStorage`,
+  backed by device-bound Expo Secure Store. Older sensitive values may be
+  migrated one way from AsyncStorage on the same device; this does not make
+  Secure Store data recoverable on another device.
 - Cache is per-wallet-address (no cross-wallet data leakage)
 - No private keys stored
 - User can clear cache anytime
+
+### Portability and storage recovery
+
+Cryptographic portability means that an existing attestation can be
+independently presented and verified offline. Storage portability and recovery
+mean synchronizing, backing up, or restoring proofs across devices; the
+current implementation does none of these.
+
+**Portability of the proof format does not imply backup, durability, or
+cross-device recovery.**
 
 ### Offline Limitations
 
@@ -302,6 +334,11 @@ const attestationService = new AttestationService({
   fetchAttestation: (params) => guildPassClient.attestation.getAttestation(params),
 });
 ```
+
+The current GuildPass SDK exposes guilds, roles, membership, access, and
+contracts services, but no attestation retrieval APIs. Implementing recovery
+would require a backend API that retains and lists previously issued
+attestations; no such recovery integration is currently available.
 
 ### 2. Use in Components
 
@@ -415,6 +452,61 @@ const onGuildKeyRotation = async (guildId: string) => {
 
 - Replace signatures with ZK proofs for privacy
 - Hide guild membership while proving eligibility
+
+### Device Co-Signing (Exploratory)
+
+**Status**: Feasibility investigation complete, prototype available. See `docs/device-signing-feasibility.md` for full analysis.
+
+**Concept**: Enable device-bound cryptographic proofs that strengthen presentation-time trust by having the user's device co-sign attestations with a hardware-backed key.
+
+**Motivation**:
+- Current attestations prove "the issuer said this wallet has this role"
+- Device co-signing would prove "the person physically presenting this device attests to it right now"
+- Strengthens offline/portable verification with device possession proof
+- Hardware-backed keys (iOS Secure Enclave, Android StrongBox) provide non-extractable private keys
+
+**Feasibility Findings**:
+- ✅ Hardware-backed asymmetric key generation is possible via `expo-hardware-key` or `expo-device-crypto`
+- ✅ iOS Secure Enclave and Android StrongBox/TEE integration is feasible
+- ✅ Biometric authentication can be required for signing operations
+- ❌ Direct EIP-712 signing not possible due to curve incompatibility (P-256 vs secp256k1)
+- ❌ `expo-secure-store` does not support asymmetric key operations
+
+**Proposed Approaches**:
+
+1. **Hybrid Device Attestation** (Recommended)
+   - Device signs attestation hash with P-256 hardware key
+   - Combined proof: { issuerSignature (secp256k1), deviceSignature (P-256), devicePublicKey }
+   - Verifier validates both signatures independently
+   - Requires protocol extension but doesn't break existing attestations
+
+2. **Hardware-Protected secp256k1 Key**
+   - Use hardware key to encrypt/protect a software-based secp256k1 key
+   - Enables EIP-712 signing with hardware protection
+   - Private key exists in memory during signing (vulnerability window)
+
+3. **Alternative Attestation Format**
+   - Separate EIP-712-like format for device attestations using P-256
+   - Clean separation but requires new protocol specification
+
+**Prototype Status**:
+- Isolated prototype module: `src/features/attestation/experimental/deviceSigning.ts`
+- Co-signing flow prototype: `src/features/attestation/experimental/deviceCoSigning.ts`
+- NOT integrated with production attestation flow
+- Requires physical device testing (iOS 15.1+, Android API 23+)
+
+**Next Steps** (If approved):
+1. Install `expo-hardware-key` dependency
+2. Test prototype on physical devices
+3. Choose integration approach (Hybrid recommended)
+4. Design protocol extension for co-signed attestations
+5. Update verification pipeline to handle device signatures
+6. Add UI for device key management
+
+**Blockers**:
+- Curve incompatibility requires protocol-level workaround
+- External library dependency adds maintenance burden
+- Platform differences require careful testing
 
 ## References
 

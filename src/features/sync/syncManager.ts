@@ -1,11 +1,11 @@
 /**
- * Sync manager (Issue #108).
+ * Sync manager — app wiring for the sync coordinator (Issues #108, #225).
  *
- * Wires the sync engine to the app: watches the network store (fed by NetInfo
- * via connectivityService) and, when the device transitions offline → online,
- * first replays any mutations React Query paused while offline, then runs the
- * reconciliation pass. Reconnect events are debounced because NetInfo can
- * flap during connectivity changes.
+ * Originally (#108) this owned the reconnect listener, the debounce and the
+ * sync call directly. Under #225 all scheduling policy moved to
+ * syncCoordinator, and this module is reduced to composition: build the
+ * engine, build the coordinator, register the trigger sources, and expose the
+ * same `initSyncManager` / `triggerSync` surface app/_layout.tsx already uses.
  */
 
 import { useNetworkStore } from "../network/connectivityService";
@@ -15,19 +15,18 @@ import type { SyncEngine } from "./syncEngine";
 import { defaultSyncFetchers } from "./syncFetchers";
 import { useSyncStore } from "./sync.store";
 
-export const SYNC_RECONNECT_DEBOUNCE_MS = 2000;
+export { SYNC_RECONNECT_DEBOUNCE_MS } from "./syncTriggers";
 
 type SyncManagerOptions = {
   engine?: SyncEngine;
+  coordinator?: SyncCoordinator;
   queryClient?: Pick<typeof appQueryClient, "resumePausedMutations">;
   debounceMs?: number;
 };
 
 let isInitialized = false;
-let unsubscribe: (() => void) | null = null;
-let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-let activeEngine: SyncEngine | null = null;
-let activeQueryClient: Pick<typeof appQueryClient, "resumePausedMutations"> | null = null;
+let activeCoordinator: SyncCoordinator | null = null;
+let triggerHandles: TriggerHandle[] = [];
 
 function getDefaultEngine(): SyncEngine {
   return createSyncEngine({
@@ -52,52 +51,43 @@ async function waitForSyncStoreHydration(): Promise<void> {
 }
 
 /**
- * Replays offline-queued mutations before reconciling reads, so local writes
- * reach the server before we treat its state as authoritative.
+ * Requests a reconciliation pass. Retained for app/_layout.tsx, which calls it
+ * once the persisted cache has been restored.
  */
 export async function triggerSync(): Promise<void> {
-  if (!activeEngine || !activeQueryClient) return;
-  await waitForSyncStoreHydration();
-  try {
-    await activeQueryClient.resumePausedMutations();
-  } catch {
-    // Failed replays stay in React Query's mutation cache; reconciliation
-    // should still run so reads are corrected.
-  }
-  await activeEngine.runReconciliation();
+  if (!activeCoordinator) return;
+  await activeCoordinator.requestSync("cache-hydrated", { force: true });
 }
 
 export function initSyncManager(options: SyncManagerOptions = {}): void {
   if (isInitialized) return;
   isInitialized = true;
 
-  activeEngine = options.engine ?? getDefaultEngine();
-  activeQueryClient = options.queryClient ?? appQueryClient;
-  const debounceMs = options.debounceMs ?? SYNC_RECONNECT_DEBOUNCE_MS;
+  const queryClient = options.queryClient ?? appQueryClient;
+  const coordinator =
+    options.coordinator ??
+    createSyncCoordinator({
+      engine: options.engine ?? getDefaultEngine(),
+      resumePausedMutations: () => queryClient.resumePausedMutations(),
+      isOnline: () => useNetworkStore.getState().isOnline,
+      waitForHydration: waitForSyncStoreHydration,
+    });
 
-  let wasOnline = useNetworkStore.getState().isOnline;
+  activeCoordinator = coordinator;
+  triggerHandles = [
+    registerReconnectTrigger({ coordinator, debounceMs: options.debounceMs }),
+    registerForegroundTrigger({ coordinator }),
+  ];
+}
 
-  unsubscribe = useNetworkStore.subscribe((state) => {
-    const cameBackOnline = state.isOnline && !wasOnline;
-    wasOnline = state.isOnline;
-    if (!cameBackOnline) return;
-
-    if (debounceTimer) clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => {
-      debounceTimer = null;
-      void triggerSync();
-    }, debounceMs);
-  });
+export function getSyncCoordinator(): SyncCoordinator | null {
+  return activeCoordinator;
 }
 
 export function resetSyncManagerForTest(): void {
-  if (debounceTimer) {
-    clearTimeout(debounceTimer);
-    debounceTimer = null;
-  }
-  unsubscribe?.();
-  unsubscribe = null;
-  activeEngine = null;
-  activeQueryClient = null;
+  triggerHandles.forEach((release) => release());
+  triggerHandles = [];
+  activeCoordinator?.reset();
+  activeCoordinator = null;
   isInitialized = false;
 }

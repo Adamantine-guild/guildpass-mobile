@@ -6,12 +6,15 @@ import { asyncStoragePersister } from "../src/lib/queryPersister";
 import { isPersistableQuery, QUERY_GC_TIME_MS } from "../src/lib/offlineCache";
 import { initConnectivityService } from "../src/features/network/connectivityService";
 import { initSyncManager, triggerSync } from "../src/features/sync/syncManager";
+import { mutationReplayer } from "../src/lib/mutationReplayer";
 import { ErrorBoundary } from "../src/components/ErrorBoundary";
 import { SyncCorrectionOverlay } from "../src/components/SyncCorrectionOverlay";
+import { SyncStatusBanner } from "../src/components/SyncStatusBanner";
 import { IntegrityWarningBanner } from "../src/components/IntegrityWarningBanner";
 import { WalletConnectProvider } from "../src/features/wallet/WalletConnectProvider";
 import { useSecurityInit } from "../src/features/security";
 import { initFocusManager } from "../src/lib/focusManager";
+import { registerBuiltInIssuers } from "../src/lib/credentials/registerBuiltInIssuers";
 import { EmbeddedWalletProvider } from "../src/features/wallet/EmbeddedWalletProvider";
 
 import "react-native-get-random-values";
@@ -21,7 +24,11 @@ import { SensitiveStorageMigrationGate } from "../src/features/security/Sensitiv
 
 initConnectivityService();
 initSyncManager();
+mutationReplayer.start();
 initFocusManager(queryClient);
+// Discovery only — verification paths hold direct references to their own
+// registries and work whether or not this has run.
+registerBuiltInIssuers();
 
 function SecurityInit() {
   useSecurityInit();

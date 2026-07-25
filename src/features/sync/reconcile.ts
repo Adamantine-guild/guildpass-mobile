@@ -5,7 +5,6 @@
  * unit-tested without a network, a QueryClient, or any UI.
  */
 
-import { PERSISTABLE_QUERY_KEY_ROOTS } from "../../lib/offlineCache";
 import { isWalletScopedQueryRoot } from "../../lib/queryKeys";
 import type {
   SyncCorrection,

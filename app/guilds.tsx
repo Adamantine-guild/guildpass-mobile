@@ -3,7 +3,7 @@ import { useRouter } from "expo-router";
 import { useWallet } from "../src/features/wallet/useWallet";
 import { AppHeader } from "../src/components/AppHeader";
 import { GuildCard } from "../src/components/GuildCard";
-import { LoadingState } from "../src/components/LoadingState";
+import { GuildListSkeleton } from "../src/components/GuildCardSkeleton";
 import { ErrorState } from "../src/components/ErrorState";
 import { EmptyMembershipsState } from "../src/components/EmptyMembershipsState";
 import { EmptyState } from "../src/components/EmptyState";
@@ -52,7 +52,7 @@ export default function Guilds() {
       <WalletRequired>
         <View className="flex-1 bg-background" testID="guilds-screen">
           <AppHeader title="My Guilds" showBack />
-          <LoadingState message="Loading memberships..." />
+          <GuildListSkeleton />
         </View>
       </WalletRequired>
     );

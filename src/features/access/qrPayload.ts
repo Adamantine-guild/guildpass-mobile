@@ -1,3 +1,4 @@
+import { isAddress } from "viem";
 import {
   ACCESS_QR_TYPE,
   ACCESS_QR_VERSION,
@@ -16,6 +17,7 @@ export const QR_PAYLOAD_ERROR_CODES = {
   MISSING_GUILD_ID: "QR_PAYLOAD_MISSING_GUILD_ID",
   MISSING_RESOURCE_ID: "QR_PAYLOAD_MISSING_RESOURCE_ID",
   INVALID_WALLET_ADDRESS: "QR_PAYLOAD_INVALID_WALLET_ADDRESS",
+  INVALID_WALLET_CHECKSUM: "QR_PAYLOAD_INVALID_WALLET_CHECKSUM",
   INVALID_EXPIRATION: "QR_PAYLOAD_INVALID_EXPIRATION",
   EXPIRED: "QR_PAYLOAD_EXPIRED",
   INVALID_SIGNATURE: "QR_PAYLOAD_INVALID_SIGNATURE",
@@ -36,6 +38,26 @@ export class QrPayloadError extends Error {
     this.code = code;
   }
 }
+
+const QR_PAYLOAD_ERROR_MESSAGES: Record<QrPayloadErrorCode, string> = {
+  [QR_PAYLOAD_ERROR_CODES.MALFORMED_JSON]: "QR code is not a supported GuildPass access payload.",
+  [QR_PAYLOAD_ERROR_CODES.MALFORMED_PAYLOAD]: "QR code payload is malformed.",
+  [QR_PAYLOAD_ERROR_CODES.UNSUPPORTED_TYPE]: "QR code payload type is not supported.",
+  [QR_PAYLOAD_ERROR_CODES.UNSUPPORTED_VERSION]: "QR code payload version is not supported. Please update your app to scan this QR code.",
+  [QR_PAYLOAD_ERROR_CODES.MISSING_GUILD_ID]: "QR code is missing a valid guild ID.",
+  [QR_PAYLOAD_ERROR_CODES.MISSING_RESOURCE_ID]: "QR code is missing a valid resource ID.",
+  [QR_PAYLOAD_ERROR_CODES.INVALID_WALLET_ADDRESS]: "QR code contains an invalid wallet address.",
+  [QR_PAYLOAD_ERROR_CODES.INVALID_WALLET_CHECKSUM]: "QR code contains a wallet address with an invalid checksum. Please rescan the code or contact the guild issuer.",
+  [QR_PAYLOAD_ERROR_CODES.INVALID_EXPIRATION]: "QR code contains an invalid expiration time.",
+  [QR_PAYLOAD_ERROR_CODES.EXPIRED]: "This QR code has expired.",
+  [QR_PAYLOAD_ERROR_CODES.INVALID_SIGNATURE]: "QR code contains an invalid signature.",
+  [QR_PAYLOAD_ERROR_CODES.INVALID_NONCE]: "QR code contains an invalid nonce.",
+  [QR_PAYLOAD_ERROR_CODES.INVALID_KID]: "QR code contains an invalid key ID.",
+  [QR_PAYLOAD_ERROR_CODES.ALREADY_USED]: "This QR code has already been used.",
+};
+
+export const describeQrPayloadError = (code: QrPayloadErrorCode): string =>
+  QR_PAYLOAD_ERROR_MESSAGES[code] ?? "Unable to read QR payload.";
 
 export type AccessQrPayload = {
   type: typeof ACCESS_QR_TYPE;
@@ -81,6 +103,12 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === "string" && value.trim().length > 0;
 
+const isValidIdentifier = (value: unknown): value is string =>
+  typeof value === "string" && /^[a-zA-Z0-9\-_.:]+$/.test(value);
+
+const hasNoControlChars = (value: string): boolean =>
+  !/[\x00-\x1F\x7F]/.test(value);
+
 export const parseAccessQrPayload = (
   rawPayload: string,
   now: Date = new Date(),
@@ -117,14 +145,14 @@ export const parseAccessQrPayload = (
     );
   }
 
-  if (!isNonEmptyString(decodedPayload.guildId)) {
+  if (!isValidIdentifier(decodedPayload.guildId)) {
     throw new QrPayloadError(
       QR_PAYLOAD_ERROR_CODES.MISSING_GUILD_ID,
       "QR code is missing a valid guild ID.",
     );
   }
 
-  if (!isNonEmptyString(decodedPayload.resourceId)) {
+  if (!isValidIdentifier(decodedPayload.resourceId)) {
     throw new QrPayloadError(
       QR_PAYLOAD_ERROR_CODES.MISSING_RESOURCE_ID,
       "QR code is missing a valid resource ID.",
@@ -142,8 +170,25 @@ export const parseAccessQrPayload = (
     );
   }
 
+  // Format is well-formed 0x + 40 hex chars at this point. Separately
+  // enforce EIP-55 checksum casing so a visually-similar/typo'd address
+  // (correct length and hex chars, wrong letter casing) fails fast here
+  // with a specific message instead of reaching the access-check
+  // submission step and producing a confusing downstream error. All-
+  // lowercase addresses are checksum-agnostic per EIP-55 and still valid.
+  if (
+    decodedPayload.walletAddress !== undefined &&
+    isNonEmptyString(decodedPayload.walletAddress) &&
+    !isAddress(decodedPayload.walletAddress, { strict: true })
+  ) {
+    throw new QrPayloadError(
+      QR_PAYLOAD_ERROR_CODES.INVALID_WALLET_CHECKSUM,
+      "QR code contains a wallet address with an invalid checksum. Please rescan the code or contact the guild issuer.",
+    );
+  }
+
   if (decodedPayload.expiresAt !== undefined) {
-    if (!isNonEmptyString(decodedPayload.expiresAt)) {
+    if (!isNonEmptyString(decodedPayload.expiresAt) || !hasNoControlChars(decodedPayload.expiresAt)) {
       throw new QrPayloadError(
         QR_PAYLOAD_ERROR_CODES.INVALID_EXPIRATION,
         "QR code contains an invalid expiration time.",
@@ -177,14 +222,17 @@ export const parseAccessQrPayload = (
   // Nonce is optional at the structural layer for the same migration-window
   // reason as signature above; replay enforcement in verifyAndParseAccessQrPayload
   // only runs when a payload actually carries one.
-  if (decodedPayload.nonce !== undefined && !isNonEmptyString(decodedPayload.nonce)) {
+  if (
+    decodedPayload.nonce !== undefined &&
+    (!isNonEmptyString(decodedPayload.nonce) || !hasNoControlChars(decodedPayload.nonce))
+  ) {
     throw new QrPayloadError(
       QR_PAYLOAD_ERROR_CODES.INVALID_NONCE,
       "QR code contains an invalid nonce.",
     );
   }
 
-  if (decodedPayload.kid !== undefined && !isNonEmptyString(decodedPayload.kid)) {
+  if (decodedPayload.kid !== undefined && !isValidIdentifier(decodedPayload.kid)) {
     throw new QrPayloadError(
       QR_PAYLOAD_ERROR_CODES.INVALID_KID,
       "QR code contains an invalid key ID.",
