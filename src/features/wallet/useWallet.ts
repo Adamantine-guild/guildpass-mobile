@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import { useWalletStore } from "./wallet.store";
 import { validateAndNormalizeAddress } from "../../lib/walletValidation";
 import {
+  createEmbeddedConnector,
   createManualConnector,
   createWalletConnectConnector,
 } from "./walletConnector.service";
@@ -43,13 +44,9 @@ export const useWallet = (): {
   const connectEmbeddedWallet = async (
     address: string,
   ): Promise<{ success: boolean; error?: string }> => {
-    const result = validateAndNormalizeAddress(address);
-    if (!result.valid) return { success: false, error: result.error };
-    // This intentionally writes to the normal wallet store. Downstream code
+    // Goes through the same connector path as every other wallet. Downstream code
     // only sees a validated EVM address, never provider-specific user data.
-    setWalletAddress(result.address, "embedded");
-    await startWalletSession(result.address!);
-    return { success: true };
+    return connectWithConnector(createEmbeddedConnector(address));
   };
 
   const connectWithConnector = async (
