@@ -74,7 +74,7 @@ describe("Preservation: Valid Address Behavior", () => {
     const validAddresses = Array.from({ length: 10 }, () => {
       const body = Array.from(
         { length: 40 },
-        () => hexChars[Math.floor(Math.random() * hexChars.length)]
+        () => hexChars[Math.floor(Math.random() * hexChars.length)],
       ).join("");
       return `0x${body}`;
     });
@@ -230,7 +230,7 @@ import { validateAndNormalizeAddress, validateAddressInput } from "../src/lib/wa
 // internal implementation exactly.
 
 describe("validateAndNormalizeAddress", () => {
-  it('returns { valid: true, address: lowercased } for a valid all-lowercase address', () => {
+  it("returns { valid: true, address: lowercased } for a valid all-lowercase address", () => {
     const result = validateAndNormalizeAddress("0x1234567890123456789012345678901234567890");
     expect(result.valid).toBe(true);
     if (result.valid) {
@@ -238,7 +238,7 @@ describe("validateAndNormalizeAddress", () => {
     }
   });
 
-  it('returns { valid: true, address: lowercased } for a valid mixed-case EIP-55 address', () => {
+  it("returns { valid: true, address: lowercased } for a valid mixed-case EIP-55 address", () => {
     const result = validateAndNormalizeAddress("0xAbCdEf1234567890AbCdEf1234567890AbCdEf12");
     expect(result.valid).toBe(true);
     if (result.valid) {
@@ -278,7 +278,7 @@ describe("validateAndNormalizeAddress", () => {
     }
   });
 
-  it('returns { valid: false, error } for null', () => {
+  it("returns { valid: false, error } for null", () => {
     const result = validateAndNormalizeAddress(null);
     expect(result.valid).toBe(false);
     if (!result.valid) {
@@ -286,7 +286,7 @@ describe("validateAndNormalizeAddress", () => {
     }
   });
 
-  it('returns { valid: false, error } for undefined', () => {
+  it("returns { valid: false, error } for undefined", () => {
     const result = validateAndNormalizeAddress(undefined);
     expect(result.valid).toBe(false);
     if (!result.valid) {
@@ -306,9 +306,11 @@ describe("setWalletAddress (fixed)", () => {
     expect(useWalletStore.getState().isConnected).toBe(false);
   });
 
-  it('stores the lowercased address and sets isConnected: true for a valid mixed-case address', () => {
+  it("stores the lowercased address and sets isConnected: true for a valid mixed-case address", () => {
     useWalletStore.getState().setWalletAddress("0xAbCdEf1234567890AbCdEf1234567890AbCdEf12");
-    expect(useWalletStore.getState().walletAddress).toBe("0xabcdef1234567890abcdef1234567890abcdef12");
+    expect(useWalletStore.getState().walletAddress).toBe(
+      "0xabcdef1234567890abcdef1234567890abcdef12",
+    );
     expect(useWalletStore.getState().isConnected).toBe(true);
   });
 
@@ -355,11 +357,11 @@ describe("PBT: Bug Condition — Fix Checking", () => {
       useWalletStore.getState().setWalletAddress(address);
       expect(
         useWalletStore.getState().walletAddress,
-        `walletAddress should remain null for "${address}"`
+        `walletAddress should remain null for "${address}"`,
       ).toBe(null);
       expect(
         useWalletStore.getState().isConnected,
-        `isConnected should remain false for "${address}"`
+        `isConnected should remain false for "${address}"`,
       ).toBe(false);
     }
   });
@@ -384,7 +386,7 @@ describe("PBT: Preservation — Valid Address", () => {
   const validAddresses: string[] = Array.from({ length: 20 }, () => {
     const body = Array.from(
       { length: 40 },
-      () => hexChars[Math.floor(Math.random() * hexChars.length)]
+      () => hexChars[Math.floor(Math.random() * hexChars.length)],
     ).join("");
     return `0x${body}`;
   });
@@ -395,7 +397,7 @@ describe("PBT: Preservation — Valid Address", () => {
       expect(result.valid, `expected valid: true for "${address}"`).toBe(true);
       if (result.valid) {
         expect(result.address, `expected lowercased address for "${address}"`).toBe(
-          address.toLowerCase()
+          address.toLowerCase(),
         );
       }
     }
@@ -407,11 +409,11 @@ describe("PBT: Preservation — Valid Address", () => {
       useWalletStore.getState().setWalletAddress(address);
       expect(
         useWalletStore.getState().walletAddress,
-        `walletAddress should be lowercased for "${address}"`
+        `walletAddress should be lowercased for "${address}"`,
       ).toBe(address.toLowerCase());
       expect(
         useWalletStore.getState().isConnected,
-        `isConnected should be true for "${address}"`
+        `isConnected should be true for "${address}"`,
       ).toBe(true);
     }
   });
@@ -436,7 +438,7 @@ describe("PBT: Case Normalisation", () => {
     // Start with a valid lowercase address body
     const body = Array.from(
       { length: 40 },
-      () => hexCharsLower[Math.floor(Math.random() * hexCharsLower.length)]
+      () => hexCharsLower[Math.floor(Math.random() * hexCharsLower.length)],
     ).join("");
     // Randomly uppercase some hex letters (a-f → A-F)
     const mixedBody = body
@@ -452,7 +454,7 @@ describe("PBT: Case Normalisation", () => {
       expect(result.valid, `expected valid: true for "${address}"`).toBe(true);
       if (result.valid) {
         expect(result.address, `expected lowercased result for "${address}"`).toBe(
-          address.toLowerCase()
+          address.toLowerCase(),
         );
       }
     }
@@ -499,9 +501,7 @@ describe("Integration: Profile Flow", () => {
     expect(result.valid).toBe(true);
     if (result.valid) {
       useWalletStore.getState().setWalletAddress(result.address);
-      expect(useWalletStore.getState().walletAddress).toBe(
-        mixedCaseAddress.toLowerCase()
-      );
+      expect(useWalletStore.getState().walletAddress).toBe(mixedCaseAddress.toLowerCase());
       expect(useWalletStore.getState().isConnected).toBe(true);
     }
   });
@@ -586,13 +586,13 @@ describe("Integration: Access-Check Flow", () => {
  * error messages and disabling the submit button until the address is valid.
  */
 describe("validateAddressInput", () => {
-  it('returns { valid: false, error: null } for empty string (no error until touched)', () => {
+  it("returns { valid: false, error: null } for empty string (no error until touched)", () => {
     const result = validateAddressInput("");
     expect(result.valid).toBe(false);
     expect(result.error).toBeNull();
   });
 
-  it('returns { valid: false, error: null } for whitespace-only string', () => {
+  it("returns { valid: false, error: null } for whitespace-only string", () => {
     const result = validateAddressInput("   ");
     expect(result.valid).toBe(false);
     expect(result.error).toBeNull();
@@ -635,24 +635,24 @@ describe("validateAddressInput", () => {
   });
 
   it('returns { valid: false, error: "Must only contain hex characters" } for special chars after 0x', () => {
-    const result = validateAddressInput("0x!!!!!aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    const result = validateAddressInput("0x!!!!!aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
     expect(result.valid).toBe(false);
     expect(result.error).toBe("Must only contain hex characters (0-9, a-f)");
   });
 
-  it('returns { valid: true, error: null } for valid lowercase address', () => {
+  it("returns { valid: true, error: null } for valid lowercase address", () => {
     const result = validateAddressInput("0x1234567890123456789012345678901234567890");
     expect(result.valid).toBe(true);
     expect(result.error).toBeNull();
   });
 
-  it('returns { valid: true, error: null } for valid mixed-case address', () => {
+  it("returns { valid: true, error: null } for valid mixed-case address", () => {
     const result = validateAddressInput("0xAbCdEf1234567890AbCdEf1234567890AbCdEf12");
     expect(result.valid).toBe(true);
     expect(result.error).toBeNull();
   });
 
-  it('returns { valid: true, error: null } for valid address with leading/trailing whitespace', () => {
+  it("returns { valid: true, error: null } for valid address with leading/trailing whitespace", () => {
     const result = validateAddressInput("  0x1234567890123456789012345678901234567890  ");
     expect(result.valid).toBe(true);
     expect(result.error).toBeNull();

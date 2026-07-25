@@ -25,7 +25,9 @@ function loadConfig(raw: Record<string, unknown>): AppConfig {
   const parsed = ConfigSchema.safeParse(raw);
 
   if (!parsed.success) {
-    const errorMessages = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("\n");
+    const errorMessages = parsed.error.issues
+      .map((i) => `${i.path.join(".")}: ${i.message}`)
+      .join("\n");
     throw new Error(`Invalid application configuration:\n${errorMessages}`);
   }
 
@@ -87,7 +89,9 @@ describe("appConfig validation", () => {
   });
 
   it("rejects non-numeric chainId", () => {
-    expect(() => loadConfig({ ...validConfig, chainId: "abc" })).toThrow("Invalid application configuration");
+    expect(() => loadConfig({ ...validConfig, chainId: "abc" })).toThrow(
+      "Invalid application configuration",
+    );
   });
 
   it("rejects Infinity as chainId", () => {
@@ -97,7 +101,9 @@ describe("appConfig validation", () => {
   });
 
   it("rejects invalid appEnv values", () => {
-    expect(() => loadConfig({ ...validConfig, appEnv: "staging" })).toThrow("Invalid application configuration");
+    expect(() => loadConfig({ ...validConfig, appEnv: "staging" })).toThrow(
+      "Invalid application configuration",
+    );
   });
 
   it("accepts optional walletConnectProjectId", () => {

@@ -8,17 +8,18 @@
  */
 
 // Types
-export * from './types';
+export * from "./types";
 
 // Core verification
-export * from './verifySignature';
+export * from "./verifySignature";
 
 // Storage layers
-export * from './attestationStorage';
-export * from './issuerKeyRegistry';
+export * from "./attestationStorage";
+export * from "./issuerKeyRegistry";
 
 // Service
-export { AttestationService, type AttestationServiceConfig } from './attestationService';
+export { AttestationService } from "./attestationService";
+export type { AttestationServiceConfig } from "./attestationService";
 
 // React hooks
-export * from './useAttestations';
+export * from "./useAttestations";

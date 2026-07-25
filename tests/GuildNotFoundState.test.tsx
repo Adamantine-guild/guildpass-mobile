@@ -27,16 +27,17 @@ describe("GuildNotFoundState Component", () => {
     const container = renderer.root.findByProps({ testID: "guild-not-found-state" });
     expect(container).toBeDefined();
 
-    const titleText = renderer.root.findAllByType("Text").find(
-      (node) => node.props.children === "Guild Not Found",
-    );
+    const titleText = renderer.root
+      .findAllByType("Text")
+      .find((node) => node.props.children === "Guild Not Found");
     expect(titleText).toBeDefined();
 
-    const descriptionText = renderer.root.findAllByType("Text").find(
-      (node) =>
-        typeof node.props.children === "string" &&
-        node.props.children.includes("doesn't exist"),
-    );
+    const descriptionText = renderer.root
+      .findAllByType("Text")
+      .find(
+        (node) =>
+          typeof node.props.children === "string" && node.props.children.includes("doesn't exist"),
+      );
     expect(descriptionText).toBeDefined();
   });
 

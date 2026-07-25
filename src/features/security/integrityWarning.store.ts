@@ -40,27 +40,25 @@ interface IntegrityWarningState {
   dismissWarning: () => void;
 }
 
-export const useIntegrityWarningStore = create<IntegrityWarningState>()(
-  (set) => ({
-    message: null,
-    detectedAt: null,
-    action: "none",
-    reason: null,
+export const useIntegrityWarningStore = create<IntegrityWarningState>()((set) => ({
+  message: null,
+  detectedAt: null,
+  action: "none",
+  reason: null,
 
-    setWarning(message, action = "none", reason = null) {
-      set({
-        message,
-        detectedAt: message ? Date.now() : null,
-        action,
-        reason,
-      });
-    },
+  setWarning(message, action = "none", reason = null) {
+    set({
+      message,
+      detectedAt: message ? Date.now() : null,
+      action,
+      reason,
+    });
+  },
 
-    dismissWarning() {
-      set({ message: null, detectedAt: null, action: "none", reason: null });
-    },
-  }),
-);
+  dismissWarning() {
+    set({ message: null, detectedAt: null, action: "none", reason: null });
+  },
+}));
 
 /** Convenience getter for non-reactive contexts. */
 export function getIntegrityWarningMessage(): string | null {

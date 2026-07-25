@@ -25,8 +25,8 @@ import {
   type AttestationKeyRegistry,
   type SerializedAttestationKeyRegistry,
   ATTESTATION_STORAGE_KEYS,
-} from './types';
-import { migratingSecureStorage } from '../../lib/storage';
+} from "./types";
+import { migratingSecureStorage } from "../../lib/storage";
 
 // ──────────────────────────────────────────────
 //  In-memory revocation registry cache
@@ -130,7 +130,7 @@ export async function clearAttestationRevocationCache(): Promise<void> {
     keys.push(REVOCATION_INDEX_KEY);
     await Promise.all(keys.map((k) => migratingSecureStorage.removeItem(k)));
   } catch (error) {
-    console.warn('Failed to clear persisted revocation cache:', error);
+    console.warn("Failed to clear persisted revocation cache:", error);
   }
 }
 
@@ -219,7 +219,7 @@ async function loadPersistedRevocationRegistry(
  */
 export async function getCachedIssuerKey(
   guildId: string,
-  maxCacheAgeDays: number = 7
+  maxCacheAgeDays: number = 7,
 ): Promise<GuildIssuerKey | null> {
   try {
     const key = `${ATTESTATION_STORAGE_KEYS.ISSUER_KEYS}${guildId}`;
@@ -264,7 +264,7 @@ export async function cacheIssuerKey(issuerKey: GuildIssuerKey): Promise<void> {
       guildIds.push(issuerKey.guildId);
       await migratingSecureStorage.setItem(
         ATTESTATION_STORAGE_KEYS.ISSUER_KEYS_INDEX,
-        JSON.stringify(guildIds)
+        JSON.stringify(guildIds),
       );
     }
   } catch (error) {
@@ -310,7 +310,7 @@ export async function getAllCachedIssuerKeys(): Promise<GuildIssuerKey[]> {
 
     return issuerKeys;
   } catch (error) {
-    console.warn('Failed to retrieve all cached issuer keys:', error);
+    console.warn("Failed to retrieve all cached issuer keys:", error);
     return [];
   }
 }
@@ -328,7 +328,7 @@ export async function clearIssuerKeyCache(): Promise<void> {
 
     await Promise.all(keys.map((key) => migratingSecureStorage.removeItem(key)));
   } catch (error) {
-    console.error('Failed to clear issuer key cache:', error);
+    console.error("Failed to clear issuer key cache:", error);
     throw error;
   }
 }

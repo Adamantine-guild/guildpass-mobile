@@ -11,7 +11,8 @@
 // `@tanstack/react-query-persist-client`.
 // ---------------------------------------------------------------------------
 
-import type { Persister, QueryClient } from "@tanstack/react-query";
+import type { QueryClient } from "@tanstack/react-query";
+import type { Persister } from "@tanstack/query-persist-client-core";
 import { getDatabase } from "./connection";
 import * as dal from "./dal";
 import {
@@ -33,7 +34,7 @@ const QUERY_CACHE_VERSION = 1;
  */
 export function createSqlitePersister(): Persister {
   return {
-    persistClient: async (client: QueryClient) => {
+    persistClient: async (client: any) => {
       const db = getDatabase();
       const dehydrated = JSON.stringify(client);
 
@@ -52,13 +53,16 @@ export function createSqlitePersister(): Persister {
              VALUES (?, ?, ?)`,
             [`v${QUERY_CACHE_VERSION}`, dehydrated, new Date().toISOString()],
             () => resolve(),
-            (_tx, err) => { reject(err); return true; },
+            (_tx, err) => {
+              reject(err);
+              return true;
+            },
           );
         });
       });
     },
 
-    restoreClient: async (): Promise<QueryClient | undefined> => {
+    restoreClient: async (): Promise<any> => {
       const db = getDatabase();
 
       // Ensure table exists before we try to read
@@ -72,7 +76,10 @@ export function createSqlitePersister(): Persister {
             )`,
             [],
             () => resolve(),
-            () => resolve(),
+            (_tx, _err) => {
+              resolve();
+              return true;
+            },
           );
         });
       });
@@ -100,7 +107,7 @@ export function createSqlitePersister(): Persister {
       if (!value) return undefined;
 
       try {
-        return JSON.parse(value) as QueryClient;
+        return JSON.parse(value);
       } catch {
         console.warn("[db] Failed to parse persisted query cache, discarding.");
         return undefined;
@@ -115,7 +122,10 @@ export function createSqlitePersister(): Persister {
             "DELETE FROM _query_cache WHERE key = ?",
             [`v${QUERY_CACHE_VERSION}`],
             () => resolve(),
-            () => resolve(),
+            (_tx, _err) => {
+              resolve();
+              return true;
+            },
           );
         });
       });
@@ -139,9 +149,7 @@ export { _isDalBackedQuery as isDalBackedQuery };
  * Try to resolve a query from the DAL.  Returns `undefined` if no cached
  * data is available, so the caller can fall back to a network request.
  */
-export async function resolveFromDal(
-  queryKey: readonly unknown[],
-): Promise<unknown | undefined> {
+export async function resolveFromDal(queryKey: readonly unknown[]): Promise<unknown | undefined> {
   const db = getDatabase();
   const root = queryKey[0] as string;
 

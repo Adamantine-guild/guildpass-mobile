@@ -40,10 +40,7 @@ export function initializeSecureFetch(): void {
  *  2. For non-pinned, non-localhost domains in production: warns.
  *  3. Optionally gates on device integrity for sensitive endpoints.
  */
-export async function secureFetch(
-  input: RequestInfo | URL,
-  init?: RequestInit,
-): Promise<Response> {
+export async function secureFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   initializeSecureFetch();
 
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
@@ -57,9 +54,7 @@ export async function secureFetch(
   } else {
     // Non-pinned domain — log a warning in non-development builds.
     if (process.env.NODE_ENV !== "development" && !url.includes("localhost")) {
-      console.warn(
-        `[GuildPass Security] Request to non-pinned domain: ${new URL(url).hostname}`,
-      );
+      console.warn(`[GuildPass Security] Request to non-pinned domain: ${new URL(url).hostname}`);
     }
   }
 
@@ -74,9 +69,7 @@ export async function secureFetch(
     const deviceSecure = isDeviceSecure();
 
     if (!deviceSecure && policy === "block") {
-      throw new Error(
-        "[GuildPass Security] Request blocked: device integrity check failed.",
-      );
+      throw new Error("[GuildPass Security] Request blocked: device integrity check failed.");
     }
 
     if (!deviceSecure && policy === "warn") {

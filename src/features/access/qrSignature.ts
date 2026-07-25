@@ -55,7 +55,6 @@ export class QrSignatureError extends Error {
   }
 }
 
-
 const QR_SIGNATURE_ERROR_MESSAGES: Record<QrSignatureErrorCode, string> = {
   [QR_SIGNATURE_ERROR_CODES.MISSING_SIGNATURE]:
     "This QR code is missing its security signature. Ask the guild admin to issue a new code.",

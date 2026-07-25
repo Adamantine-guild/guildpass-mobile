@@ -11,11 +11,7 @@ export function useResolvedGuildName(guildId: string): string {
     networkMode: "offlineFirst",
   });
 
-  if (
-    data &&
-    typeof data === "object" &&
-    "name" in (data as Record<string, unknown>)
-  ) {
+  if (data && typeof data === "object" && "name" in (data as Record<string, unknown>)) {
     return (data as { name: string }).name;
   }
 

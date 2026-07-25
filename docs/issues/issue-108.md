@@ -115,7 +115,7 @@ reconciled.
 - A `null` server payload is treated as an authoritative "gone" (membership
   revoked / all roles removed), not as malformed data, so the primary
   revocation shapes cannot slip through without a correction notice.
-- Malformed/unexpected payload shapes skip conflict *detection* but never
+- Malformed/unexpected payload shapes skip conflict _detection_ but never
   the server-authoritative overwrite, so corrupt local data cannot pin the
   cache to a stale state.
 - Entity fetches on reconnect run through a small concurrency pool, and

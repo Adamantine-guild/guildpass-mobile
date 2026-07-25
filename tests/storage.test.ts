@@ -156,9 +156,7 @@ describe("Persistence and Rehydration", () => {
     expect(secureKey).not.toContain(walletAddress);
     expect(secureKey).not.toBe(previousHexSecureStorageKey(storageName));
     expect(getSecureStorageKey("wallet-storage")).toBe("wallet-storage");
-    expect(getSecureStorageKey(`wallet.${walletAddress.slice(2)}`)).toMatch(
-      /^gp\.[0-9a-f]{64}$/,
-    );
+    expect(getSecureStorageKey(`wallet.${walletAddress.slice(2)}`)).toMatch(/^gp\.[0-9a-f]{64}$/);
   });
 
   it("migrates the previous reversible SecureStore key format to the opaque format", async () => {

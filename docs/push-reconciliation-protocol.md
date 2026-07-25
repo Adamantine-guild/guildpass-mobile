@@ -12,13 +12,13 @@ Push notifications are inherently **best-effort**: messages can be dropped, dela
 
 ### Key design principles
 
-| Principle | Implementation |
-|---|---|
-| **Push is only a hint** | Push payloads contain only entity identifiers (`guildId`, `walletAddress`); data is never trusted directly. |
-| **Authoritative fetch** | Every wake-up triggers a full server round-trip to fetch the true current role/membership state. |
-| **Monotonic versioning** | A per-entity `roleChangeSeq` (monotonic sequence number) detects duplicates and out-of-order delivery. |
-| **At-most-once notification** | Duplicate or stale wake-ups are suppressed; only genuine state transitions produce user-facing alerts. |
-| **Offline resilience** | A periodic background sweep + foreground event trigger catch up on missed pushes after extended offline periods. |
+| Principle                     | Implementation                                                                                                   |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| **Push is only a hint**       | Push payloads contain only entity identifiers (`guildId`, `walletAddress`); data is never trusted directly.      |
+| **Authoritative fetch**       | Every wake-up triggers a full server round-trip to fetch the true current role/membership state.                 |
+| **Monotonic versioning**      | A per-entity `roleChangeSeq` (monotonic sequence number) detects duplicates and out-of-order delivery.           |
+| **At-most-once notification** | Duplicate or stale wake-ups are suppressed; only genuine state transitions produce user-facing alerts.           |
+| **Offline resilience**        | A periodic background sweep + foreground event trigger catch up on missed pushes after extended offline periods. |
 
 ---
 
@@ -175,13 +175,13 @@ sequenceDiagram
 
 ### `RoleChangeSnapshot` (server response)
 
-| Field | Type | Description |
-|---|---|---|
-| `guildId` | `string` | Guild identifier |
-| `walletAddress` | `string` | Wallet address |
-| `roleChangeSeq` | `number` | Monotonic sequence number — strictly increases on every role change |
-| `roles` | `string[]` | Current role names for this entity |
-| `membershipActive` | `boolean` | Whether the wallet holds active membership |
+| Field              | Type       | Description                                                         |
+| ------------------ | ---------- | ------------------------------------------------------------------- |
+| `guildId`          | `string`   | Guild identifier                                                    |
+| `walletAddress`    | `string`   | Wallet address                                                      |
+| `roleChangeSeq`    | `number`   | Monotonic sequence number — strictly increases on every role change |
+| `roles`            | `string[]` | Current role names for this entity                                  |
+| `membershipActive` | `boolean`  | Whether the wallet holds active membership                          |
 
 ---
 
@@ -208,7 +208,7 @@ function PushHandler() {
     await reconcile(data);
   };
 
-  return /* ... */;
+  return; /* ... */
 }
 ```
 
@@ -224,7 +224,7 @@ function RootLayout() {
     },
   });
 
-  return /* ... */;
+  return; /* ... */
 }
 ```
 
@@ -243,20 +243,20 @@ useEffect(() => {
 
 ## Testing Strategy
 
-| Scenario | Expected behavior | Test file |
-|---|---|---|
-| Duplicate push delivery | Exactly ONE notification, ONE state update | `tests/reconciliation/reconciliation.store.test.ts` |
-| Out-of-order push (older after newer) | Stale push suppressed, UI not regressed | `tests/reconciliation/reconciliation.store.test.ts` |
-| Extended offline → reconnect | Missed changes caught up; ONE notification (not N) | `tests/reconciliation/useReconciliation.test.ts` |
-| Fetch failure during reconciliation | Graceful degradation, no crash, store not corrupted | `tests/reconciliation/useReconciliation.test.ts` |
-| Store persistence across restarts | Versions survive app kill/relaunch | `tests/reconciliation/reconciliation.store.test.ts` |
-| Wallet clear on sign-out | All versions for wallet removed | `tests/reconciliation/reconciliation.store.test.ts` |
+| Scenario                              | Expected behavior                                   | Test file                                           |
+| ------------------------------------- | --------------------------------------------------- | --------------------------------------------------- |
+| Duplicate push delivery               | Exactly ONE notification, ONE state update          | `tests/reconciliation/reconciliation.store.test.ts` |
+| Out-of-order push (older after newer) | Stale push suppressed, UI not regressed             | `tests/reconciliation/reconciliation.store.test.ts` |
+| Extended offline → reconnect          | Missed changes caught up; ONE notification (not N)  | `tests/reconciliation/useReconciliation.test.ts`    |
+| Fetch failure during reconciliation   | Graceful degradation, no crash, store not corrupted | `tests/reconciliation/useReconciliation.test.ts`    |
+| Store persistence across restarts     | Versions survive app kill/relaunch                  | `tests/reconciliation/reconciliation.store.test.ts` |
+| Wallet clear on sign-out              | All versions for wallet removed                     | `tests/reconciliation/reconciliation.store.test.ts` |
 
 ---
 
 ## SDK Contract Requirements
 
-The reconciliation protocol requires the GuildPass SDK (`@guildpass/sdk`) to expose a `roleChangeSeq` field on membership responses.  Until that field is available, the client falls back to `updatedAt` or `0`, which is safe but may cause the first fetch after an upgrade to be treated as an update.
+The reconciliation protocol requires the GuildPass SDK (`@guildpass/sdk`) to expose a `roleChangeSeq` field on membership responses. Until that field is available, the client falls back to `updatedAt` or `0`, which is safe but may cause the first fetch after an upgrade to be treated as an update.
 
 **Recommended SDK addition:**
 

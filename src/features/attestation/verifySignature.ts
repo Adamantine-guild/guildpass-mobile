@@ -27,7 +27,7 @@
  * a proof that might have been signed by a compromised key.
  */
 
-import { verifyTypedData } from 'viem';
+import { verifyTypedData } from "viem";
 import {
   type RoleAttestation,
   type AttestationValidationResult,
@@ -35,8 +35,8 @@ import {
   EIP712_TYPES,
   createEIP712Domain,
   ATTESTATION_REVOCATION_REASONS,
-} from './types';
-import { checkIssuerKeyRevoked } from './issuerKeyRegistry';
+} from "./types";
+import { checkIssuerKeyRevoked } from "./issuerKeyRegistry";
 
 /**
  * Verifies an attestation signature against a known issuer public key
@@ -49,7 +49,7 @@ import { checkIssuerKeyRevoked } from './issuerKeyRegistry';
 export async function verifyAttestationSignature(
   attestation: RoleAttestation,
   issuerAddress: `0x${string}`,
-  chainId: number
+  chainId: number,
 ): Promise<AttestationValidationResult> {
   try {
     // Verify the signature using EIP-712 typed data
@@ -57,7 +57,7 @@ export async function verifyAttestationSignature(
       address: issuerAddress,
       domain: createEIP712Domain(chainId),
       types: EIP712_TYPES,
-      primaryType: 'RoleAttestation',
+      primaryType: "RoleAttestation",
       message: {
         guildId: attestation.guildId,
         roleId: attestation.roleId,
@@ -71,7 +71,7 @@ export async function verifyAttestationSignature(
     if (!isValid) {
       return {
         valid: false,
-        reason: 'Invalid signature - does not match issuer key',
+        reason: "Invalid signature - does not match issuer key",
         recoveredSigner: issuerAddress,
       };
     }
@@ -83,7 +83,7 @@ export async function verifyAttestationSignature(
   } catch (error) {
     return {
       valid: false,
-      reason: `Signature verification failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      reason: `Signature verification failed: ${error instanceof Error ? error.message : "Unknown error"}`,
     };
   }
 }
@@ -94,9 +94,10 @@ export async function verifyAttestationSignature(
  * @param attestation The attestation to check
  * @returns Expiry check result
  */
-export function checkAttestationExpiry(
-  attestation: RoleAttestation
-): { expired: boolean; remainingSeconds: number } {
+export function checkAttestationExpiry(attestation: RoleAttestation): {
+  expired: boolean;
+  remainingSeconds: number;
+} {
   const nowSeconds = Math.floor(Date.now() / 1000);
   const remainingSeconds = attestation.expiresAt - nowSeconds;
 
@@ -124,7 +125,7 @@ export function checkAttestationExpiry(
  */
 export async function checkAttestationRevocation(
   guildId: string,
-  issuerAddress: `0x${string}`
+  issuerAddress: `0x${string}`,
 ): Promise<{ revoked: boolean; unavailable?: boolean }> {
   const isRevoked = await checkIssuerKeyRevoked(guildId, issuerAddress);
 
@@ -148,7 +149,7 @@ export async function checkAttestationRevocation(
 export async function validateAttestation(
   attestation: RoleAttestation,
   issuerAddress: `0x${string}`,
-  chainId: number
+  chainId: number,
 ): Promise<AttestationValidationResult> {
   // ── 1. Expiry check (O(1), no I/O) ──
   const expiryCheck = checkAttestationExpiry(attestation);
@@ -156,17 +157,14 @@ export async function validateAttestation(
   if (expiryCheck.expired) {
     return {
       valid: false,
-      reason: 'Attestation has expired',
+      reason: "Attestation has expired",
       expired: true,
       remainingValidity: 0,
     };
   }
 
   // ── 2. Revocation check (in-memory lookup) ──
-  const revocationResult = await checkAttestationRevocation(
-    attestation.guildId,
-    issuerAddress
-  );
+  const revocationResult = await checkAttestationRevocation(attestation.guildId, issuerAddress);
 
   if (revocationResult.revoked) {
     if (revocationResult.unavailable) {
@@ -190,11 +188,7 @@ export async function validateAttestation(
   }
 
   // ── 3. Cryptographic signature verification (most expensive) ──
-  const signatureResult = await verifyAttestationSignature(
-    attestation,
-    issuerAddress,
-    chainId
-  );
+  const signatureResult = await verifyAttestationSignature(attestation, issuerAddress, chainId);
 
   if (!signatureResult.valid) {
     return signatureResult;
@@ -221,7 +215,7 @@ export function getAttestationValidityStatus(attestation: RoleAttestation): stri
   const { expired, remainingSeconds } = checkAttestationExpiry(attestation);
 
   if (expired) {
-    return 'Expired';
+    return "Expired";
   }
 
   if (remainingSeconds < 3600) {
@@ -235,5 +229,5 @@ export function getAttestationValidityStatus(attestation: RoleAttestation): stri
   }
 
   const days = Math.floor(remainingSeconds / 86400);
-  return `Expires in ${days} day${days > 1 ? 's' : ''}`;
+  return `Expires in ${days} day${days > 1 ? "s" : ""}`;
 }

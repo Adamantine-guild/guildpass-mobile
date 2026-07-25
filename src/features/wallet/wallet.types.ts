@@ -4,12 +4,7 @@
  * wallets so membership and access checks remain provider-agnostic.
  */
 export type WalletConnectionKind =
-  | "manual"
-  | "walletconnect"
-  | "embedded"
-  | "coinbase"
-  | "metamask"
-  | null;
+  "manual" | "walletconnect" | "embedded" | "coinbase" | "metamask" | null;
 
 export type WalletState = {
   walletAddress: string | null;

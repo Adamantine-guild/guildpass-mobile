@@ -76,9 +76,7 @@ export default function Profile() {
     };
   }, []);
 
-  const isAddressValid = inputValue.trim()
-    ? validateAddressInput(inputValue).valid
-    : false;
+  const isAddressValid = inputValue.trim() ? validateAddressInput(inputValue).valid : false;
 
   // ── WalletConnect flow ──────────────────────────────────────────────
   const handleWalletConnect = async () => {

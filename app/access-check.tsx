@@ -190,7 +190,6 @@ export default function AccessCheck() {
       onSuccess: (data) => {
         recordCheck({
           ...params,
-          guildName: guildQuery.data?.name ?? params.guildId,
           resourceName: params.resourceId,
           result: data,
         });
@@ -198,7 +197,6 @@ export default function AccessCheck() {
       onError: (error) => {
         recordCheck({
           ...params,
-          guildName: guildQuery.data?.name ?? params.guildId,
           resourceName: params.resourceId,
           error,
         });

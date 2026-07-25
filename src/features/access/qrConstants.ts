@@ -10,4 +10,3 @@ export {
   SUPPORTED_QR_PAYLOAD_VERSIONS,
   type SupportedQrPayloadVersion,
 } from "./constants";
-

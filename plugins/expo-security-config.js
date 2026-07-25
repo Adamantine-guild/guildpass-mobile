@@ -42,13 +42,11 @@ function withGuildPassSecurity(config) {
     // Ensure the <application> element has android:networkSecurityConfig
     const app = manifest.manifest.application?.[0];
     if (app) {
-      const existingNetworkConfig =
-        app.$?.["android:networkSecurityConfig"];
+      const existingNetworkConfig = app.$?.["android:networkSecurityConfig"];
 
       if (!existingNetworkConfig) {
         app.$ = app.$ || {};
-        app.$["android:networkSecurityConfig"] =
-          "@xml/network_security_config";
+        app.$["android:networkSecurityConfig"] = "@xml/network_security_config";
         console.log(
           "[GuildPass Security] Added android:networkSecurityConfig to AndroidManifest.xml",
         );
@@ -61,9 +59,7 @@ function withGuildPassSecurity(config) {
       // Ensure cleartext traffic is disabled (defense-in-depth)
       if (app.$["android:usesCleartextTraffic"] === undefined) {
         app.$["android:usesCleartextTraffic"] = "false";
-        console.log(
-          "[GuildPass Security] Set android:usesCleartextTraffic=false",
-        );
+        console.log("[GuildPass Security] Set android:usesCleartextTraffic=false");
       }
     }
 
@@ -83,9 +79,7 @@ function withGuildPassSecurity(config) {
     );
   } else {
     const pinnedDomains = Object.keys(ats.NSPinnedDomains || {});
-    console.log(
-      `[GuildPass Security] iOS ATS pinning configured for: ${pinnedDomains.join(", ")}`,
-    );
+    console.log(`[GuildPass Security] iOS ATS pinning configured for: ${pinnedDomains.join(", ")}`);
   }
 
   return config;

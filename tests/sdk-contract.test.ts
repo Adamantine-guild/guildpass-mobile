@@ -20,7 +20,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { createSdkMock, resetSdkMock, type SdkMock } from "./fixtures/sdk.mock";
+import { createSdkMock, resetSdkMock } from "./fixtures/sdk.mock";
+import type { SdkMock } from "./fixtures/sdk.mock";
 import {
   GUILD_DETAIL_FIXTURE,
   GUILD_CONFIG_FIXTURE,

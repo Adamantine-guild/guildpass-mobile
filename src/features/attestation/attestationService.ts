@@ -3,20 +3,20 @@
  * Orchestrates attestation fetching, verification, caching and local verification
  */
 
-import { type RoleAttestation, type GuildIssuerKey, type AttestationValidationResult } from './types';
-import { validateAttestation, getAttestationValidityStatus } from './verifySignature';
+import type { RoleAttestation, GuildIssuerKey, AttestationValidationResult } from "./types";
+import { validateAttestation, getAttestationValidityStatus } from "./verifySignature";
 import {
   getCachedIssuerKey,
   cacheIssuerKey,
   invalidateIssuerKeyCache,
   cacheAttestationRevocationRegistry,
-} from './issuerKeyRegistry';
+} from "./issuerKeyRegistry";
 import {
   cacheAttestation,
   getCachedAttestation,
   removeCachedAttestation,
   getAttestationsForGuild,
-} from './attestationStorage';
+} from "./attestationStorage";
 
 /**
  * Callback for fetching revocation registry from the backend.
@@ -81,7 +81,7 @@ export class AttestationService {
   async fetchAndVerifyAttestation(
     walletAddress: string,
     guildId: string,
-    roleId: string
+    roleId: string,
   ): Promise<{
     valid: boolean;
     attestation?: RoleAttestation;
@@ -103,11 +103,7 @@ export class AttestationService {
       await this.maybeRefreshRevocationCache(guildId);
 
       // Verify the attestation
-      const validationResult = await validateAttestation(
-        attestation,
-        issuerAddress,
-        this.chainId
-      );
+      const validationResult = await validateAttestation(attestation, issuerAddress, this.chainId);
 
       if (!validationResult.valid) {
         return {
@@ -127,7 +123,7 @@ export class AttestationService {
     } catch (error) {
       return {
         valid: false,
-        error: error instanceof Error ? error.message : 'Unknown error fetching attestation',
+        error: error instanceof Error ? error.message : "Unknown error fetching attestation",
       };
     }
   }
@@ -144,7 +140,7 @@ export class AttestationService {
   async verifyLocalAttestation(
     walletAddress: string,
     guildId: string,
-    roleId: string
+    roleId: string,
   ): Promise<AttestationValidationResult> {
     try {
       // Get cached attestation
@@ -153,7 +149,7 @@ export class AttestationService {
       if (!cached) {
         return {
           valid: false,
-          reason: 'No cached attestation found',
+          reason: "No cached attestation found",
         };
       }
 
@@ -163,22 +159,18 @@ export class AttestationService {
       if (!issuerKey) {
         return {
           valid: false,
-          reason: 'Issuer key not cached - requires online fetch',
+          reason: "Issuer key not cached - requires online fetch",
         };
       }
 
       // Verify the cached attestation
-      const result = await validateAttestation(
-        cached,
-        issuerKey.issuerAddress,
-        this.chainId
-      );
+      const result = await validateAttestation(cached, issuerKey.issuerAddress, this.chainId);
 
       return result;
     } catch (error) {
       return {
         valid: false,
-        reason: error instanceof Error ? error.message : 'Verification failed',
+        reason: error instanceof Error ? error.message : "Verification failed",
       };
     }
   }
@@ -252,7 +244,7 @@ export class AttestationService {
   async hasCachedAttestation(
     walletAddress: string,
     guildId: string,
-    roleId: string
+    roleId: string,
   ): Promise<boolean> {
     const cached = await getCachedAttestation(walletAddress, guildId, roleId);
 
@@ -267,11 +259,7 @@ export class AttestationService {
       return false;
     }
 
-    const result = await validateAttestation(
-      cached,
-      issuerKey.issuerAddress,
-      this.chainId
-    );
+    const result = await validateAttestation(cached, issuerKey.issuerAddress, this.chainId);
 
     return result.valid;
   }
@@ -285,7 +273,7 @@ export class AttestationService {
    */
   async getCachedAttestationsForGuild(
     walletAddress: string,
-    guildId: string
+    guildId: string,
   ): Promise<RoleAttestation[]> {
     const attestations = await getAttestationsForGuild(walletAddress, guildId);
     const issuerKey = await getCachedIssuerKey(guildId);
@@ -297,11 +285,7 @@ export class AttestationService {
     const valid: RoleAttestation[] = [];
 
     for (const attestation of attestations) {
-      const result = await validateAttestation(
-        attestation,
-        issuerKey.issuerAddress,
-        this.chainId
-      );
+      const result = await validateAttestation(attestation, issuerKey.issuerAddress, this.chainId);
 
       if (result.valid) {
         valid.push(attestation);

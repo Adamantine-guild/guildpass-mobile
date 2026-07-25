@@ -10,7 +10,8 @@
 
 import { useNetworkStore } from "../network/connectivityService";
 import { queryClient as appQueryClient } from "../../lib/queryClient";
-import { createSyncEngine, type SyncEngine } from "./syncEngine";
+import { createSyncEngine } from "./syncEngine";
+import type { SyncEngine } from "./syncEngine";
 import { defaultSyncFetchers } from "./syncFetchers";
 import { useSyncStore } from "./sync.store";
 

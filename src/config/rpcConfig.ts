@@ -24,8 +24,7 @@ function parseJsonObject(raw: string | undefined): unknown {
 }
 
 function parseNumber(raw: unknown, fallback: number): number {
-  const n =
-    typeof raw === "string" ? Number(raw) : typeof raw === "number" ? raw : NaN;
+  const n = typeof raw === "string" ? Number(raw) : typeof raw === "number" ? raw : NaN;
   return Number.isFinite(n) ? n : fallback;
 }
 
@@ -43,7 +42,9 @@ function loadRpcConfig(): RpcConfig {
   const extra = Constants.expoConfig?.extra ?? {};
 
   const endpointsJsonRaw: unknown = (extra as any).EXPO_PUBLIC_RPC_ENDPOINTS_JSON;
-  const parsed = parseJsonObject(typeof endpointsJsonRaw === "string" ? endpointsJsonRaw : undefined);
+  const parsed = parseJsonObject(
+    typeof endpointsJsonRaw === "string" ? endpointsJsonRaw : undefined,
+  );
 
   const chainRpcUrls: Record<number, string[]> = {};
 
@@ -94,6 +95,3 @@ export function getRpcsForChain(chainId: number): string[] {
 export function hasAnyRpcsConfigured(): boolean {
   return Object.values(rpcConfig.chainRpcUrls).some((arr) => arr.length > 0);
 }
-
-
-

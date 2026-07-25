@@ -17,10 +17,7 @@ import {
 import { EncryptionService } from "../src/lib/encryptionService";
 import { KeyManager } from "../src/lib/keyManager";
 import { PERSISTED_QUERY_CACHE_KEY } from "../src/lib/offlineCache";
-import {
-  TEST_WALLET_ADDRESS,
-  MEMBERSHIP_ACTIVE_FIXTURE,
-} from "./fixtures/membership.fixtures";
+import { TEST_WALLET_ADDRESS, MEMBERSHIP_ACTIVE_FIXTURE } from "./fixtures/membership.fixtures";
 import { GUILD_DETAIL_FIXTURE } from "./fixtures/guild.fixtures";
 
 // 32-byte raw key (64 hex chars), matching what a real KeyManager would
@@ -48,9 +45,7 @@ function createMemoryStorage() {
 }
 
 /** A KeyManager stub that returns a fixed hex key - never hits SecureStore. */
-function fakeKeyManager(
-  options: { throwOnGet?: boolean } = {},
-): KeyManager {
+function fakeKeyManager(options: { throwOnGet?: boolean } = {}): KeyManager {
   if (options.throwOnGet) {
     return {
       getOrCreateKey: vi.fn().mockRejectedValue(new Error("secure-store-unavailable")),
@@ -78,10 +73,7 @@ function buildPersister(opts: Partial<EncryptedPersisterOptions> = {}) {
 
 function buildPersistedClient() {
   const sourceClient = new QueryClient();
-  sourceClient.setQueryData(
-    ["guild", "guild_abc"],
-    GUILD_DETAIL_FIXTURE,
-  );
+  sourceClient.setQueryData(["guild", "guild_abc"], GUILD_DETAIL_FIXTURE);
   sourceClient.setQueryData(
     ["membership", TEST_WALLET_ADDRESS, "guild_abc"],
     MEMBERSHIP_ACTIVE_FIXTURE,
@@ -115,12 +107,10 @@ describe("EncryptedPersister – API compatibility (Req 4.1 / 6.4)", () => {
 
     const newClient = new QueryClient();
     hydrate(newClient, restored!.clientState);
-    expect(newClient.getQueryData(["guild", "guild_abc"])).toStrictEqual(
-      GUILD_DETAIL_FIXTURE,
+    expect(newClient.getQueryData(["guild", "guild_abc"])).toStrictEqual(GUILD_DETAIL_FIXTURE);
+    expect(newClient.getQueryData(["membership", TEST_WALLET_ADDRESS, "guild_abc"])).toStrictEqual(
+      MEMBERSHIP_ACTIVE_FIXTURE,
     );
-    expect(
-      newClient.getQueryData(["membership", TEST_WALLET_ADDRESS, "guild_abc"]),
-    ).toStrictEqual(MEMBERSHIP_ACTIVE_FIXTURE);
   });
 
   it("removeClient clears the persisted entry", async () => {
@@ -195,10 +185,7 @@ describe("EncryptedPersister – migration from legacy plaintext (Req 4.3)", () 
 
     // Seed the storage with a legacy plaintext PersistedClient (issue #22 format)
     const legacyClient = buildPersistedClient();
-    await storage.setItem(
-      PERSISTED_QUERY_CACHE_KEY,
-      JSON.stringify(legacyClient),
-    );
+    await storage.setItem(PERSISTED_QUERY_CACHE_KEY, JSON.stringify(legacyClient));
 
     const restored = await persister.restoreClient();
     expect(restored).toBeDefined();
@@ -235,19 +222,14 @@ describe("EncryptedPersister – migration from legacy plaintext (Req 4.3)", () 
     });
 
     const legacyClient = buildPersistedClient();
-    await storage.setItem(
-      PERSISTED_QUERY_CACHE_KEY,
-      JSON.stringify(legacyClient),
-    );
+    await storage.setItem(PERSISTED_QUERY_CACHE_KEY, JSON.stringify(legacyClient));
 
     // restoreClient should return undefined because migration fails AND we
     // hold no cached key to maintain decryption.
     const restored = await persister.restoreClient();
     expect(restored).toBeUndefined();
     // Migration hook reports cleared
-    expect(onMigration).toHaveBeenCalledWith(
-      expect.objectContaining({ status: "cleared" }),
-    );
+    expect(onMigration).toHaveBeenCalledWith(expect.objectContaining({ status: "cleared" }));
     // The plaintext blob must have been removed from disk
     expect(await storage.getItem(PERSISTED_QUERY_CACHE_KEY)).toBeNull();
   });
@@ -324,12 +306,10 @@ describe("EncryptedPersister – integration with QueryClient (Req 6.4)", () => 
     const restored = await persister.restoreClient();
     expect(restored).toBeDefined();
     hydrate(target, restored!.clientState);
-    expect(target.getQueryData(["guild", "guild_abc"])).toStrictEqual(
-      GUILD_DETAIL_FIXTURE,
+    expect(target.getQueryData(["guild", "guild_abc"])).toStrictEqual(GUILD_DETAIL_FIXTURE);
+    expect(target.getQueryData(["membership", TEST_WALLET_ADDRESS, "guild_abc"])).toStrictEqual(
+      MEMBERSHIP_ACTIVE_FIXTURE,
     );
-    expect(
-      target.getQueryData(["membership", TEST_WALLET_ADDRESS, "guild_abc"]),
-    ).toStrictEqual(MEMBERSHIP_ACTIVE_FIXTURE);
   });
 
   it("preserves stale-while-revalidate semantics - stale data remains available after failed refetch", async () => {

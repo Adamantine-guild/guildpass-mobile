@@ -51,7 +51,7 @@ export function BiometricGate({
             setAuthState("unavailable");
             setErrorMessage(
               "Biometric authentication is not available on this device. " +
-                "You can disable this requirement in Settings."
+                "You can disable this requirement in Settings.",
             );
           }
           return;
@@ -79,7 +79,7 @@ export function BiometricGate({
               ? "Authentication was cancelled."
               : result.error === "lockout"
                 ? "Too many attempts. Please try again later."
-                : "Authentication failed. Please try again."
+                : "Authentication failed. Please try again.",
           );
         }
       } catch {
@@ -135,11 +135,7 @@ export function BiometricGate({
             }}
           />
         )}
-        <Button
-          title="Go Back"
-          variant="outline"
-          onPress={onCancel}
-        />
+        <Button title="Go Back" variant="outline" onPress={() => onCancel?.()} />
       </View>
     </View>
   );

@@ -170,9 +170,7 @@ describe("sync engine – behaviour", () => {
     expect(summary.entitiesUpdated).toBe(0);
     expect(useSyncStore.getState().corrections).toStrictEqual([]);
     // Metadata still refreshes: the entity was confirmed against the server.
-    expect(
-      useSyncStore.getState().entityMeta[serializeQueryKey(MEMBERSHIP_KEY)],
-    ).toBeDefined();
+    expect(useSyncStore.getState().entityMeta[serializeQueryKey(MEMBERSHIP_KEY)]).toBeDefined();
   });
 
   it("continues reconciling other entities when one fetch fails", async () => {

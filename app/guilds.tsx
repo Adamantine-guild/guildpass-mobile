@@ -86,12 +86,11 @@ export default function Guilds() {
     );
   }
 
-  const staleBanner =
-    staleState.isOffline ? (
-      <StaleDataBanner reason="offline" lastSyncedAt={staleState.lastSyncedAt} />
-    ) : staleState.isStale && staleState.reason ? (
-      <StaleDataBanner reason={staleState.reason} lastSyncedAt={staleState.lastSyncedAt} />
-    ) : null;
+  const staleBanner = staleState.isOffline ? (
+    <StaleDataBanner reason="offline" lastSyncedAt={staleState.lastSyncedAt} />
+  ) : staleState.isStale && staleState.reason ? (
+    <StaleDataBanner reason={staleState.reason} lastSyncedAt={staleState.lastSyncedAt} />
+  ) : null;
 
   const searchHeader = (
     <View>
@@ -138,9 +137,7 @@ export default function Guilds() {
           contentContainerStyle={{ padding: 16 }}
           testID="guilds-list"
           ListHeaderComponent={searchHeader}
-          refreshControl={
-            <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />
-          }
+          refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />}
           renderItem={({ item }) => (
             <GuildCard
               name={item.guildName}

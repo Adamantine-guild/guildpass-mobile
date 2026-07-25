@@ -29,7 +29,9 @@ describe("RoleBadge Component", () => {
     const container = root.findByProps({ accessibilityLabel: "Role: VIP" });
     expect(container.props.className).toContain("bg-success/10");
 
-    const icon = root.findAllByType("Text").find((node) => node.props.accessibilityElementsHidden === true);
+    const icon = root
+      .findAllByType("Text")
+      .find((node) => node.props.accessibilityElementsHidden === true);
     expect(icon).toBeDefined();
     expect(icon?.props.importantForAccessibility).toBe("no-hide-descendants");
   });

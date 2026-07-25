@@ -45,11 +45,11 @@ closes #26
 
 This fix adds validation logic and inline error display to existing input fields. No new screens added.
 
-| Before | After |
-| ------ | ----- |
+| Before                                                             | After                                                                                                              |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
 | Invalid address `"0x123"` stored silently with `isConnected: true` | Invalid address rejected; "Please enter a valid Ethereum address (0x followed by 40 hex characters)." shown inline |
-| Mixed-case `"0xAbCd..."` stored as-is | Normalised to `"0xabcd..."` before storage |
-| Access-check fires SDK query with any truthy address string | Access-check blocked until address passes format validation |
+| Mixed-case `"0xAbCd..."` stored as-is                              | Normalised to `"0xabcd..."` before storage                                                                         |
+| Access-check fires SDK query with any truthy address string        | Access-check blocked until address passes format validation                                                        |
 
 ## Test Evidence
 

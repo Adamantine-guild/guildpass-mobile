@@ -160,20 +160,14 @@ export const parseAccessQrPayload = (
     }
 
     if (expiresAt.getTime() <= now.getTime()) {
-      throw new QrPayloadError(
-        QR_PAYLOAD_ERROR_CODES.EXPIRED,
-        "QR code has expired.",
-      );
+      throw new QrPayloadError(QR_PAYLOAD_ERROR_CODES.EXPIRED, "QR code has expired.");
     }
   }
 
   // During the migration window the signature field is optional at the
   // structural layer; cryptographic verification is enforced separately by
   // verifyAndParseAccessQrPayload when the feature flag is enabled.
-  if (
-    decodedPayload.signature !== undefined &&
-    !isNonEmptyString(decodedPayload.signature)
-  ) {
+  if (decodedPayload.signature !== undefined && !isNonEmptyString(decodedPayload.signature)) {
     throw new QrPayloadError(
       QR_PAYLOAD_ERROR_CODES.INVALID_SIGNATURE,
       "QR code contains an invalid signature.",

@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useState, type ReactNode } from "react";
+import React, { useCallback, useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import {
   migrateLegacySensitiveStorage,

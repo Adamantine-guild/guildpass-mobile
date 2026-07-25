@@ -1,7 +1,8 @@
 import { appConfig } from "../../config/appConfig";
 import { getGuildIssuerPublicKey } from "./guildIssuerKey";
 import { verifyQrSignature } from "./qrSignature";
-import { parseAccessQrPayload, type ParsedAccessQrPayload } from "./qrPayload";
+import { parseAccessQrPayload } from "./qrPayload";
+import type { ParsedAccessQrPayload } from "./qrPayload";
 import { checkAndRecordNonce } from "./qrReplayGuard";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -65,7 +66,7 @@ export const verifyAndParseAccessQrPayload = async (
   }
 
   if (parsed.nonce !== undefined) {
-    checkAndRecordNonce(parsed.nonce, parsed.expiresAt, now);
+    await checkAndRecordNonce(parsed.nonce, parsed.expiresAt, now);
   }
 
   return parsed;

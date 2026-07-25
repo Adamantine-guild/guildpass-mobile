@@ -2,8 +2,16 @@ import { useSessionStore } from "./session.store";
 import { SessionAdapter } from "./session.types";
 
 export function useSession() {
-  const { status, walletAddress, token, expiresAt, startSession, refreshSession, endSession, setAdapter } =
-    useSessionStore();
+  const {
+    status,
+    walletAddress,
+    token,
+    expiresAt,
+    startSession,
+    refreshSession,
+    endSession,
+    setAdapter,
+  } = useSessionStore();
 
   return {
     status,

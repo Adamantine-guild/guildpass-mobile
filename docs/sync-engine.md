@@ -18,7 +18,7 @@ it.
    (revoked membership, removed roles, deactivated guild, changed access
    policy), the user sees a visible correction notice.
 3. **Local mutations replay first.** Mutations React Query queued while
-   offline (e.g. access-check submissions) are replayed *before* reads are
+   offline (e.g. access-check submissions) are replayed _before_ reads are
    reconciled, so local writes reach the server before its state is treated
    as final.
 4. **Testable in isolation.** The engine takes every collaborator (query
@@ -60,15 +60,15 @@ it.
 
 ### Modules (`src/features/sync/`)
 
-| Module | Responsibility |
-| --- | --- |
-| `sync.types.ts` | Domain types: descriptors, corrections, per-entity metadata, run summaries. |
-| `reconcile.ts` | Pure logic: parse query keys into entity descriptors, content-hash versioning, per-entity-kind conflict detection. No side effects. |
-| `sync.store.ts` | Zustand store persisted to AsyncStorage: sync status, per-entity `lastSyncedAt`/`version` metadata, unacknowledged corrections (capped, deduplicated by deterministic id). |
-| `syncEngine.ts` | The reconciliation pass. Walks the React Query cache, refetches each reconcilable entity, applies the server-authoritative overwrite, records metadata and corrections. All dependencies injected. |
-| `syncFetchers.ts` | Default per-entity fetchers backed by the GuildPass SDK singleton. |
-| `syncManager.ts` | App wiring: watches the network store for offline → online transitions, debounces NetInfo flapping, waits for the sync store's persisted state to hydrate, replays paused mutations, then runs the engine. Initialized once in `app/_layout.tsx`. |
-| `useSyncStatus.ts` | UI hooks: `useSyncStatus()` and `useSyncCorrections()`. |
+| Module             | Responsibility                                                                                                                                                                                                                                    |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sync.types.ts`    | Domain types: descriptors, corrections, per-entity metadata, run summaries.                                                                                                                                                                       |
+| `reconcile.ts`     | Pure logic: parse query keys into entity descriptors, content-hash versioning, per-entity-kind conflict detection. No side effects.                                                                                                               |
+| `sync.store.ts`    | Zustand store persisted to AsyncStorage: sync status, per-entity `lastSyncedAt`/`version` metadata, unacknowledged corrections (capped, deduplicated by deterministic id).                                                                        |
+| `syncEngine.ts`    | The reconciliation pass. Walks the React Query cache, refetches each reconcilable entity, applies the server-authoritative overwrite, records metadata and corrections. All dependencies injected.                                                |
+| `syncFetchers.ts`  | Default per-entity fetchers backed by the GuildPass SDK singleton.                                                                                                                                                                                |
+| `syncManager.ts`   | App wiring: watches the network store for offline → online transitions, debounces NetInfo flapping, waits for the sync store's persisted state to hydrate, replays paused mutations, then runs the engine. Initialized once in `app/_layout.tsx`. |
+| `useSyncStatus.ts` | UI hooks: `useSyncStatus()` and `useSyncCorrections()`.                                                                                                                                                                                           |
 
 UI lives in `src/components/SyncCorrectionNotice.tsx` (presentational banner,
 follows the `StaleDataBanner` conventions) and
@@ -82,7 +82,7 @@ the root layout so corrections surface on whatever screen is active).
 2. **Startup, after cache restore** — `PersistQueryClientProvider`'s
    `onSuccess` fires once the persisted query cache is fully restored, and
    the layout triggers a pass then. This covers the device that went offline,
-   was closed, and reopens *online*: no reconnect event ever fires, but the
+   was closed, and reopens _online_: no reconnect event ever fires, but the
    restored cache may hold revoked grants. It also guarantees reconciliation
    never races the async cache restore (a reconnect-triggered pass before
    restore would walk a still-empty cache).
@@ -97,13 +97,13 @@ entity). The list is **derived from** `PERSISTABLE_QUERY_KEY_ROOTS` in
 `src/lib/walletScopedCache.ts`), so adding a new persisted namespace forces
 the sync module to handle it at compile time instead of silently skipping it:
 
-| Query key | Scope | Critical corrections | Info corrections |
-| --- | --- | --- | --- |
-| `["membership", wallet, guildId]` | wallet | `membership_revoked` | `membership_restored` |
-| `["user-roles", wallet, guildId]` | wallet | `roles_removed` | `roles_added` |
-| `["guild", guildId]` | guild | `guild_deactivated` | — |
-| `["guild-config", guildId]` | guild | — | `access_policy_changed` |
-| `["guild-roles", guildId]` | guild | — (silent refresh) | — |
+| Query key                         | Scope  | Critical corrections | Info corrections        |
+| --------------------------------- | ------ | -------------------- | ----------------------- |
+| `["membership", wallet, guildId]` | wallet | `membership_revoked` | `membership_restored`   |
+| `["user-roles", wallet, guildId]` | wallet | `roles_removed`      | `roles_added`           |
+| `["guild", guildId]`              | guild  | `guild_deactivated`  | —                       |
+| `["guild-config", guildId]`       | guild  | —                    | `access_policy_changed` |
+| `["guild-roles", guildId]`        | guild  | — (silent refresh)   | —                       |
 
 **Severity semantics:** `critical` means local state overstated the user's
 access (they may have acted on a "granted" that is now false); `info` means
@@ -112,7 +112,7 @@ treatment when any correction is critical.
 
 Every reconciled entity always adopts the server value, whether or not a
 correction is emitted — malformed/unrecognized payload shapes simply skip
-conflict *detection*, never the overwrite. A **`null` server payload is not
+conflict _detection_, never the overwrite. A **`null` server payload is not
 "malformed"**: for memberships it means the membership no longer exists
 (revoked if the cache said active), and for user roles it means no roles
 remain (roles_removed if any were cached) — the primary revocation shapes

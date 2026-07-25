@@ -1,7 +1,9 @@
 import React from "react";
-import TestRenderer, { act, type ReactTestRenderer } from "react-test-renderer";
+import TestRenderer, { act } from "react-test-renderer";
+import type { ReactTestRenderer } from "react-test-renderer";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useCameraPermissions, type PermissionResponse } from "expo-camera/next";
+import { useCameraPermissions } from "expo-camera";
+import type { PermissionResponse } from "expo-modules-core";
 import AccessScanner from "../app/access-scanner";
 import { useAccessHistoryStore } from "../src/features/access/accessHistory.store";
 
@@ -14,6 +16,22 @@ vi.mock("react-native", () => ({
   ActivityIndicator: "ActivityIndicator",
   SafeAreaView: "SafeAreaView",
   StyleSheet: { create: (styles: Record<string, unknown>) => styles },
+  Platform: { OS: "ios", select: (objs: Record<string, unknown>) => objs.ios ?? objs.default },
+  DeviceEventEmitter: {
+    addListener: vi.fn(() => ({ remove: vi.fn() })),
+    removeListener: vi.fn(),
+    emit: vi.fn(),
+  },
+  NativeModules: {},
+  NativeEventEmitter: vi.fn(() => ({
+    addListener: vi.fn(() => ({ remove: vi.fn() })),
+    removeListener: vi.fn(),
+  })),
+  Linking: {
+    openURL: vi.fn(),
+    canOpenURL: vi.fn(),
+    addEventListener: vi.fn(() => ({ remove: vi.fn() })),
+  },
 }));
 
 type MockCameraViewProps = {
@@ -90,7 +108,7 @@ vi.mock("expo-router", () => ({
   }),
 }));
 
-vi.mock("expo-camera/next", () => ({
+vi.mock("expo-camera", () => ({
   useCameraPermissions: vi.fn(),
   CameraView: cameraViewMock,
 }));
@@ -227,9 +245,18 @@ describe("AccessScanner", () => {
   });
 
   it.each([
-    [QR_SIGNATURE_ERROR_CODES_MOCK.REVOKED_KEY, qrSignatureMessagesMock[QR_SIGNATURE_ERROR_CODES_MOCK.REVOKED_KEY]],
-    [QR_SIGNATURE_ERROR_CODES_MOCK.KEY_REGISTRY_EXPIRED, qrSignatureMessagesMock[QR_SIGNATURE_ERROR_CODES_MOCK.KEY_REGISTRY_EXPIRED]],
-    [QR_SIGNATURE_ERROR_CODES_MOCK.INVALID_SIGNATURE_FORMAT, qrSignatureMessagesMock[QR_SIGNATURE_ERROR_CODES_MOCK.INVALID_SIGNATURE_FORMAT]],
+    [
+      QR_SIGNATURE_ERROR_CODES_MOCK.REVOKED_KEY,
+      qrSignatureMessagesMock[QR_SIGNATURE_ERROR_CODES_MOCK.REVOKED_KEY],
+    ],
+    [
+      QR_SIGNATURE_ERROR_CODES_MOCK.KEY_REGISTRY_EXPIRED,
+      qrSignatureMessagesMock[QR_SIGNATURE_ERROR_CODES_MOCK.KEY_REGISTRY_EXPIRED],
+    ],
+    [
+      QR_SIGNATURE_ERROR_CODES_MOCK.INVALID_SIGNATURE_FORMAT,
+      qrSignatureMessagesMock[QR_SIGNATURE_ERROR_CODES_MOCK.INVALID_SIGNATURE_FORMAT],
+    ],
   ])("shows a specific signature error message for %s", async (code, expectedMessage) => {
     mockCameraPermission(createPermissionResponse(true, true));
     verifyAndParseAccessQrPayloadMock.mockRejectedValueOnce(new QrSignatureErrorMock(code));
@@ -362,7 +389,6 @@ describe("AccessScanner", () => {
         {
           id: "entry-1",
           guildId: "guild-alpha",
-          guildName: "Guild Alpha",
           resourceId: "vip-door",
           resourceName: "VIP Door",
           status: "granted",

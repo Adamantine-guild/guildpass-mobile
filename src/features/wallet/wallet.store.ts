@@ -42,6 +42,6 @@ export const useWalletStore = create<WalletState & WalletActions & { _hasHydrate
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true);
       },
-    }
-  )
+    },
+  ),
 );

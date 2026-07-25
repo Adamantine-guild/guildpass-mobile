@@ -64,12 +64,13 @@ describe("useAccessCheck mutation flow", () => {
 
   it("runs submitted params through a mutation and exposes the result", async () => {
     const result = renderAccessCheckHook();
+    let res: any;
 
     await act(async () => {
-      await result.current.mutateAsync(ACCESS_CHECK_PARAMS);
+      res = await result.current.mutateAsync(ACCESS_CHECK_PARAMS);
     });
 
-    expect(result.current.data).toStrictEqual(ACCESS_GRANTED_FIXTURE);
+    expect(res).toStrictEqual(ACCESS_GRANTED_FIXTURE);
     expect(guildPassClientMock.checkAccess).toHaveBeenCalledTimes(1);
     expect(guildPassClientMock.checkAccess).toHaveBeenCalledWith(ACCESS_CHECK_PARAMS);
   });

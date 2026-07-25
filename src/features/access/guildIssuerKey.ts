@@ -22,9 +22,7 @@ export type IssuerKeyEntry = {
 export type GuildConfigWithIssuerKeys = {
   guildId: string;
   issuerPublicKey?: string;
-  issuerKeys?:
-    | Record<string, string>
-    | Array<IssuerKeyEntry>;
+  issuerKeys?: Record<string, string> | Array<IssuerKeyEntry>;
   revokedKids?: string[];
   [key: string]: unknown;
 };

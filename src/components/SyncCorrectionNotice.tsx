@@ -39,8 +39,8 @@ export function SyncCorrectionNotice({ corrections, onDismiss }: SyncCorrectionN
     >
       <Text className={titleClass}>{title}</Text>
       <Text className="text-text text-sm mb-1">
-        While you were offline, your saved data went out of date. It has been updated to
-        match the server:
+        While you were offline, your saved data went out of date. It has been updated to match the
+        server:
       </Text>
       {ordered.map((correction) => (
         <Text key={correction.id} className="text-text text-sm mt-1">

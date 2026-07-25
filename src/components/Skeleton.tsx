@@ -21,7 +21,7 @@ export const Skeleton = ({ className = "" }: SkeletonProps) => {
           duration: 800,
           useNativeDriver: true,
         }),
-      ])
+      ]),
     );
 
     animation.start();

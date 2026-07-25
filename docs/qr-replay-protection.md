@@ -43,20 +43,20 @@ before.
 
 ### Cache shape
 
-| Property | Behavior |
-| --- | --- |
-| Self-pruning | On every check, entries whose `expiresAt` has passed are dropped before the new nonce is checked/recorded — no timers needed. |
-| Bounded | Capped at 500 entries; once full, the oldest-inserted entry is evicted to make room. Prevents unbounded growth from a scan burst or payloads without `expiresAt`. |
-| Fallback TTL | A payload without a usable `expiresAt` is still tracked, but with a 5-minute fallback TTL so it doesn't linger forever. |
+| Property     | Behavior                                                                                                                                                          |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Self-pruning | On every check, entries whose `expiresAt` has passed are dropped before the new nonce is checked/recorded — no timers needed.                                     |
+| Bounded      | Capped at 500 entries; once full, the oldest-inserted entry is evicted to make room. Prevents unbounded growth from a scan burst or payloads without `expiresAt`. |
+| Fallback TTL | A payload without a usable `expiresAt` is still tracked, but with a 5-minute fallback TTL so it doesn't linger forever.                                           |
 
 ---
 
 ## Error codes
 
-| Code | Meaning |
-| --- | --- |
+| Code                       | Meaning                                                                             |
+| -------------------------- | ----------------------------------------------------------------------------------- |
 | `QR_PAYLOAD_INVALID_NONCE` | `nonce` is present but not a non-empty string (structural check in `qrPayload.ts`). |
-| `QR_PAYLOAD_ALREADY_USED` | `nonce` was already accepted within its validity window (`qrReplayGuard.ts`). |
+| `QR_PAYLOAD_ALREADY_USED`  | `nonce` was already accepted within its validity window (`qrReplayGuard.ts`).       |
 
 Both are `QrPayloadError` instances — check `.code` to distinguish them from
 other payload rejection reasons.

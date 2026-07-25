@@ -50,10 +50,7 @@ export class ErrorBoundary extends Component<Props, State> {
   render(): ReactNode {
     if (this.state.hasError) {
       return (
-        <View
-          className="flex-1 bg-background"
-          testID="error-boundary-fallback"
-        >
+        <View className="flex-1 bg-background" testID="error-boundary-fallback">
           <ScrollView
             contentContainerStyle={{
               flexGrow: 1,
