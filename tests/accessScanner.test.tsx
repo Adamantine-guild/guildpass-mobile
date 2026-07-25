@@ -166,10 +166,13 @@ describe("AccessScanner", () => {
   it("announces processing and success during a valid scan", async () => {
     mockCameraPermission(createPermissionResponse(true, true));
     verifyAndParseAccessQrPayloadMock.mockResolvedValue({
-      guildId: "guild-alpha",
-      resourceId: "vip-door",
-      walletAddress: "0xabc",
-      expiresAt: "2099-01-01T00:00:00.000Z",
+      success: true,
+      payload: {
+        guildId: "guild-alpha",
+        resourceId: "vip-door",
+        walletAddress: "0xabc",
+        expiresAt: "2099-01-01T00:00:00.000Z",
+      }
     });
 
     TestRenderer.create(<AccessScanner />);
@@ -194,7 +197,7 @@ describe("AccessScanner", () => {
 
   it("marks scan errors as assertive live-region alerts", async () => {
     mockCameraPermission(createPermissionResponse(true, true));
-    verifyAndParseAccessQrPayloadMock.mockRejectedValue(new Error("forged"));
+    verifyAndParseAccessQrPayloadMock.mockResolvedValue({ success: false, reason: "UNKNOWN_ERROR", message: "forged" });
 
     const renderer = TestRenderer.create(<AccessScanner />);
 
@@ -227,10 +230,13 @@ describe("AccessScanner", () => {
   it("verifies a valid scan and navigates to the access-check screen", async () => {
     mockCameraPermission(createPermissionResponse(true, true));
     verifyAndParseAccessQrPayloadMock.mockResolvedValue({
-      guildId: "guild-alpha",
-      resourceId: "vip-door",
-      walletAddress: "0xabc",
-      expiresAt: "2099-01-01T00:00:00.000Z",
+      success: true,
+      payload: {
+        guildId: "guild-alpha",
+        resourceId: "vip-door",
+        walletAddress: "0xabc",
+        expiresAt: "2099-01-01T00:00:00.000Z",
+      }
     });
 
     TestRenderer.create(<AccessScanner />);
@@ -283,7 +289,7 @@ describe("AccessScanner", () => {
     expect(routerMocks.replace).not.toHaveBeenCalled();
 
     await act(async () => {
-      resolveVerification?.({ guildId: "g", resourceId: "r" });
+      resolveVerification?.({ success: true, payload: { guildId: "g", resourceId: "r" } });
       await firstScanPromise;
     });
 
@@ -300,7 +306,7 @@ describe("AccessScanner", () => {
     [QR_SIGNATURE_ERROR_CODES_MOCK.INVALID_SIGNATURE_FORMAT, qrSignatureMessagesMock[QR_SIGNATURE_ERROR_CODES_MOCK.INVALID_SIGNATURE_FORMAT]],
   ])("shows a specific signature error message for %s", async (code, expectedMessage) => {
     mockCameraPermission(createPermissionResponse(true, true));
-    verifyAndParseAccessQrPayloadMock.mockRejectedValueOnce(new QrSignatureErrorMock(code));
+    verifyAndParseAccessQrPayloadMock.mockResolvedValueOnce({ success: false, reason: code });
 
     const renderer = TestRenderer.create(<AccessScanner />);
 
@@ -324,9 +330,11 @@ describe("AccessScanner", () => {
 
   it("shows a safe rejection message for invalid or forged QR payloads", async () => {
     mockCameraPermission(createPermissionResponse(true, true));
-    verifyAndParseAccessQrPayloadMock.mockRejectedValue(
-      new Error("Authorization: Bearer secret-token"),
-    );
+    verifyAndParseAccessQrPayloadMock.mockResolvedValue({
+      success: false,
+      reason: "UNKNOWN_ERROR",
+      message: "Authorization: Bearer secret-token"
+    });
 
     const renderer = TestRenderer.create(<AccessScanner />);
 
@@ -351,12 +359,15 @@ describe("AccessScanner", () => {
   it("restores scanning after an error", async () => {
     mockCameraPermission(createPermissionResponse(true, true));
     verifyAndParseAccessQrPayloadMock
-      .mockRejectedValueOnce(new Error("forged"))
+      .mockResolvedValueOnce({ success: false, reason: "UNKNOWN_ERROR", message: "forged" })
       .mockResolvedValueOnce({
-        guildId: "guild-alpha",
-        resourceId: "vip-door",
-        walletAddress: "0xabc",
-        expiresAt: "2099-01-01T00:00:00.000Z",
+        success: true,
+        payload: {
+          guildId: "guild-alpha",
+          resourceId: "vip-door",
+          walletAddress: "0xabc",
+          expiresAt: "2099-01-01T00:00:00.000Z",
+        }
       });
 
     const renderer = TestRenderer.create(<AccessScanner />);
@@ -394,12 +405,15 @@ describe("AccessScanner", () => {
   it("automatically re-arms the scanner guard after a scan error", async () => {
     mockCameraPermission(createPermissionResponse(true, true));
     verifyAndParseAccessQrPayloadMock
-      .mockRejectedValueOnce(new Error("first error"))
+      .mockResolvedValueOnce({ success: false, reason: "UNKNOWN_ERROR", message: "first error" })
       .mockResolvedValueOnce({
-        guildId: "guild-alpha",
-        resourceId: "vip-door",
-        walletAddress: "0xabc",
-        expiresAt: "2099-01-01T00:00:00.000Z",
+        success: true,
+        payload: {
+          guildId: "guild-alpha",
+          resourceId: "vip-door",
+          walletAddress: "0xabc",
+          expiresAt: "2099-01-01T00:00:00.000Z",
+        }
       });
 
     TestRenderer.create(<AccessScanner />);
