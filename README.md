@@ -196,17 +196,25 @@ QR access checks use a JSON payload encoded directly in the QR code:
 ```json
 {
   "type": "guildpass.access-check",
-  "version": 1,
+  "version": 2,
   "guildId": "guild_abc",
   "resourceId": "vip-door",
   "walletAddress": "0x1234567890123456789012345678901234567890",
-  "expiresAt": "2026-06-23T12:05:00.000Z"
+  "expiresAt": "2026-06-23T12:05:00.000Z",
+  "kid": "key_2026",
+  "signature": "3045022100e...20b"
 }
 ```
 
-`type`, `version`, `guildId`, and `resourceId` are required. `walletAddress` and `expiresAt`
+`type`, `version`, `guildId`, `resourceId`, `kid`, and `signature` are required. `walletAddress` and `expiresAt`
 are optional. Unsupported types or versions, malformed JSON, missing required fields, invalid
-wallet addresses, and expired payloads are rejected before the access check is submitted.
+wallet addresses, expired payloads, and cryptographically invalid signatures are rejected before the access check is submitted.
+
+### Version 1 Compatibility Policy
+As of the rollout of cryptographic signatures in `version: 2`, legacy `version: 1` unsigned payloads are **strictly rejected**. This completely closes downgrade attacks where a malicious actor strips the signature and changes the version to 1 to bypass security controls. All issuers must use `version: 2`.
+
+### Cryptographic Signatures
+The `signature` field is a DER-encoded, hex-secp256k1 signature over a deterministic, newline-delimited canonicalization of the payload fields (in order: `type`, `version`, `guildId`, `resourceId`, `walletAddress`, `expiresAt`, `kid`). This signature is verified locally using the issuer's public key (fetched from the GuildPass backend and cached per `kid`).
 
 ## � Deep Linking
 

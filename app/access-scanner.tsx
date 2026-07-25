@@ -16,8 +16,9 @@ import { useAccessHistoryStore } from "../src/features/access/accessHistory.stor
 export default function AccessScanner() {
   const router = useRouter();
   const [permission, requestPermission] = useCameraPermissions();
-  const [scanError, setScanError] = useState<string | null>(null);
+  const [scanError, setScanError] = useState<{ message: string; isUntrusted: boolean } | null>(null);
   const [isProcessingScan, setIsProcessingScan] = useState(false);
+  const [verificationSuccess, setVerificationSuccess] = useState(false);
   const scanInProgressRef = useRef(false);
   const entries = useAccessHistoryStore((state) => state.entries);
   const clearHistory = useAccessHistoryStore((state) => state.clearHistory);
@@ -34,22 +35,39 @@ export default function AccessScanner() {
     try {
       AccessibilityInfo.announceForAccessibility("Processing access QR code.");
       await verifyAndParseAccessQrPayload(data);
-      AccessibilityInfo.announceForAccessibility("QR code accepted. Opening access check.");
-      router.replace({ pathname: "/access-check", params: { qrPayload: data } });
+      setVerificationSuccess(true);
+      AccessibilityInfo.announceForAccessibility("Signature verified. Opening access check.");
+      
+      setTimeout(() => {
+        setVerificationSuccess(false);
+        router.replace({ pathname: "/access-check", params: { qrPayload: data } });
+      }, 1500);
       return;
-    } catch (scanError) {
+    } catch (error) {
       let errorMessage = "Unable to read QR payload.";
+      let isUntrusted = false;
 
-      if (scanError instanceof QrSignatureError) {
-        errorMessage = describeQrSignatureError(scanError.code);
-      } else if (
-        scanError instanceof QrPayloadError &&
-        scanError.code === QR_PAYLOAD_ERROR_CODES.ALREADY_USED
-      ) {
-        errorMessage = "This QR code has already been used.";
+      if (error instanceof QrSignatureError) {
+        errorMessage = describeQrSignatureError(error.code);
+        isUntrusted = true;
+      } else if (error instanceof QrPayloadError) {
+        if (
+          error.code === QR_PAYLOAD_ERROR_CODES.INVALID_SIGNATURE ||
+          error.code === QR_PAYLOAD_ERROR_CODES.UNSUPPORTED_VERSION ||
+          error.code === QR_PAYLOAD_ERROR_CODES.INVALID_KID
+        ) {
+          errorMessage = error.message;
+          isUntrusted = true;
+        } else if (error.code === QR_PAYLOAD_ERROR_CODES.ALREADY_USED) {
+          errorMessage = "This QR code has already been used.";
+        } else {
+          errorMessage = error.message;
+        }
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
       }
 
-      setScanError(errorMessage);
+      setScanError({ message: errorMessage, isUntrusted });
       AccessibilityInfo.announceForAccessibility(`QR code rejected. ${errorMessage}`);
     }
 
@@ -120,14 +138,34 @@ export default function AccessScanner() {
     );
   }
 
+  if (verificationSuccess) {
+    return (
+      <View accessibilityLabel="Signature verified" accessibilityState={{ busy: true }} className="flex-1 bg-background justify-center items-center">
+        <AppHeader title="Scan Access QR" showBack />
+        <View className="flex-1 px-4 py-6 justify-center w-full">
+          <Card className="border-success bg-success/5 items-center py-8">
+            <Text className="text-success text-4xl mb-4 font-bold">✓</Text>
+            <Text className="text-success font-bold text-xl">Signature verified</Text>
+            <Text className="text-success/80 mt-2 text-center">Redirecting to access check...</Text>
+          </Card>
+        </View>
+      </View>
+    );
+  }
+
   if (scanError) {
+    const isUntrusted = scanError.isUntrusted;
     return (
       <View className="flex-1 bg-background">
         <AppHeader title="Scan Access QR" showBack />
         <View className="flex-1 px-4 py-6">
-          <Card className="border-error bg-error/5">
-            <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" className="text-error font-bold">QR code rejected</Text>
-            <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" className="text-error/80 text-sm mt-1 mb-4">{scanError}</Text>
+          <Card className={isUntrusted ? "border-amber-500 bg-amber-500/10" : "border-error bg-error/5"}>
+            <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" className={isUntrusted ? "text-amber-600 font-bold text-lg" : "text-error font-bold text-lg"}>
+              {isUntrusted ? "Untrusted QR code" : "QR code rejected"}
+            </Text>
+            <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" className={isUntrusted ? "text-amber-700/80 text-sm mt-1 mb-4" : "text-error/80 text-sm mt-1 mb-4"}>
+              {scanError.message}
+            </Text>
             <Button title="Scan Again" onPress={handleScanAgain} variant="outline" />
           </Card>
         </View>

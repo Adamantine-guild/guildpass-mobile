@@ -49,13 +49,13 @@ export type AccessQrPayload = {
   /**
    * Key ID (kid) indicating which versioned issuer public key was used to sign the payload.
    */
-  kid?: string;
+  kid: string;
   /**
    * DER-encoded, hex-secp256k1 signature over the canonical signing message
    * (see qrSignature.buildSigningMessage). Verified against the guild's
-   * published issuer public key. Optional during the migration window.
+   * published issuer public key.
    */
-  signature?: string;
+  signature: string;
   /**
    * Unique per-issuance identifier used for client-side replay protection
    * (see qrReplayGuard.ts). A payload photographed or screen-recorded before
@@ -71,7 +71,7 @@ export type ParsedAccessQrPayload = {
   resourceId: string;
   walletAddress?: string;
   expiresAt?: string;
-  kid?: string;
+  kid: string;
   nonce?: string;
 };
 
@@ -192,16 +192,12 @@ export const parseAccessQrPayload = (
     }
   }
 
-  // During the migration window the signature field is optional at the
-  // structural layer; cryptographic verification is enforced separately by
-  // verifyAndParseAccessQrPayload when the feature flag is enabled.
   if (
-    decodedPayload.signature !== undefined &&
-    (!isNonEmptyString(decodedPayload.signature) || !hasNoControlChars(decodedPayload.signature))
+    !isNonEmptyString(decodedPayload.signature) || !hasNoControlChars(decodedPayload.signature)
   ) {
     throw new QrPayloadError(
       QR_PAYLOAD_ERROR_CODES.INVALID_SIGNATURE,
-      "QR code contains an invalid signature.",
+      "QR code contains an invalid or missing signature.",
     );
   }
 
@@ -218,10 +214,10 @@ export const parseAccessQrPayload = (
     );
   }
 
-  if (decodedPayload.kid !== undefined && !isValidIdentifier(decodedPayload.kid)) {
+  if (!isValidIdentifier(decodedPayload.kid)) {
     throw new QrPayloadError(
       QR_PAYLOAD_ERROR_CODES.INVALID_KID,
-      "QR code contains an invalid key ID.",
+      "QR code contains an invalid or missing key ID.",
     );
   }
 
@@ -232,7 +228,7 @@ export const parseAccessQrPayload = (
       ? decodedPayload.walletAddress
       : undefined,
     expiresAt: isNonEmptyString(decodedPayload.expiresAt) ? decodedPayload.expiresAt : undefined,
-    kid: isNonEmptyString(decodedPayload.kid) ? decodedPayload.kid.trim() : undefined,
+    kid: decodedPayload.kid.trim(),
     nonce: isNonEmptyString(decodedPayload.nonce) ? decodedPayload.nonce : undefined,
   };
 };
