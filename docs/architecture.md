@@ -21,8 +21,69 @@ We use **Expo Router**, which provides file-system based routing similar to Next
 ## State Management
 
 1. **Server State**: Managed by **React Query**. All protocol data (guilds, memberships, access) is fetched and cached here.
-2. **Global Client State**: Managed by **Zustand**. Used for lightweight UI state like the connected wallet address.
+2. **Global Client State**: Managed by **Zustand**, in feature-scoped stores (see below).
 3. **Local State**: Standard React `useState` for form inputs and transient UI toggles.
+
+`MIGRATION_STATE.md` is the canonical deep reference for the layering, the query-key
+factory, and cache-coherence mechanisms. This section covers store ownership and the
+rules contributors need when adding state.
+
+### Golden rule
+
+Server entity data (guilds, roles, memberships) never goes into Zustand. Zustand holds
+only client state that has no server equivalent. Store an entity `id` and resolve the
+entity through React Query at render time rather than copying a snapshot into a store.
+
+### Store ownership
+
+Each store lives in the feature that owns it and is the only owner of its state.
+
+| Store | Location | Owns | Persistence |
+| ----- | -------- | ---- | ----------- |
+| `useWalletStore` | `features/wallet/wallet.store.ts` | Connected address, connection status, connector kind | SecureStore |
+| `useSessionStore` | `features/session/session.store.ts` | Auth status, token, expiry, session adapter | SecureStore |
+| `useSyncStore` | `features/sync/sync.store.ts` | Sync status, per-entity sync metadata, unacknowledged corrections | SecureStore |
+| `useReconciliationStore` | `features/notifications/reconciliation.store.ts` | Highest processed `roleChangeSeq` per (guild, wallet) | SecureStore |
+| `useAccessHistoryStore` | `features/access/accessHistory.store.ts` | Recent access-check log (capped) | In-memory |
+| `useBiometricStore` | `features/security/biometric.store.ts` | Biometric-required preference | SecureStore |
+| `useIntegrityWarningStore` | `features/security/integrityWarning.store.ts` | Device-compromise warning banner state | In-memory |
+| `useNetworkStore` | `features/network/connectivityService.ts` | Online/offline flag, fed by NetInfo | In-memory |
+
+### Cross-feature writes
+
+A feature module imports only its own store. Every state write that spans features is
+declared in `src/lib/`, so the fan-out is readable, ordered, and awaitable in one place:
+
+- **`src/lib/walletLifecycle.ts`** — `startWalletSession`, `endWalletSession`,
+  `invalidateSessionForCompromise`. Wallet connect/disconnect spans the session, sync,
+  and query-cache layers; `endWalletSession` drops wallet-scoped queries and sync state
+  **before** ending the session, so a screen still mounted during teardown cannot
+  refetch against a live token.
+- **`src/lib/resetAppState.ts`** — full app reset across every store, the persisted
+  query cache, and attestation storage.
+
+Adding a cross-feature transition means adding it to one of these modules, not importing
+another feature's store into a hook or component.
+
+### Selectors
+
+Subscribe with a selector, never by calling the store hook bare. `useWalletStore()`
+returns a new state object on every `set()`, so it re-renders consumers even when no
+value they read has changed:
+
+```ts
+// Do this — re-renders only when this slice changes
+const walletAddress = useWalletStore((s) => s.walletAddress);
+
+// Not this — re-renders on every store write
+const { walletAddress } = useWalletStore();
+```
+
+Prefer one atomic selector per value. Reach for `useShallow` (from
+`zustand/react/shallow`) only when a selector must return a **newly constructed** object
+or array, which is the single case `Object.is` equality cannot handle. No selector in the
+codebase currently needs it; wrapping atomic selectors that return primitives or stable
+action references adds indirection with no effect on re-render counts.
 
 <!-- GuildPass Mobile: Informational section content header block. -->
 
