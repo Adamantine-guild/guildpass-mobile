@@ -7,9 +7,9 @@ import * as Linking from "expo-linking";
 import { AppHeader } from "../src/components/AppHeader";
 import { Button } from "../src/components/Button";
 import { Card } from "../src/components/Card";
-import { verifyAndParseAccessQrPayload } from "../src/features/access/verifyQrPayload";
-import { QrSignatureError, describeQrSignatureError } from "../src/features/access/qrSignature";
-import { QrPayloadError, QR_PAYLOAD_ERROR_CODES } from "../src/features/access/qrPayload";
+import { verifyAndParseAccessQrPayload, QrValidationResult } from "../src/features/access/verifyQrPayload";
+import { describeQrSignatureError, QR_SIGNATURE_ERROR_CODES, QrSignatureErrorCode } from "../src/features/access/qrSignature";
+import { describeQrPayloadError, QR_PAYLOAD_ERROR_CODES, QrPayloadErrorCode } from "../src/features/access/qrPayload";
 import { AccessHistoryList } from "../src/components/AccessHistoryList";
 import { useAccessHistoryStore } from "../src/features/access/accessHistory.store";
 
@@ -31,30 +31,29 @@ export default function AccessScanner() {
     setIsProcessingScan(true);
     setScanError(null);
 
-    try {
-      AccessibilityInfo.announceForAccessibility("Processing access QR code.");
-      await verifyAndParseAccessQrPayload(data);
+    const result = await verifyAndParseAccessQrPayload(data);
+
+    if (result.success) {
       AccessibilityInfo.announceForAccessibility("QR code accepted. Opening access check.");
       router.replace({ pathname: "/access-check", params: { qrPayload: data } });
       return;
-    } catch (scanError) {
+    } else {
       let errorMessage = "Unable to read QR payload.";
 
-      if (scanError instanceof QrSignatureError) {
-        errorMessage = describeQrSignatureError(scanError.code);
-      } else if (
-        scanError instanceof QrPayloadError &&
-        scanError.code === QR_PAYLOAD_ERROR_CODES.ALREADY_USED
-      ) {
-        errorMessage = "This QR code has already been used.";
+      // Type guards based on keys in the constant objects
+      if (Object.values(QR_SIGNATURE_ERROR_CODES).includes(result.reason as any)) {
+        errorMessage = describeQrSignatureError(result.reason as QrSignatureErrorCode);
+      } else if (Object.values(QR_PAYLOAD_ERROR_CODES).includes(result.reason as any)) {
+        errorMessage = describeQrPayloadError(result.reason as QrPayloadErrorCode);
+      } else if (result.reason === "UNKNOWN_ERROR") {
+        errorMessage = result.message || errorMessage;
       }
 
       setScanError(errorMessage);
       AccessibilityInfo.announceForAccessibility(`QR code rejected. ${errorMessage}`);
+      setIsProcessingScan(false);
+      scanInProgressRef.current = false;
     }
-
-    setIsProcessingScan(false);
-    scanInProgressRef.current = false;
   };
 
   const handleScanAgain = () => {
@@ -156,6 +155,20 @@ export default function AccessScanner() {
           </Card>
           <AccessHistoryList entries={entries} onClear={clearHistory} />
         </View>
+        
+        {__DEV__ && (
+          <View className="absolute top-4 right-4">
+            <Button
+              title="Test: Fail Scan"
+              accessibilityLabel="test-fail-scan"
+              onPress={() => {
+                setScanError("This QR code has expired.");
+                setIsProcessingScan(false);
+                scanInProgressRef.current = true;
+              }}
+            />
+          </View>
+        )}
       </View>
     </View>
   );
