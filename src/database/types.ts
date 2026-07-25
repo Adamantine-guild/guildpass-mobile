@@ -91,6 +91,14 @@ export interface SchemaMigrationRow {
   applied_at: string;
 }
 
+/** A row in the `qr_replay_nonces` table. */
+export interface QrReplayNonceRow {
+  /** The nonce value (primary key). */
+  nonce: string;
+  /** Unix epoch milliseconds at which this nonce entry may be safely pruned. */
+  expires_at_ms: number;
+}
+
 /**
  * A single migration step.
  * `version` is a monotonically increasing integer.

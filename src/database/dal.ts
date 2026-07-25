@@ -12,11 +12,7 @@
 // ---------------------------------------------------------------------------
 
 import type * as SQLite from "expo-sqlite";
-import {
-  execInTransaction,
-  execAndGetAll,
-  execAndGetOne,
-} from "./connection";
+import { execInTransaction, execAndGetAll, execAndGetOne } from "./connection";
 import type {
   GuildRow,
   GuildConfigRow,
@@ -27,6 +23,7 @@ import type {
   AccessCheckRow,
   AccessCheckStatus,
   MembershipStatus,
+  QrReplayNonceRow,
 } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -66,7 +63,10 @@ export async function upsertGuild(
           guild.updated_at,
         ],
         () => resolve(),
-        (_tx, err) => { reject(err); return true; },
+        (_tx, err) => {
+          reject(err);
+          return true;
+        },
       );
     });
   });
@@ -79,9 +79,7 @@ export async function getGuildById(
   return execAndGetOne<GuildRow>(db, "SELECT * FROM guilds WHERE id = ?", [id]);
 }
 
-export async function getAllGuilds(
-  db: SQLite.WebSQLDatabase,
-): Promise<GuildRow[]> {
+export async function getAllGuilds(db: SQLite.WebSQLDatabase): Promise<GuildRow[]> {
   return execAndGetAll<GuildRow>(db, "SELECT * FROM guilds ORDER BY name ASC");
 }
 
@@ -96,10 +94,7 @@ export async function getGuildsUpdatedSince(
   );
 }
 
-export async function deleteGuild(
-  db: SQLite.WebSQLDatabase,
-  id: string,
-): Promise<void> {
+export async function deleteGuild(db: SQLite.WebSQLDatabase, id: string): Promise<void> {
   await execInTransaction(db, [`DELETE FROM guilds WHERE id = '${id.replace(/'/g, "''")}'`]);
 }
 
@@ -119,7 +114,10 @@ export async function upsertGuildConfig(
          VALUES (?, ?, ?, ?, ?)`,
         [config.id, config.guild_id, config.config_json, created, config.updated_at],
         () => resolve(),
-        (_tx, err) => { reject(err); return true; },
+        (_tx, err) => {
+          reject(err);
+          return true;
+        },
       );
     });
   });
@@ -129,11 +127,9 @@ export async function getGuildConfigByGuildId(
   db: SQLite.WebSQLDatabase,
   guildId: string,
 ): Promise<GuildConfigRow | null> {
-  return execAndGetOne<GuildConfigRow>(
-    db,
-    "SELECT * FROM guild_configs WHERE guild_id = ?",
-    [guildId],
-  );
+  return execAndGetOne<GuildConfigRow>(db, "SELECT * FROM guild_configs WHERE guild_id = ?", [
+    guildId,
+  ]);
 }
 
 // ---------------------------------------------------------------------------
@@ -152,49 +148,43 @@ export async function addWallet(
         `INSERT OR IGNORE INTO wallets (address, label, added_at) VALUES (?, ?, ?)`,
         [address.toLowerCase(), label ?? null, addedAt],
         () => resolve(),
-        (_tx, err) => { reject(err); return true; },
+        (_tx, err) => {
+          reject(err);
+          return true;
+        },
       );
     });
   });
-  const row = await execAndGetOne<WalletRow>(
-    db,
-    "SELECT * FROM wallets WHERE address = ?",
-    [address.toLowerCase()],
-  );
+  const row = await execAndGetOne<WalletRow>(db, "SELECT * FROM wallets WHERE address = ?", [
+    address.toLowerCase(),
+  ]);
   return row!;
 }
 
-export async function getAllWallets(
-  db: SQLite.WebSQLDatabase,
-): Promise<WalletRow[]> {
-  return execAndGetAll<WalletRow>(
-    db,
-    "SELECT * FROM wallets ORDER BY added_at DESC",
-  );
+export async function getAllWallets(db: SQLite.WebSQLDatabase): Promise<WalletRow[]> {
+  return execAndGetAll<WalletRow>(db, "SELECT * FROM wallets ORDER BY added_at DESC");
 }
 
 export async function getWalletByAddress(
   db: SQLite.WebSQLDatabase,
   address: string,
 ): Promise<WalletRow | null> {
-  return execAndGetOne<WalletRow>(
-    db,
-    "SELECT * FROM wallets WHERE address = ?",
-    [address.toLowerCase()],
-  );
+  return execAndGetOne<WalletRow>(db, "SELECT * FROM wallets WHERE address = ?", [
+    address.toLowerCase(),
+  ]);
 }
 
-export async function removeWallet(
-  db: SQLite.WebSQLDatabase,
-  address: string,
-): Promise<void> {
+export async function removeWallet(db: SQLite.WebSQLDatabase, address: string): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     db.transaction((tx) => {
       tx.executeSql(
         "DELETE FROM wallets WHERE address = ?",
         [address.toLowerCase()],
         () => resolve(),
-        (_tx, err) => { reject(err); return true; },
+        (_tx, err) => {
+          reject(err);
+          return true;
+        },
       );
     });
   });
@@ -211,7 +201,10 @@ export async function updateWalletLabel(
         "UPDATE wallets SET label = ? WHERE address = ?",
         [label, address.toLowerCase()],
         () => resolve(),
-        (_tx, err) => { reject(err); return true; },
+        (_tx, err) => {
+          reject(err);
+          return true;
+        },
       );
     });
   });
@@ -227,23 +220,27 @@ export async function upsertRolesBatch(
 ): Promise<void> {
   const now = nowISO();
   await new Promise<void>((resolve, reject) => {
-    db.transaction((tx) => {
-      for (const r of roles) {
-        tx.executeSql(
-          `INSERT OR REPLACE INTO roles (id, guild_id, name, permissions, raw_json, created_at, updated_at)
+    db.transaction(
+      (tx) => {
+        for (const r of roles) {
+          tx.executeSql(
+            `INSERT OR REPLACE INTO roles (id, guild_id, name, permissions, raw_json, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [
-            r.id,
-            r.guild_id,
-            r.name,
-            r.permissions ?? null,
-            r.raw_json,
-            r.created_at ?? now,
-            r.updated_at,
-          ],
-        );
-      }
-    }, reject, resolve);
+            [
+              r.id,
+              r.guild_id,
+              r.name,
+              r.permissions ?? null,
+              r.raw_json,
+              (r as Partial<RoleRow>).created_at ?? now,
+              r.updated_at,
+            ],
+          );
+        }
+      },
+      reject,
+      resolve,
+    );
   });
 }
 
@@ -251,11 +248,9 @@ export async function getRolesByGuildId(
   db: SQLite.WebSQLDatabase,
   guildId: string,
 ): Promise<RoleRow[]> {
-  return execAndGetAll<RoleRow>(
-    db,
-    "SELECT * FROM roles WHERE guild_id = ? ORDER BY name ASC",
-    [guildId],
-  );
+  return execAndGetAll<RoleRow>(db, "SELECT * FROM roles WHERE guild_id = ? ORDER BY name ASC", [
+    guildId,
+  ]);
 }
 
 export async function deleteRolesByGuildId(
@@ -268,7 +263,10 @@ export async function deleteRolesByGuildId(
         "DELETE FROM roles WHERE guild_id = ?",
         [guildId],
         () => resolve(),
-        (_tx, err) => { reject(err); return true; },
+        (_tx, err) => {
+          reject(err);
+          return true;
+        },
       );
     });
   });
@@ -299,7 +297,10 @@ export async function upsertMembership(
             membership.updated_at,
           ],
           () => resolve(),
-          (_tx, err) => { reject(err); return true; },
+          (_tx, err) => {
+            reject(err);
+            return true;
+          },
         );
       } else {
         tx.executeSql(
@@ -314,7 +315,10 @@ export async function upsertMembership(
             membership.updated_at,
           ],
           () => resolve(),
-          (_tx, err) => { reject(err); return true; },
+          (_tx, err) => {
+            reject(err);
+            return true;
+          },
         );
       }
     });
@@ -355,13 +359,8 @@ export async function getMembershipsByGuild(
   );
 }
 
-export async function getAllMemberships(
-  db: SQLite.WebSQLDatabase,
-): Promise<MembershipRow[]> {
-  return execAndGetAll<MembershipRow>(
-    db,
-    "SELECT * FROM memberships ORDER BY updated_at DESC",
-  );
+export async function getAllMemberships(db: SQLite.WebSQLDatabase): Promise<MembershipRow[]> {
+  return execAndGetAll<MembershipRow>(db, "SELECT * FROM memberships ORDER BY updated_at DESC");
 }
 
 export async function deleteMembershipByWalletAndGuild(
@@ -375,7 +374,10 @@ export async function deleteMembershipByWalletAndGuild(
         "DELETE FROM memberships WHERE wallet_address = ? AND guild_id = ?",
         [walletAddress.toLowerCase(), guildId],
         () => resolve(),
-        (_tx, err) => { reject(err); return true; },
+        (_tx, err) => {
+          reject(err);
+          return true;
+        },
       );
     });
   });
@@ -391,22 +393,26 @@ export async function upsertUserRolesBatch(
 ): Promise<void> {
   const now = nowISO();
   await new Promise<void>((resolve, reject) => {
-    db.transaction((tx) => {
-      for (const ur of userRoles) {
-        tx.executeSql(
-          `INSERT OR REPLACE INTO user_roles (wallet_address, guild_id, role_id, raw_json, created_at, updated_at)
+    db.transaction(
+      (tx) => {
+        for (const ur of userRoles) {
+          tx.executeSql(
+            `INSERT OR REPLACE INTO user_roles (wallet_address, guild_id, role_id, raw_json, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, ?)`,
-          [
-            ur.wallet_address.toLowerCase(),
-            ur.guild_id,
-            ur.role_id,
-            ur.raw_json,
-            ur.created_at ?? now,
-            ur.updated_at,
-          ],
-        );
-      }
-    }, reject, resolve);
+            [
+              ur.wallet_address.toLowerCase(),
+              ur.guild_id,
+              ur.role_id,
+              ur.raw_json,
+              (ur as Partial<UserRoleRow>).created_at ?? now,
+              ur.updated_at,
+            ],
+          );
+        }
+      },
+      reject,
+      resolve,
+    );
   });
 }
 
@@ -453,7 +459,10 @@ export async function deleteUserRolesByWalletAndGuild(
         "DELETE FROM user_roles WHERE wallet_address = ? AND guild_id = ?",
         [walletAddress.toLowerCase(), guildId],
         () => resolve(),
-        (_tx, err) => { reject(err); return true; },
+        (_tx, err) => {
+          reject(err);
+          return true;
+        },
       );
     });
   });
@@ -487,7 +496,10 @@ export async function insertAccessCheck(
           check.created_at ?? nowISO(),
         ],
         () => resolve(),
-        (_tx, err) => { reject(err); return true; },
+        (_tx, err) => {
+          reject(err);
+          return true;
+        },
       );
     });
   });
@@ -520,13 +532,8 @@ export async function getRecentAccessChecks(
   );
 }
 
-export async function getAccessCheckCount(
-  db: SQLite.WebSQLDatabase,
-): Promise<number> {
-  const row = await execAndGetOne<{ cnt: number }>(
-    db,
-    "SELECT COUNT(*) AS cnt FROM access_checks",
-  );
+export async function getAccessCheckCount(db: SQLite.WebSQLDatabase): Promise<number> {
+  const row = await execAndGetOne<{ cnt: number }>(db, "SELECT COUNT(*) AS cnt FROM access_checks");
   return row?.cnt ?? 0;
 }
 
@@ -540,7 +547,10 @@ export async function deleteAccessChecksByWallet(
         "DELETE FROM access_checks WHERE wallet_address = ?",
         [walletAddress.toLowerCase()],
         () => resolve(),
-        (_tx, err) => { reject(err); return true; },
+        (_tx, err) => {
+          reject(err);
+          return true;
+        },
       );
     });
   });
@@ -556,7 +566,10 @@ export async function deleteAccessChecksOlderThan(
         "DELETE FROM access_checks WHERE checked_at < ?",
         [cutoffISO],
         () => resolve(),
-        (_tx, err) => { reject(err); return true; },
+        (_tx, err) => {
+          reject(err);
+          return true;
+        },
       );
     });
   });
@@ -572,24 +585,28 @@ export async function bulkInsertGuilds(
 ): Promise<void> {
   const now = nowISO();
   await new Promise<void>((resolve, reject) => {
-    db.transaction((tx) => {
-      for (const g of guilds) {
-        tx.executeSql(
-          `INSERT OR REPLACE INTO guilds (id, name, description, icon_url, chain_id, raw_json, created_at, updated_at)
+    db.transaction(
+      (tx) => {
+        for (const g of guilds) {
+          tx.executeSql(
+            `INSERT OR REPLACE INTO guilds (id, name, description, icon_url, chain_id, raw_json, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            g.id,
-            g.name,
-            g.description ?? null,
-            g.icon_url ?? null,
-            g.chain_id,
-            g.raw_json,
-            g.created_at ?? now,
-            g.updated_at,
-          ],
-        );
-      }
-    }, reject, resolve);
+            [
+              g.id,
+              g.name,
+              g.description ?? null,
+              g.icon_url ?? null,
+              g.chain_id,
+              g.raw_json,
+              (g as Partial<GuildRow>).created_at ?? now,
+              g.updated_at,
+            ],
+          );
+        }
+      },
+      reject,
+      resolve,
+    );
   });
 }
 
@@ -599,23 +616,27 @@ export async function bulkInsertRoles(
 ): Promise<void> {
   const now = nowISO();
   await new Promise<void>((resolve, reject) => {
-    db.transaction((tx) => {
-      for (const r of roles) {
-        tx.executeSql(
-          `INSERT OR REPLACE INTO roles (id, guild_id, name, permissions, raw_json, created_at, updated_at)
+    db.transaction(
+      (tx) => {
+        for (const r of roles) {
+          tx.executeSql(
+            `INSERT OR REPLACE INTO roles (id, guild_id, name, permissions, raw_json, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [
-            r.id,
-            r.guild_id,
-            r.name,
-            r.permissions ?? null,
-            r.raw_json,
-            r.created_at ?? now,
-            r.updated_at,
-          ],
-        );
-      }
-    }, reject, resolve);
+            [
+              r.id,
+              r.guild_id,
+              r.name,
+              r.permissions ?? null,
+              r.raw_json,
+              (r as Partial<RoleRow>).created_at ?? now,
+              r.updated_at,
+            ],
+          );
+        }
+      },
+      reject,
+      resolve,
+    );
   });
 }
 
@@ -688,40 +709,163 @@ export async function generateSyntheticData(
   }
 
   await new Promise<void>((resolve, reject) => {
-    db.transaction((tx) => {
-      for (const g of guilds) {
-        tx.executeSql(
-          `INSERT OR REPLACE INTO guilds (id, name, description, icon_url, chain_id, raw_json, created_at, updated_at)
+    db.transaction(
+      (tx) => {
+        for (const g of guilds) {
+          tx.executeSql(
+            `INSERT OR REPLACE INTO guilds (id, name, description, icon_url, chain_id, raw_json, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          [g.id, g.name, g.description ?? null, g.icon_url ?? null, g.chain_id, g.raw_json, now, g.updated_at],
-        );
-      }
-      for (const r of roles) {
-        tx.executeSql(
-          `INSERT OR REPLACE INTO roles (id, guild_id, name, permissions, raw_json, created_at, updated_at)
+            [
+              g.id,
+              g.name,
+              g.description ?? null,
+              g.icon_url ?? null,
+              g.chain_id,
+              g.raw_json,
+              now,
+              g.updated_at,
+            ],
+          );
+        }
+        for (const r of roles) {
+          tx.executeSql(
+            `INSERT OR REPLACE INTO roles (id, guild_id, name, permissions, raw_json, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [r.id, r.guild_id, r.name, r.permissions ?? null, r.raw_json, now, r.updated_at],
-        );
-      }
-      for (const w of wallets) {
-        tx.executeSql(
-          "INSERT OR IGNORE INTO wallets (address, label, added_at) VALUES (?, ?, ?)",
-          [w.address, w.label, now],
-        );
-      }
-      for (const c of checks) {
-        tx.executeSql(
-          `INSERT OR REPLACE INTO access_checks
+            [r.id, r.guild_id, r.name, r.permissions ?? null, r.raw_json, now, r.updated_at],
+          );
+        }
+        for (const w of wallets) {
+          tx.executeSql(
+            "INSERT OR IGNORE INTO wallets (address, label, added_at) VALUES (?, ?, ?)",
+            [w.address, w.label, now],
+          );
+        }
+        for (const c of checks) {
+          tx.executeSql(
+            `INSERT OR REPLACE INTO access_checks
            (id, wallet_address, guild_id, resource_id, status, reason,
             matched_roles_json, required_roles_json, checked_at, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            c.id, c.wallet_address, c.guild_id, c.resource_id,
-            c.status, c.reason, c.matched_roles_json,
-            c.required_roles_json, c.checked_at, c.created_at,
-          ],
-        );
-      }
-    }, reject, resolve);
+            [
+              c.id,
+              c.wallet_address,
+              c.guild_id,
+              c.resource_id,
+              c.status,
+              c.reason,
+              c.matched_roles_json,
+              c.required_roles_json,
+              c.checked_at,
+              c.created_at,
+            ],
+          );
+        }
+      },
+      reject,
+      resolve,
+    );
+  });
+}
+// ---------------------------------------------------------------------------
+// QR Replay Nonces
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns true if the given nonce exists in the persisted store,
+ * regardless of whether it has expired (pruning is done separately).
+ */
+export async function hasNonce(db: SQLite.WebSQLDatabase, nonce: string): Promise<boolean> {
+  const row = await execAndGetOne<QrReplayNonceRow>(
+    db,
+    "SELECT nonce FROM qr_replay_nonces WHERE nonce = ?",
+    [nonce],
+  );
+  return row !== null;
+}
+
+/**
+ * Persist a nonce with its expiry timestamp.
+ * Uses INSERT OR REPLACE so re-recording the same nonce is idempotent.
+ */
+export async function insertNonce(
+  db: SQLite.WebSQLDatabase,
+  nonce: string,
+  expiresAtMs: number,
+): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    db.transaction((tx) => {
+      tx.executeSql(
+        "INSERT OR REPLACE INTO qr_replay_nonces (nonce, expires_at_ms) VALUES (?, ?)",
+        [nonce, expiresAtMs],
+        () => resolve(),
+        (_tx, err) => {
+          reject(err);
+          return true;
+        },
+      );
+    });
+  });
+}
+
+/**
+ * Delete all nonce rows whose expiry has passed.
+ * Call this lazily on each `checkAndRecordNonce` to keep the table small.
+ */
+export async function pruneExpiredNonces(db: SQLite.WebSQLDatabase, nowMs: number): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    db.transaction((tx) => {
+      tx.executeSql(
+        "DELETE FROM qr_replay_nonces WHERE expires_at_ms <= ?",
+        [nowMs],
+        () => resolve(),
+        (_tx, err) => {
+          reject(err);
+          return true;
+        },
+      );
+    });
+  });
+}
+
+/**
+ * Return the number of nonce rows currently in the table.
+ */
+export async function countNonces(db: SQLite.WebSQLDatabase): Promise<number> {
+  const row = await execAndGetOne<{ cnt: number }>(
+    db,
+    "SELECT COUNT(*) AS cnt FROM qr_replay_nonces",
+  );
+  return row?.cnt ?? 0;
+}
+
+/**
+ * Delete the oldest `(total - keepCount)` nonce rows so the table stays
+ * bounded at `keepCount` entries.  Rows are ordered oldest-first by rowid
+ * (insertion order), mirroring the Map-based eviction strategy.
+ *
+ * No-ops when the table already has ≤ keepCount rows.
+ */
+export async function deleteOldestNonces(
+  db: SQLite.WebSQLDatabase,
+  keepCount: number,
+): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    db.transaction((tx) => {
+      // Delete all rows whose rowid is not in the newest `keepCount` rowids.
+      tx.executeSql(
+        `DELETE FROM qr_replay_nonces
+         WHERE rowid NOT IN (
+           SELECT rowid FROM qr_replay_nonces
+           ORDER BY rowid DESC
+           LIMIT ?
+         )`,
+        [keepCount],
+        () => resolve(),
+        (_tx, err) => {
+          reject(err);
+          return true;
+        },
+      );
+    });
   });
 }

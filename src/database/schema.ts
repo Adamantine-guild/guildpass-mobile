@@ -116,6 +116,24 @@ CREATE INDEX IF NOT EXISTS idx_access_checks_checked  ON access_checks(checked_a
 `;
 
 /**
+ * Migration version 2: QR replay-nonce persistence.
+ *
+ * A lightweight table that survives app restarts so that a nonce accepted in
+ * one session is still rejected in the next, for the full payload validity
+ * window.  The guard prunes expired rows lazily on every check.
+ */
+export const SCHEMA_VERSION_2 = `
+-- Persisted QR replay nonces (client-side single-use enforcement)
+CREATE TABLE IF NOT EXISTS qr_replay_nonces (
+  nonce         TEXT    PRIMARY KEY,
+  expires_at_ms INTEGER NOT NULL
+);
+
+-- Index for fast expired-row pruning (DELETE WHERE expires_at_ms <= ?)
+CREATE INDEX IF NOT EXISTS idx_qr_nonces_expires ON qr_replay_nonces(expires_at_ms);
+`;
+
+/**
  * Map of version → Migration.  Add new entries here when the schema evolves.
  *
  * IMPORTANT: Each version N migration must be safe to run on a database that is
@@ -123,6 +141,5 @@ CREATE INDEX IF NOT EXISTS idx_access_checks_checked  ON access_checks(checked_a
  */
 export const MIGRATIONS: Record<number, { name: string; sql: string }> = {
   1: { name: "initial-schema", sql: SCHEMA_VERSION_1 },
-  // Future migrations:
-  // 2: { name: "add-foo-column", sql: "ALTER TABLE ..." },
+  2: { name: "add-qr-replay-nonces", sql: SCHEMA_VERSION_2 },
 };
