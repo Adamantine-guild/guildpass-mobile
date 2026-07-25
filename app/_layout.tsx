@@ -8,6 +8,7 @@ import { initConnectivityService } from "../src/features/network/connectivitySer
 import { initSyncManager, triggerSync } from "../src/features/sync/syncManager";
 import { ErrorBoundary } from "../src/components/ErrorBoundary";
 import { SyncCorrectionOverlay } from "../src/components/SyncCorrectionOverlay";
+import { SyncStatusBanner } from "../src/components/SyncStatusBanner";
 import { IntegrityWarningBanner } from "../src/components/IntegrityWarningBanner";
 import { WalletConnectProvider } from "../src/features/wallet/WalletConnectProvider";
 import { useSecurityInit } from "../src/features/security";
@@ -74,6 +75,7 @@ export default function RootLayout() {
                 <Stack.Screen name="deep-link-error" />
               </Stack>
               <SyncCorrectionOverlay />
+              <SyncStatusBanner />
               <IntegrityWarningBanner />
             </WalletConnectProvider>
           </View>

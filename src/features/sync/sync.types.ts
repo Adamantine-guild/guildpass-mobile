@@ -8,15 +8,32 @@
  * silently overwritten.
  */
 
-import type { PersistableQueryKeyRoot } from "../../lib/offlineCache";
-
 /**
- * Entity families the reconciliation pass covers: every persistable query
- * namespace except "access-check", which is a mutation namespace. Derived
- * from the offline-cache allowlist so adding a new persisted namespace
- * forces this module (fetchers, diffing) to handle it at compile time.
+ * Entity families the reconciliation pass covers.
+ *
+ * This list is deliberately NOT derived from the offline-cache allowlist
+ * (Issue #225). Being persisted and being reconcilable are different
+ * properties, and conflating them was a live defect: `PersistableQueryKeyRoot`
+ * also contains "memberships", "profile" and "user-profile", for which no
+ * fetcher exists or can exist —
+ *
+ *   - "memberships" is a client-side aggregate, not a server entity;
+ *   - "profile"/"user-profile" have no query key in use anywhere.
+ *
+ * Because the engine dispatches via `fetchers[descriptor.kind]`, a cached
+ * ["memberships", wallet] entry (written by the guilds and profile screens)
+ * resolved to `undefined` and threw, failing every pass after those screens
+ * were visited. Enumerating the kinds explicitly keeps the fetcher map
+ * exhaustive by construction, and leaves the persistence allowlist alone:
+ * those three roots are still cached and still persisted, they are simply
+ * not reconciled.
  */
-export type SyncEntityKind = Exclude<PersistableQueryKeyRoot, "access-check">;
+export type SyncEntityKind =
+  | "membership"
+  | "user-roles"
+  | "guild"
+  | "guild-config"
+  | "guild-roles";
 
 /** A single cached entity instance, parsed from its React Query key. */
 export type SyncEntityDescriptor = {
@@ -74,7 +91,17 @@ export type SyncRunError = {
 };
 
 export type SyncRunSummary = {
-  status: "completed" | "completed_with_errors" | "skipped_offline";
+  /**
+   * "interrupted_offline" means connectivity was lost part-way: entities that
+   * did reconcile are committed, the rest are simply left for the next pass.
+   * Distinct from "completed_with_errors", where the server was reachable and
+   * genuinely rejected or failed the request.
+   */
+  status:
+    | "completed"
+    | "completed_with_errors"
+    | "interrupted_offline"
+    | "skipped_offline";
   startedAt: number;
   finishedAt: number;
   entitiesChecked: number;
