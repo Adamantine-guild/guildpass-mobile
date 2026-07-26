@@ -5,6 +5,7 @@
  */
 
 import { guildPassClient } from "../../lib/guildpassClient";
+import { cacheAttestationRevocationRegistryFromGuildConfig } from "../attestation/issuerKeyRegistry";
 import type { SyncEntityFetchers } from "./syncEngine";
 
 export const defaultSyncFetchers: SyncEntityFetchers = {
@@ -13,6 +14,10 @@ export const defaultSyncFetchers: SyncEntityFetchers = {
   "user-roles": ({ walletAddress, guildId }) =>
     guildPassClient.roles.getUserRoles({ walletAddress: walletAddress!, guildId }),
   guild: ({ guildId }) => guildPassClient.guilds.getGuild({ guildId }),
-  "guild-config": ({ guildId }) => guildPassClient.guilds.getGuildConfig({ guildId }),
+  "guild-config": async ({ guildId }) => {
+    const config = await guildPassClient.guilds.getGuildConfig({ guildId });
+    await cacheAttestationRevocationRegistryFromGuildConfig(guildId, config);
+    return config;
+  },
   "guild-roles": ({ guildId }) => guildPassClient.roles.getRoles({ guildId }),
 };

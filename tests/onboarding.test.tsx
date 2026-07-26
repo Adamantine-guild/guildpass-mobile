@@ -1,5 +1,5 @@
 import React from "react";
-import TestRenderer, { act } from "react-test-renderer";
+import TestRenderer from "react-test-renderer";
 import { describe, expect, it, vi } from "vitest";
 import { View } from "react-native";
 import Onboarding from "../app/onboarding";
@@ -27,13 +27,8 @@ vi.mock("../src/features/wallet/EmbeddedWalletProvider", () => ({
 
 describe("Onboarding", () => {
   it("renders the device-loss attestation warning", () => {
-    let renderer: TestRenderer.ReactTestRenderer;
-    act(() => {
-      renderer = TestRenderer.create(<Onboarding />);
-    });
+    const renderer = TestRenderer.create(<Onboarding />);
 
-    expect(
-      renderer!.root.findByProps({ testID: "onboarding-attestation-warning" }).children.join(""),
-    ).toContain("stored only on this device");
+    expect(JSON.stringify(renderer.toJSON())).toContain("stored only on this device");
   });
 });

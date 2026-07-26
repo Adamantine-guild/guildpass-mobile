@@ -27,6 +27,15 @@ import {
   ATTESTATION_STORAGE_KEYS,
 } from "./types";
 import { migratingSecureStorage } from "../../lib/storage";
+import {
+  classifyRegistryFreshness,
+  type FreshnessPolicy,
+} from "../../lib/credentials/registryFreshness";
+import type {
+  CredentialIssuerRegistry,
+  IssuerKeyLookup,
+  IssuerKeyRef,
+} from "../../lib/credentials/credentialIssuer.types";
 
 // ──────────────────────────────────────────────
 //  In-memory revocation registry cache
@@ -57,13 +66,13 @@ export const ATTESTATION_REVOCATION_OFFLINE_TRUST_WINDOW_MS = 24 * 60 * 60 * 100
 const MEMORY_FRESHNESS_POLICY: FreshnessPolicy = {
   ttlMs: ATTESTATION_REVOCATION_CACHE_TTL_MS,
   offlineTrustWindowMs: ATTESTATION_REVOCATION_OFFLINE_TRUST_WINDOW_MS,
-  trustWindowBoundary: 'inclusive',
+  trustWindowBoundary: "inclusive",
 };
 
 const PERSISTED_FRESHNESS_POLICY: FreshnessPolicy = {
   ttlMs: ATTESTATION_REVOCATION_CACHE_TTL_MS,
   offlineTrustWindowMs: ATTESTATION_REVOCATION_OFFLINE_TRUST_WINDOW_MS,
-  trustWindowBoundary: 'exclusive',
+  trustWindowBoundary: "exclusive",
 };
 
 /** Storage key prefix for cached revocation registries */
@@ -95,7 +104,11 @@ export async function checkIssuerKeyRevoked(
 ): Promise<boolean | null> {
   // Calls the module-local registry object directly, never the global credential
   // registry: this gates access, so it must not depend on bootstrap ordering.
-  return attestationIssuerRegistry.isRevoked(guildId, { kind: 'address', address: issuerAddress }, now);
+  return attestationIssuerRegistry.isRevoked(
+    guildId,
+    { kind: "address", address: issuerAddress },
+    now,
+  );
 }
 
 /**
@@ -137,6 +150,90 @@ export async function cacheAttestationRevocationRegistry(
   }
 }
 
+export type AttestationRevocationRegistryMetadata = {
+  guildId: string;
+  fetchedAt: number;
+  revokedAddressCount: number;
+};
+
+const ADDRESS_PATTERN = /^0x[a-fA-F0-9]{40}$/;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function normalizeRevokedAddressList(value: unknown): Set<string> | null {
+  if (!Array.isArray(value)) return null;
+
+  const addresses = new Set<string>();
+  for (const entry of value) {
+    if (typeof entry !== "string") continue;
+    const normalized = entry.trim().toLowerCase();
+    if (ADDRESS_PATTERN.test(normalized)) {
+      addresses.add(normalized);
+    }
+  }
+
+  return addresses;
+}
+
+function firstRevokedAddressList(record: Record<string, unknown>): Set<string> | null {
+  const directCandidates = [
+    record.revokedIssuerAddresses,
+    record.revokedAttestationIssuerAddresses,
+    record.attestationRevokedIssuerAddresses,
+    record.revokedAddresses,
+  ];
+
+  for (const candidate of directCandidates) {
+    const addresses = normalizeRevokedAddressList(candidate);
+    if (addresses !== null) return addresses;
+  }
+
+  const nestedCandidates = [
+    record.attestationRevocationRegistry,
+    record.attestationKeyRegistry,
+    record.attestationRevocations,
+  ];
+
+  for (const candidate of nestedCandidates) {
+    if (!isRecord(candidate)) continue;
+    const addresses =
+      normalizeRevokedAddressList(candidate.revokedIssuerAddresses) ??
+      normalizeRevokedAddressList(candidate.revokedAddresses) ??
+      normalizeRevokedAddressList(candidate.addresses);
+    if (addresses !== null) return addresses;
+  }
+
+  if (isRecord(record.issuerRevocations)) {
+    const addresses =
+      normalizeRevokedAddressList(record.issuerRevocations.attestations) ??
+      normalizeRevokedAddressList(record.issuerRevocations.eip712Attestations);
+    if (addresses !== null) return addresses;
+  }
+
+  return null;
+}
+
+export function extractRevokedAttestationIssuerAddresses(config: unknown): Set<string> | null {
+  return isRecord(config) ? firstRevokedAddressList(config) : null;
+}
+
+export async function cacheAttestationRevocationRegistryFromGuildConfig(
+  guildId: string,
+  config: unknown,
+  fetchedAt?: number,
+): Promise<boolean> {
+  if (!isRecord(config)) return false;
+  if (typeof config.guildId === "string" && config.guildId !== guildId) return false;
+
+  const revokedAddresses = extractRevokedAttestationIssuerAddresses(config);
+  if (revokedAddresses === null) return false;
+
+  await cacheAttestationRevocationRegistry(guildId, revokedAddresses, fetchedAt);
+  return true;
+}
+
 /**
  * Clear the revocation registry cache (both in-memory and persisted).
  */
@@ -173,7 +270,7 @@ async function getAttestationRevocationRegistry(
     // Fresh, or past TTL but still inside the offline trust window — either way
     // the cached data is usable. A fresh fetch is the caller's responsibility;
     // this path never reaches the network.
-    if (classifyRegistryFreshness(cached.fetchedAt, nowMs, MEMORY_FRESHNESS_POLICY) !== 'expired') {
+    if (classifyRegistryFreshness(cached.fetchedAt, nowMs, MEMORY_FRESHNESS_POLICY) !== "expired") {
       return cached;
     }
     // Past the offline trust window — cache is too stale to trust.
@@ -185,7 +282,8 @@ async function getAttestationRevocationRegistry(
   const persisted = await loadPersistedRevocationRegistry(guildId);
   if (persisted !== null) {
     if (
-      classifyRegistryFreshness(persisted.fetchedAt, nowMs, PERSISTED_FRESHNESS_POLICY) !== 'expired'
+      classifyRegistryFreshness(persisted.fetchedAt, nowMs, PERSISTED_FRESHNESS_POLICY) !==
+      "expired"
     ) {
       // Persisted data is within trust window — hydrate in-memory and return
       revocationRegistryCache.set(guildId, persisted);
@@ -197,6 +295,20 @@ async function getAttestationRevocationRegistry(
 
   // 3. No usable cached data at all — fail closed
   return null;
+}
+
+export async function getTrustedAttestationRevocationRegistryMetadata(
+  guildId: string,
+  now: Date = new Date(),
+): Promise<AttestationRevocationRegistryMetadata | null> {
+  const registry = await getAttestationRevocationRegistry(guildId, now);
+  if (registry === null) return null;
+
+  return {
+    guildId: registry.guildId,
+    fetchedAt: registry.fetchedAt,
+    revokedAddressCount: registry.revokedAddresses.size,
+  };
 }
 
 /**
@@ -348,7 +460,7 @@ export async function getAllCachedIssuerKeys(): Promise<GuildIssuerKey[]> {
  * of the far more expensive signature check.
  */
 export const attestationIssuerRegistry: CredentialIssuerRegistry = {
-  credentialKind: 'eip712_attestation',
+  credentialKind: "eip712_attestation",
 
   async lookupIssuerKey(
     guildId: string,
@@ -358,21 +470,21 @@ export const attestationIssuerRegistry: CredentialIssuerRegistry = {
     // Revocation is checked against the *supplied* reference first, mirroring the
     // QR path's ordering. A revoked address must report as revoked even when it is
     // not the guild's currently cached key — "unknown" would understate it.
-    if (ref !== null && ref.kind === 'address') {
+    if (ref !== null && ref.kind === "address") {
       const refRevoked = await this.isRevoked(guildId, ref, now);
 
       if (refRevoked === null) {
         // Indeterminate — fail closed rather than hand back a key that may since
         // have been compromised.
         return {
-          status: 'unavailable',
-          reason: 'no_registry_data',
-          detail: 'Revocation data unavailable for this guild.',
+          status: "unavailable",
+          reason: "no_registry_data",
+          detail: "Revocation data unavailable for this guild.",
         };
       }
 
       if (refRevoked) {
-        return { status: 'revoked', ref };
+        return { status: "revoked", ref };
       }
     }
 
@@ -383,18 +495,18 @@ export const attestationIssuerRegistry: CredentialIssuerRegistry = {
 
     if (cachedKey === null) {
       return {
-        status: 'unavailable',
-        reason: 'no_registry_data',
-        detail: 'Issuer key not cached - requires online fetch',
+        status: "unavailable",
+        reason: "no_registry_data",
+        detail: "Issuer key not cached - requires online fetch",
       };
     }
 
     if (
       ref !== null &&
-      ref.kind === 'address' &&
+      ref.kind === "address" &&
       ref.address.toLowerCase() !== cachedKey.issuerAddress.toLowerCase()
     ) {
-      return { status: 'unknown', ref };
+      return { status: "unknown", ref };
     }
 
     if (ref === null) {
@@ -402,24 +514,24 @@ export const attestationIssuerRegistry: CredentialIssuerRegistry = {
       // revocation status still has to be confirmed before handing it back.
       const cachedRevoked = await this.isRevoked(
         guildId,
-        { kind: 'address', address: cachedKey.issuerAddress },
+        { kind: "address", address: cachedKey.issuerAddress },
         now,
       );
 
       if (cachedRevoked === null) {
         return {
-          status: 'unavailable',
-          reason: 'no_registry_data',
-          detail: 'Revocation data unavailable for this guild.',
+          status: "unavailable",
+          reason: "no_registry_data",
+          detail: "Revocation data unavailable for this guild.",
         };
       }
 
       if (cachedRevoked) {
-        return { status: 'revoked', ref: { kind: 'address', address: cachedKey.issuerAddress } };
+        return { status: "revoked", ref: { kind: "address", address: cachedKey.issuerAddress } };
       }
     }
 
-    return { status: 'active', keyMaterial: cachedKey.issuerAddress };
+    return { status: "active", keyMaterial: cachedKey.issuerAddress };
   },
 
   async isRevoked(
@@ -427,7 +539,7 @@ export const attestationIssuerRegistry: CredentialIssuerRegistry = {
     ref: IssuerKeyRef,
     now: Date = new Date(),
   ): Promise<boolean | null> {
-    if (ref.kind !== 'address') {
+    if (ref.kind !== "address") {
       // This path revokes by issuer address; a kid reference is not answerable.
       return null;
     }

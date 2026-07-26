@@ -27,13 +27,38 @@ export type AccessDecisionConfidence =
   | 'partial_rpc_only'
   | 'partial_attestation_only';
 
+type BackendSourceResult =
+  | { success: true; result: AccessCheckResult }
+  | { success: false; error: string };
+
+type RpcSourceResult =
+  | { success: true; resolvedRoles: string[] }
+  | { success: false; error: string };
+
+type AttestationSourceResult =
+  | {
+      success: true;
+      valid: boolean;
+      error?: string;
+      matchedRoles?: string[];
+      requiredRoles?: string[];
+      lastSyncedAt?: string;
+      credentialExpiresAt?: string;
+      revocationSyncedAt?: string;
+    }
+  | {
+      success: false;
+      valid: false;
+      error: string;
+    };
+
 export type AccessDecisionResult = {
   granted: boolean;
   confidence: AccessDecisionConfidence;
   sources: {
-    backend?: { success: boolean; result?: AccessCheckResult; error?: string };
-    rpc?: { success: boolean; resolvedRoles?: string[]; error?: string };
-    attestation?: { success: boolean; valid: boolean; error?: string };
+    backend?: BackendSourceResult;
+    rpc?: RpcSourceResult;
+    attestation?: AttestationSourceResult;
   };
   matchedRoles: string[];
   requiredRoles: string[];
@@ -51,7 +76,15 @@ export type ResolveAccessDecisionParams = {
   resourceId: string;
   backendCheck?: () => Promise<AccessCheckResult>;
   rpcResolver?: () => Promise<PerChainRoleEligibilityResolution[]>;
-  attestationVerifier?: () => Promise<{ valid: boolean; error?: string }>;
+  attestationVerifier?: () => Promise<{
+    valid: boolean;
+    error?: string;
+    matchedRoles?: string[];
+    requiredRoles?: string[];
+    lastSyncedAt?: string;
+    credentialExpiresAt?: string;
+    revocationSyncedAt?: string;
+  }>;
   options?: {
     requireBackend?: boolean;
     allowRpcFallback?: boolean;
@@ -89,29 +122,39 @@ export async function resolveAccessDecision(
   } = options;
 
   // Execute all available sources in parallel
-  const backendPromise = backendCheck
+  const backendPromise: Promise<BackendSourceResult | undefined> = backendCheck
     ? backendCheck().then(
-        (result) => ({ success: true, result }),
-        (error) => ({ success: false, error: error instanceof Error ? error.message : String(error) })
+        (result) => ({ success: true as const, result }),
+        (error) => ({
+          success: false as const,
+          error: error instanceof Error ? error.message : String(error),
+        }),
       )
     : Promise.resolve(undefined);
 
-  const rpcPromise = rpcResolver
+  const rpcPromise: Promise<RpcSourceResult | undefined> = rpcResolver
     ? rpcResolver().then(
         (resolutions) => {
           const resolvedRoles = resolutions
             .filter((r) => r.status === 'resolved' && r.resolvedRoles)
             .flatMap((r) => r.resolvedRoles ?? []);
-          return { success: true, resolvedRoles };
+          return { success: true as const, resolvedRoles };
         },
-        (error) => ({ success: false, error: error instanceof Error ? error.message : String(error) })
+        (error) => ({
+          success: false as const,
+          error: error instanceof Error ? error.message : String(error),
+        }),
       )
     : Promise.resolve(undefined);
 
-  const attestationPromise = attestationVerifier
+  const attestationPromise: Promise<AttestationSourceResult | undefined> = attestationVerifier
     ? attestationVerifier().then(
-        (result) => ({ success: true, valid: result.valid, error: result.error }),
-        (error) => ({ success: false, error: error instanceof Error ? error.message : String(error) })
+        (result) => ({ success: true as const, ...result }),
+        (error) => ({
+          success: false as const,
+          valid: false,
+          error: error instanceof Error ? error.message : String(error),
+        }),
       )
     : Promise.resolve(undefined);
 
@@ -217,7 +260,9 @@ export async function resolveAccessDecision(
       sources,
       matchedRoles: [],
       requiredRoles: [],
-      reason: backendResult?.error ?? 'Backend check required but not provided',
+      reason: backendResult
+        ? `Backend check required but failed: ${backendResult.error ?? 'unknown error'}`
+        : 'Backend check required but not provided',
     };
   }
 
@@ -231,20 +276,24 @@ export async function resolveAccessDecision(
       sources,
       matchedRoles: rpcResult.resolvedRoles,
       requiredRoles: [], // RPC doesn't provide required roles
-      reason: rpcGranted ? 'Role verified via on-chain RPC' : rpcResult.error,
+      reason: rpcGranted ? 'Role verified via on-chain RPC' : 'No matching roles verified via on-chain RPC',
     };
   }
 
   // Try attestation fallback
   if (allowAttestationFallback && attestationResult?.success) {
     const attestationGranted = attestationResult.valid;
+    const matchedRoles = attestationGranted
+      ? (attestationResult.matchedRoles ?? ['attestation_verified'])
+      : (attestationResult.matchedRoles ?? []);
+    const requiredRoles = attestationResult.requiredRoles ?? [];
     
     return {
       granted: attestationGranted,
       confidence: backendResult ? 'backend_unavailable_attestation_verified' : 'partial_attestation_only',
       sources,
-      matchedRoles: attestationGranted ? ['attestation_verified'] : [],
-      requiredRoles: [],
+      matchedRoles,
+      requiredRoles,
       reason: attestationGranted 
         ? 'Verified via cached attestation' 
         : attestationResult.error ?? 'Attestation verification failed',
@@ -258,7 +307,12 @@ export async function resolveAccessDecision(
     sources,
     matchedRoles: [],
     requiredRoles: [],
-    reason: backendResult?.error ?? rpcResult?.error ?? attestationResult?.error ?? 'All verification sources failed',
+    reason:
+      backendResult && !backendResult.success
+        ? backendResult.error
+        : rpcResult && !rpcResult.success
+          ? rpcResult.error
+          : attestationResult?.error ?? 'All verification sources failed',
   };
 }
 

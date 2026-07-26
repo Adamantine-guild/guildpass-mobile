@@ -1,7 +1,11 @@
 import { useCallback } from "react";
 import { useWalletStore } from "./wallet.store";
 import { validateAndNormalizeAddress } from "../../lib/walletValidation";
-import { createManualConnector, createWalletConnectConnector } from "./walletConnector.service";
+import {
+  createEmbeddedConnector,
+  createManualConnector,
+  createWalletConnectConnector,
+} from "./walletConnector.service";
 import { WalletConnector } from "./walletConnector.types";
 import { getWalletConnectProvider } from "./walletConnectSession";
 import { endWalletSession, startWalletSession } from "../../lib/walletLifecycle";
