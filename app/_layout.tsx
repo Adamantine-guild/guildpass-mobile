@@ -10,6 +10,7 @@ import { mutationReplayer } from "../src/lib/mutationReplayer";
 import { ErrorBoundary } from "../src/components/ErrorBoundary";
 import { SyncCorrectionOverlay } from "../src/components/SyncCorrectionOverlay";
 import { SyncStatusBanner } from "../src/components/SyncStatusBanner";
+import { OfflineBanner } from "../src/components/OfflineBanner";
 import { IntegrityWarningBanner } from "../src/components/IntegrityWarningBanner";
 import { WalletConnectProvider } from "../src/features/wallet/WalletConnectProvider";
 import { useSecurityInit } from "../src/features/security";
@@ -44,50 +45,6 @@ export default function RootLayout() {
         <SecurityInit />
         <EmbeddedWalletProvider>
         <PersistQueryClientProvider
-          client={queryClient}
-          persistOptions={{
-            persister: asyncStoragePersister,
-            maxAge: QUERY_GC_TIME_MS,
-            dehydrateOptions: {
-              shouldDehydrateQuery: (query) =>
-                query.state.status === "success" && isPersistableQuery(query.queryKey),
-              shouldDehydrateMutation: (mutation) =>
-                mutation.meta?.isQueueable === true,
-            },
-          }}
-          onSuccess={() => {
-            // The persisted cache is only fully restored now; reconcile it so a
-            // device that reopens online (after being offline) still corrects
-            // stale grants instead of waiting for the next reconnect event.
-            void triggerSync();
-          }}
-        >
-          <View className="flex-1 bg-background">
-            <WalletConnectProvider>
-              <Stack
-                screenOptions={{
-                  headerShown: false,
-                  contentStyle: { backgroundColor: "#f8fafc" },
-                }}
-              >
-                <Stack.Screen name="index" />
-                <Stack.Screen name="onboarding" />
-                <Stack.Screen name="profile" />
-                <Stack.Screen name="guilds" />
-                <Stack.Screen name="guilds/[guildId]" />
-                <Stack.Screen name="access-check" />
-                <Stack.Screen name="access-scanner" />
-                <Stack.Screen name="settings" />
-                <Stack.Screen name="pending-changes" options={{ presentation: 'modal' }} />
-                <Stack.Screen name="deep-link-error" />
-              </Stack>
-              <SyncCorrectionOverlay />
-              <SyncStatusBanner />
-              <IntegrityWarningBanner />
-            </WalletConnectProvider>
-          </View>
-        </PersistQueryClientProvider>
-          <PersistQueryClientProvider
             client={queryClient}
             persistOptions={{
               persister: asyncStoragePersister,
@@ -95,6 +52,8 @@ export default function RootLayout() {
               dehydrateOptions: {
                 shouldDehydrateQuery: (query) =>
                   query.state.status === "success" && isPersistableQuery(query.queryKey),
+                shouldDehydrateMutation: (mutation) =>
+                  mutation.meta?.isQueueable === true,
               },
             }}
             onSuccess={() => {
@@ -120,9 +79,12 @@ export default function RootLayout() {
                   <Stack.Screen name="access-check" />
                   <Stack.Screen name="access-scanner" />
                   <Stack.Screen name="settings" />
+                  <Stack.Screen name="pending-changes" options={{ presentation: 'modal' }} />
                   <Stack.Screen name="deep-link-error" />
                 </Stack>
                 <SyncCorrectionOverlay />
+                <SyncStatusBanner />
+                <OfflineBanner />
                 <IntegrityWarningBanner />
               </WalletConnectProvider>
             </View>

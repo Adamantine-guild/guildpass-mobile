@@ -46,6 +46,11 @@ export default function AccessScanner() {
       AccessibilityInfo.announceForAccessibility("Processing access QR code.");
       const result = await verifyAndParseAccessQrPayload(data);
       setVerificationSuccess(true);
+      AccessibilityInfo.announceForAccessibility("Signature verified. Opening access check.");
+    try {
+      AccessibilityInfo.announceForAccessibility("Processing access QR code.");
+      const result = await verifyAndParseAccessQrPayload(data);
+      setVerificationSuccess(true);
       AccessibilityInfo.announceForAccessibility("QR code accepted. Opening access check.");
       
       setTimeout(() => {
