@@ -110,27 +110,30 @@ export default function AccessScanner() {
         <AppHeader title="Scan Access QR" showBack />
         <View className="flex-1 px-4 py-6">
           <Card>
-            <Text accessibilityRole="header" className="text-xl font-bold text-text mb-2">Camera access needed</Text>
-            <Text accessibilityLiveRegion="polite" className="text-text-muted mb-6">
-              GuildPass needs camera permission to scan access check QR codes.
+            <Text accessibilityRole="header" className="text-xl font-bold text-text mb-2">
+              {permission.status === "denied" ? "Camera permission denied" : "Camera access needed"}
             </Text>
+            
+            {permission.status === "denied" ? (
+              <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" className="text-error mb-6">
+                {permission.canAskAgain
+                  ? "Camera permission was denied. Please allow camera access to scan QR codes."
+                  : "Camera permission was permanently denied. Open Settings to enable camera access for GuildPass to scan QR codes."}
+              </Text>
+            ) : (
+              <Text accessibilityLiveRegion="polite" className="text-text-muted mb-6">
+                GuildPass needs camera permission to scan access check QR codes.
+              </Text>
+            )}
+
             {permission.canAskAgain ? (
               <Button title="Allow Camera Access" onPress={requestPermission} />
             ) : (
-              <>
-                <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" className="text-error">
-                  Camera permission was denied. Enable camera access in your device settings to scan
-                  QR codes.
-                </Text>
-                <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" className="text-error mb-6">
-                  Camera permission was denied. Open Settings to enable camera access for GuildPass.
-                </Text>
-                <Button
-                  title="Open Settings"
-                  onPress={() => Linking.openSettings()}
-                  variant="outline"
-                />
-              </>
+              <Button
+                title="Open Settings"
+                onPress={() => Linking.openSettings()}
+                variant="outline"
+              />
             )}
           </Card>
         </View>
