@@ -6,7 +6,7 @@ import { useWalletConnectModal } from "../src/features/wallet/WalletConnectProvi
 import { useWalletStore } from "../src/features/wallet/wallet.store";
 import { AppHeader } from "../src/components/AppHeader";
 import { Card } from "../src/components/Card";
-import { AddressChip } from "../src/components/AddressChip";
+import { WalletAddress } from "../src/components/WalletAddress";
 import { WalletInput } from "../src/components/WalletInput";
 import { Button } from "../src/components/Button";
 import { StaleDataBanner } from "../src/components/StaleDataBanner";
@@ -235,7 +235,7 @@ export default function Profile() {
               </Text>
               <View className="mb-4">
                 {walletAddress ? (
-                  <AddressChip address={walletAddress} testID="connected-wallet-address" />
+                  <WalletAddress address={walletAddress} testID="connected-wallet-address" />
                 ) : null}
               </View>
               <Button
