@@ -152,6 +152,7 @@ export default function GuildDetail() {
                   <View className="flex-row justify-between items-center mb-2">
                     <Text className="text-text-muted dark:text-slate-400">Owner</Text>
                     <WalletAddress address={guild.ownerAddress} testID="guild-owner" />
+                    <AddressChip address={guild.ownerAddress} testID="guild-owner" />
                   </View>
                   <View className="flex-row justify-between">
                     <Text className="text-text-muted dark:text-slate-400">Chain ID</Text>

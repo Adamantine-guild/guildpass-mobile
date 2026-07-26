@@ -10,6 +10,7 @@ import { mutationReplayer } from "../src/lib/mutationReplayer";
 import { ErrorBoundary } from "../src/components/ErrorBoundary";
 import { SyncCorrectionOverlay } from "../src/components/SyncCorrectionOverlay";
 import { SyncStatusBanner } from "../src/components/SyncStatusBanner";
+import { OfflineBanner } from "../src/components/OfflineBanner";
 import { IntegrityWarningBanner } from "../src/components/IntegrityWarningBanner";
 import { WalletConnectProvider } from "../src/features/wallet/WalletConnectProvider";
 import { useSecurityInit } from "../src/features/security";
@@ -43,7 +44,7 @@ export default function RootLayout() {
       <SensitiveStorageMigrationGate>
         <SecurityInit />
         <EmbeddedWalletProvider>
-          <PersistQueryClientProvider
+        <PersistQueryClientProvider
             client={queryClient}
             persistOptions={{
               persister: asyncStoragePersister,
@@ -51,6 +52,8 @@ export default function RootLayout() {
               dehydrateOptions: {
                 shouldDehydrateQuery: (query) =>
                   query.state.status === "success" && isPersistableQuery(query.queryKey),
+                shouldDehydrateMutation: (mutation) =>
+                  mutation.meta?.isQueueable === true,
               },
             }}
             onSuccess={() => {
@@ -76,9 +79,12 @@ export default function RootLayout() {
                   <Stack.Screen name="access-check" />
                   <Stack.Screen name="access-scanner" />
                   <Stack.Screen name="settings" />
+                  <Stack.Screen name="pending-changes" options={{ presentation: 'modal' }} />
                   <Stack.Screen name="deep-link-error" />
                 </Stack>
                 <SyncCorrectionOverlay />
+                <SyncStatusBanner />
+                <OfflineBanner />
                 <IntegrityWarningBanner />
               </WalletConnectProvider>
             </View>

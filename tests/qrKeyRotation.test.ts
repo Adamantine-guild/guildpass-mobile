@@ -139,10 +139,9 @@ describe("QR Key Rotation & Revocation Protocol", () => {
       const revokedFields = { ...validFields, kid: "key-revoked-99" };
       const revokedPayload = buildSignedQrPayloadString(revokedFields, TEST_REVOKED_PRIVATE_KEY);
 
-      await expect(verifyAndParseAccessQrPayload(revokedPayload, now)).resolves.toMatchObject({
-        success: false,
-        reason: QR_SIGNATURE_ERROR_CODES.REVOKED_KEY,
-      });
+      await expect(verifyAndParseAccessQrPayload(revokedPayload, now)).rejects.toThrow(
+        expect.objectContaining({ code: QR_SIGNATURE_ERROR_CODES.REVOKED_KEY })
+      );
     });
 
     it("rejects a revoked kid when marked as status 'revoked' in issuerKeys array", async () => {
@@ -159,10 +158,9 @@ describe("QR Key Rotation & Revocation Protocol", () => {
         TEST_REVOKED_PRIVATE_KEY,
       );
 
-      await expect(verifyAndParseAccessQrPayload(payload, now)).resolves.toMatchObject({
-        success: false,
-        reason: QR_SIGNATURE_ERROR_CODES.REVOKED_KEY,
-      });
+      await expect(verifyAndParseAccessQrPayload(payload, now)).rejects.toThrow(
+        expect.objectContaining({ code: QR_SIGNATURE_ERROR_CODES.REVOKED_KEY })
+      );
     });
   });
 
@@ -180,10 +178,9 @@ describe("QR Key Rotation & Revocation Protocol", () => {
         TEST_ISSUER_PRIVATE_KEY,
       );
 
-      await expect(verifyAndParseAccessQrPayload(unknownPayload, now)).resolves.toMatchObject({
-        success: false,
-        reason: QR_SIGNATURE_ERROR_CODES.UNKNOWN_KEY,
-      });
+      await expect(verifyAndParseAccessQrPayload(unknownPayload, now)).rejects.toThrow(
+        expect.objectContaining({ code: QR_SIGNATURE_ERROR_CODES.UNKNOWN_KEY })
+      );
     });
 
     it("rejects payload with invalid non-string kid format at structural layer", async () => {
@@ -197,10 +194,9 @@ describe("QR Key Rotation & Revocation Protocol", () => {
         kid: "", // empty kid string
       });
 
-      await expect(verifyAndParseAccessQrPayload(malformedKidPayload, now)).resolves.toMatchObject({
-        success: false,
-        reason: QR_PAYLOAD_ERROR_CODES.INVALID_KID,
-      });
+      await expect(verifyAndParseAccessQrPayload(malformedKidPayload, now)).rejects.toThrow(
+        expect.objectContaining({ code: QR_PAYLOAD_ERROR_CODES.INVALID_KID })
+      );
     });
   });
 
@@ -376,10 +372,9 @@ describe("QR Key Rotation & Revocation Protocol", () => {
         TEST_ISSUER_PRIVATE_KEY,
       );
 
-      await expect(verifyAndParseAccessQrPayload(payload, now)).resolves.toMatchObject({
-        success: false,
-        reason: QR_SIGNATURE_ERROR_CODES.PUBLIC_KEY_UNAVAILABLE,
-      });
+      await expect(verifyAndParseAccessQrPayload(payload, now)).rejects.toThrow(
+        expect.objectContaining({ code: QR_SIGNATURE_ERROR_CODES.PUBLIC_KEY_UNAVAILABLE })
+      );
     });
   });
 });

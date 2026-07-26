@@ -67,7 +67,11 @@ export default function Guilds() {
           {staleState.isOffline ? (
             <StaleDataBanner reason="offline" lastSyncedAt={staleState.lastSyncedAt} />
           ) : null}
-          <ErrorState message="Failed to load memberships" />
+          <ErrorState
+            message="Failed to load memberships"
+            onRetry={handleRefresh}
+            isRetrying={isRefetching || membershipsQuery.isRefetching}
+          />
         </View>
       </WalletRequired>
     );

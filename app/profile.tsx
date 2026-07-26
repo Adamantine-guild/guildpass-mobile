@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, TouchableOpacity } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, RefreshControl } from "react-native";
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "expo-router";
 import { useWallet } from "../src/features/wallet/useWallet";
@@ -118,10 +118,31 @@ export default function Profile() {
   const membershipsQuery = useMembershipsQuery();
   const staleState = useStaleQuery(membershipsQuery);
 
+  // ── Pull-to-refresh ─────────────────────────────────────────────────
+  const [isManuallyRefreshing, setIsManuallyRefreshing] = useState(false);
+
+  const handleRefresh = useCallback(async () => {
+    if (!isConnected) return;
+    setIsManuallyRefreshing(true);
+    try {
+      await membershipsQuery.refetch();
+    } finally {
+      setIsManuallyRefreshing(false);
+    }
+  }, [isConnected, membershipsQuery.refetch]);
+
+  const isRefreshing = isConnected && (isManuallyRefreshing || membershipsQuery.isRefetching);
+
   return (
     <View className="flex-1 bg-background dark:bg-slate-900" testID="profile-screen">
       <AppHeader title="Profile" />
-      <ScrollView className="flex-1 px-4 py-6">
+      <ScrollView
+        className="flex-1 px-4 py-6"
+        testID="profile-scroll-view"
+        refreshControl={
+          <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} testID="profile-refresh-control" />
+        }
+      >
         {staleState.isOffline ? (
           <StaleDataBanner reason="offline" lastSyncedAt={staleState.lastSyncedAt} />
         ) : staleState.isStale && staleState.reason ? (
