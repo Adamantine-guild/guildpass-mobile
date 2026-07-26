@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator } from "react-native";
+import { View, Text, FlatList, TouchableOpacity, SafeAreaView, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
 import { mutationQueue, QueueItem } from "../src/lib/mutationQueue";
 import { mutationReplayer } from "../src/lib/mutationReplayer";
@@ -18,7 +18,7 @@ export default function PendingChangesScreen() {
       setQueue(updatedQueue);
     });
 
-    return () => unsubscribe();
+    return () => { unsubscribe(); };
   }, []);
 
   const handleRetryAll = async () => {
@@ -36,26 +36,41 @@ export default function PendingChangesScreen() {
     mutationReplayer.replayPending();
   };
 
+  const getStatusClasses = (status: string) => {
+    switch (status) {
+      case "PENDING":
+        return "bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400";
+      case "SYNCING":
+        return "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400";
+      case "FAILED":
+        return "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400";
+      case "CONFLICT":
+        return "bg-pink-100 text-pink-600 dark:bg-pink-900/30 dark:text-pink-400";
+      default:
+        return "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400";
+    }
+  };
+
   const renderItem = ({ item }: { item: QueueItem }) => {
     return (
-      <View style={styles.itemContainer}>
-        <View style={styles.itemHeader}>
-          <Text style={styles.itemType}>{item.type.replace(/_/g, " ")}</Text>
-          <Text style={[styles.statusBadge, styles[`status_${item.status}`]]}>{item.status}</Text>
+      <View className="bg-white dark:bg-slate-800 p-4 rounded-lg mb-3 shadow-sm">
+        <View className="flex-row justify-between items-center mb-2">
+          <Text className="text-base font-semibold text-text dark:text-slate-100">{item.type.replace(/_/g, " ")}</Text>
+          <Text className={`px-2 py-1 rounded-full text-xs font-bold overflow-hidden ${getStatusClasses(item.status)}`}>{item.status}</Text>
         </View>
-        <Text style={styles.itemDate}>{new Date(item.createdAt).toLocaleString()}</Text>
+        <Text className="text-xs text-text-muted dark:text-slate-400 mb-2">{new Date(item.createdAt).toLocaleString()}</Text>
         
         {item.lastError && (
-          <Text style={styles.errorText}>Error: {item.lastError}</Text>
+          <Text className="text-[13px] text-error dark:text-red-400 mb-2">Error: {item.lastError}</Text>
         )}
 
         {(item.status === "CONFLICT" || item.status === "FAILED") && (
-          <View style={styles.actionRow}>
-            <TouchableOpacity style={[styles.button, styles.retryButton]} onPress={() => handleRetryItem(item.id)}>
-              <Text style={styles.buttonText}>Retry</Text>
+          <View className="flex-row mt-2">
+            <TouchableOpacity className="flex-1 py-2 rounded-md items-center bg-primary dark:bg-indigo-500 mr-2" onPress={() => handleRetryItem(item.id)}>
+              <Text className="text-white font-semibold text-sm">Retry</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.button, styles.discardButton]} onPress={() => handleDiscard(item.id)}>
-              <Text style={styles.buttonText}>Discard</Text>
+            <TouchableOpacity className="flex-1 py-2 rounded-md items-center bg-error dark:bg-red-500 ml-2" onPress={() => handleDiscard(item.id)}>
+              <Text className="text-white font-semibold text-sm">Discard</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -64,64 +79,36 @@ export default function PendingChangesScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backButtonText}>← Back</Text>
+    <SafeAreaView className="flex-1 bg-background dark:bg-slate-900">
+      <View className="flex-row items-center p-4 bg-white dark:bg-slate-800 border-b border-border dark:border-slate-700">
+        <TouchableOpacity onPress={() => router.back()} className="mr-4">
+          <Text className="text-base text-primary dark:text-indigo-400">← Back</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Pending Changes</Text>
+        <Text className="text-lg font-bold text-text dark:text-slate-100">Pending Changes</Text>
       </View>
 
       {queue.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No pending changes.</Text>
+        <View className="flex-1 justify-center items-center">
+          <Text className="text-base text-text-muted dark:text-slate-400">No pending changes.</Text>
         </View>
       ) : (
         <FlatList
           data={queue}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={{ padding: 16 }}
         />
       )}
 
       {queue.length > 0 && (
-        <TouchableOpacity style={styles.syncAllButton} onPress={handleRetryAll} disabled={isRefreshing}>
+        <TouchableOpacity className="m-4 bg-success dark:bg-green-600 p-4 rounded-lg items-center" onPress={handleRetryAll} disabled={isRefreshing}>
           {isRefreshing ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.syncAllText}>Retry All Pending</Text>
+            <Text className="text-white text-base font-bold">Retry All Pending</Text>
           )}
         </TouchableOpacity>
       )}
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f3f4f6" },
-  header: { flexDirection: "row", alignItems: "center", padding: 16, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#e5e7eb" },
-  backButton: { marginRight: 16 },
-  backButtonText: { fontSize: 16, color: "#2563eb" },
-  title: { fontSize: 18, fontWeight: "bold" },
-  emptyContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
-  emptyText: { fontSize: 16, color: "#6b7280" },
-  listContent: { padding: 16 },
-  itemContainer: { backgroundColor: "#fff", padding: 16, borderRadius: 8, marginBottom: 12, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
-  itemHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
-  itemType: { fontSize: 16, fontWeight: "600", color: "#111827" },
-  statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, fontSize: 12, fontWeight: "bold", overflow: "hidden" },
-  status_PENDING: { backgroundColor: "#fef3c7", color: "#d97706" },
-  status_SYNCING: { backgroundColor: "#dbeafe", color: "#2563eb" },
-  status_FAILED: { backgroundColor: "#fee2e2", color: "#dc2626" },
-  status_CONFLICT: { backgroundColor: "#fce7f3", color: "#db2777" },
-  itemDate: { fontSize: 12, color: "#6b7280", marginBottom: 8 },
-  errorText: { fontSize: 13, color: "#dc2626", marginBottom: 8 },
-  actionRow: { flexDirection: "row", marginTop: 8 },
-  button: { flex: 1, paddingVertical: 8, borderRadius: 6, alignItems: "center" },
-  retryButton: { backgroundColor: "#2563eb", marginRight: 8 },
-  discardButton: { backgroundColor: "#ef4444", marginLeft: 8 },
-  buttonText: { color: "#fff", fontWeight: "600", fontSize: 14 },
-  syncAllButton: { margin: 16, backgroundColor: "#10b981", padding: 16, borderRadius: 8, alignItems: "center" },
-  syncAllText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
-});
