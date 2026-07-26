@@ -1,0 +1,21 @@
+appId: xyz.guildpass.mobile
+---
+# E2E Test: Guild Detail Deep Link Invalid guildId
+# Validates: Invalid guild-detail links show the specific guildId validation error.
+
+- launchApp:
+    clearState: true
+
+- openLink:
+    link: "guildpass://guild/%20"
+
+- extendedWaitUntil:
+    visible:
+      id: "deep-link-error-screen"
+    timeout: 10000
+- assertVisible:
+    text: "Invalid Link"
+- assertVisible:
+    text: "Guild detail link requires a valid guildId."
+- assertNotVisible:
+    text: "The link you followed is not supported or is malformed."

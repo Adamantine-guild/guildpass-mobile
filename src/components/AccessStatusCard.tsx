@@ -45,7 +45,8 @@ export const AccessStatusCard = ({
   const getConfidenceDisplay = () => {
     if (!confidence) return null;
 
-    const isDiscrepancyCase = confidence === "rpc_disagreed" || confidence === "attestation_disagreed";
+    const isDiscrepancyCase =
+      confidence === "rpc_disagreed" || confidence === "attestation_disagreed";
     const isOfflineCase =
       confidence === "backend_unavailable_attestation_verified" ||
       confidence === "partial_attestation_only";
@@ -129,15 +130,18 @@ export const AccessStatusCard = ({
           : null;
 
   return (
-    <Card className={`border-2 ${hasAccess ? "border-success" : "border-error"}`}>
+    <Card
+      className={`border-2 ${hasAccess ? "border-success" : "border-error"}`}
+      testID="access-check-result"
+    >
       {/* Discrepancy Warning Banner */}
       {discrepancy && (
         <View className="bg-error/10 border-b border-error/30 p-4" accessibilityRole="alert">
           <Text className="text-error font-bold mb-1">Verification Discrepancy Detected</Text>
           <Text className="text-error/80 text-sm">
             Server {discrepancy.backendDecision ? "granted" : "denied"} access but{" "}
-            {discrepancy.type === "rpc" ? "blockchain" : "attestation"} verification disagreed.
-            This may indicate a configuration issue. Please contact support if this persists.
+            {discrepancy.type === "rpc" ? "blockchain" : "attestation"} verification disagreed. This
+            may indicate a configuration issue. Please contact support if this persists.
           </Text>
         </View>
       )}

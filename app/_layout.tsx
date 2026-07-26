@@ -17,6 +17,7 @@ import { useSecurityInit } from "../src/features/security";
 import { initFocusManager } from "../src/lib/focusManager";
 import { registerBuiltInIssuers } from "../src/lib/credentials/registerBuiltInIssuers";
 import { EmbeddedWalletProvider } from "../src/features/wallet/EmbeddedWalletProvider";
+import { DeepLinkHandler } from "../src/features/deep-links/DeepLinkHandler";
 
 import "react-native-get-random-values";
 import "fast-text-encoding";
@@ -44,7 +45,7 @@ export default function RootLayout() {
       <SensitiveStorageMigrationGate>
         <SecurityInit />
         <EmbeddedWalletProvider>
-        <PersistQueryClientProvider
+          <PersistQueryClientProvider
             client={queryClient}
             persistOptions={{
               persister: asyncStoragePersister,
@@ -52,8 +53,7 @@ export default function RootLayout() {
               dehydrateOptions: {
                 shouldDehydrateQuery: (query) =>
                   query.state.status === "success" && isPersistableQuery(query.queryKey),
-                shouldDehydrateMutation: (mutation) =>
-                  mutation.meta?.isQueueable === true,
+                shouldDehydrateMutation: (mutation) => mutation.meta?.isQueueable === true,
               },
             }}
             onSuccess={() => {
@@ -65,10 +65,13 @@ export default function RootLayout() {
           >
             <View className="flex-1 bg-background dark:bg-slate-900">
               <WalletConnectProvider>
+                <DeepLinkHandler />
                 <Stack
                   screenOptions={{
                     headerShown: false,
-                    contentStyle: { backgroundColor: colorScheme === 'dark' ? '#0f172a' : '#f8fafc' },
+                    contentStyle: {
+                      backgroundColor: colorScheme === "dark" ? "#0f172a" : "#f8fafc",
+                    },
                   }}
                 >
                   <Stack.Screen name="index" />
@@ -79,7 +82,7 @@ export default function RootLayout() {
                   <Stack.Screen name="access-check" />
                   <Stack.Screen name="access-scanner" />
                   <Stack.Screen name="settings" />
-                  <Stack.Screen name="pending-changes" options={{ presentation: 'modal' }} />
+                  <Stack.Screen name="pending-changes" options={{ presentation: "modal" }} />
                   <Stack.Screen name="deep-link-error" />
                 </Stack>
                 <SyncCorrectionOverlay />

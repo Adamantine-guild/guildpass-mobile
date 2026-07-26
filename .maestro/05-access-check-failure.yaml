@@ -6,14 +6,24 @@ env:
 # Validates: User sees appropriate error when access check fails
 # Note: Requires mock API to return error response
 
-- launchApp
+- launchApp:
+    clearState: true
 - tapOn:
     id: "onboarding-get-started-button"
+- tapOn:
+    id: "show-manual-entry-button"
 - tapOn:
     id: "wallet-address-input"
 - inputText: "0x0000000000000000000000000000000000000000"
 - tapOn:
     id: "wallet-connect-button"
+- extendedWaitUntil:
+    visible:
+      id: "guilds-screen"
+    timeout: 10000
+- pressKey: "back"
+- assertVisible:
+    id: "profile-connected"
 
 # Navigate to access check
 - tapOn:
@@ -34,6 +44,7 @@ env:
     id: "check-access-button"
 
 # Wait for error
-- assertVisible:
-    id: "access-check-error"
+- extendedWaitUntil:
+    visible:
+      id: "access-check-error"
     timeout: 10000

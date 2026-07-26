@@ -47,6 +47,10 @@ vi.mock("expo-clipboard", () => ({
   setStringAsync: vi.fn(),
 }));
 
+vi.mock("../src/features/offline/mutationQueue", () => ({
+  useMutationQueue: () => [],
+}));
+
 // Mock useAccessCheck
 vi.mock("../src/features/access/useAccessCheck", () => ({
   useAccessCheck: () => ({
