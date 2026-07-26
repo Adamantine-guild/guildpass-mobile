@@ -12,10 +12,10 @@
  * See docs/access-decision-pipeline.md for the full decision policy.
  */
 
-import { useState, useCallback, useRef } from "react";
+import { useReducer, useCallback, useRef } from "react";
 import { guildPassClient } from "../../lib/guildpassClient";
 import { useMultiChainRoleEligibility } from "./useMultiChainRoleEligibility";
-import { resolveAccessDecision, type AccessDecisionResult, type ResolveAccessDecisionParams } from "./accessDecisionPipeline";
+import { resolveAccessDecision, type AccessDecisionResult } from "./accessDecisionPipeline";
 import type { AccessCheckParams } from "./useAccessCheck";
 import type { PerChainRoleEligibilityResolution } from "./roleEligibilityResolver";
 
@@ -79,9 +79,6 @@ export const useAccessDecision = (options: UseAccessDecisionOptions = {}) => {
           backendCheck: async () => {
             return await guildPassClient.access.checkAccess(params) as any;
           },
-          rpcResolver: async () => {
-            return await multiChain.resolve(params.guildId, params.walletAddress);
-          },
           attestationVerifier: attestationVerifier
             ? () => attestationVerifier(params.walletAddress, params.guildId, params.resourceId)
             : undefined,
@@ -90,6 +87,10 @@ export const useAccessDecision = (options: UseAccessDecisionOptions = {}) => {
             allowRpcFallback,
             allowAttestationFallback,
           },
+        });
+
+        void multiChain.resolve(params.guildId, params.walletAddress).catch(() => {
+          // multiChain hook already stores per-chain errors.
         });
 
         dispatch({ type: "RESOLVED", result });

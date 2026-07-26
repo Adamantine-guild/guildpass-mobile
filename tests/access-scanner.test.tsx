@@ -63,6 +63,10 @@ vi.mock("../src/features/access/verifyQrPayload", () => ({
   verifyAndParseAccessQrPayload: vi.fn(),
 }));
 
+vi.mock("../src/features/guilds/useGuildName", () => ({
+  useResolvedGuildName: (guildId: string) => guildId,
+}));
+
 vi.mock("../src/features/access/qrSignature", () => ({
   QrSignatureError: class QrSignatureError extends Error {
     readonly code = "QR_SIGNATURE_VERIFICATION_FAILED";

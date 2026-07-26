@@ -3,9 +3,15 @@ import TestRenderer, { act } from "react-test-renderer";
 import type { ReactTestRenderer } from "react-test-renderer";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useCameraPermissions } from "expo-camera";
-import type { PermissionResponse } from "expo-modules-core";
 import AccessScanner from "../app/access-scanner";
 import { useAccessHistoryStore } from "../src/features/access/accessHistory.store";
+
+type PermissionResponse = {
+  granted: boolean;
+  canAskAgain: boolean;
+  status: "granted" | "denied";
+  expires: "never";
+};
 
 const accessibilityInfoMock = vi.hoisted(() => ({
   announceForAccessibility: vi.fn(),
@@ -36,6 +42,7 @@ vi.mock("react-native", () => ({
     canOpenURL: vi.fn(),
     addEventListener: vi.fn(() => ({ remove: vi.fn() })),
   },
+  AccessibilityInfo: accessibilityInfoMock,
 }));
 
 type MockCameraViewProps = {
@@ -119,6 +126,10 @@ vi.mock("expo-camera", () => ({
 
 vi.mock("../src/features/access/verifyQrPayload", () => ({
   verifyAndParseAccessQrPayload: verifyAndParseAccessQrPayloadMock,
+}));
+
+vi.mock("../src/features/guilds/useGuildName", () => ({
+  useResolvedGuildName: (guildId: string) => guildId,
 }));
 
 vi.mock("../src/features/access/qrSignature", () => ({

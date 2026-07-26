@@ -13,6 +13,14 @@ import { describeQrPayloadError, QR_PAYLOAD_ERROR_CODES, QrPayloadErrorCode } fr
 import { AccessHistoryList } from "../src/components/AccessHistoryList";
 import { useAccessHistoryStore } from "../src/features/access/accessHistory.store";
 
+type AccessibleCameraViewProps = React.ComponentProps<typeof CameraView> & {
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
+  accessibilityLiveRegion?: "none" | "polite" | "assertive";
+};
+
+const AccessibleCameraView = CameraView as React.ComponentType<AccessibleCameraViewProps>;
+
 export default function AccessScanner() {
   const router = useRouter();
   const [permission, requestPermission] = useCameraPermissions();
@@ -30,6 +38,7 @@ export default function AccessScanner() {
     scanInProgressRef.current = true;
     setIsProcessingScan(true);
     setScanError(null);
+    AccessibilityInfo.announceForAccessibility("Processing access QR code.");
 
     const result = await verifyAndParseAccessQrPayload(data);
 
@@ -45,8 +54,6 @@ export default function AccessScanner() {
         errorMessage = describeQrSignatureError(result.reason as QrSignatureErrorCode);
       } else if (Object.values(QR_PAYLOAD_ERROR_CODES).includes(result.reason as any)) {
         errorMessage = describeQrPayloadError(result.reason as QrPayloadErrorCode);
-      } else if (result.reason === "UNKNOWN_ERROR") {
-        errorMessage = result.message || errorMessage;
       }
 
       setScanError(errorMessage);
@@ -138,7 +145,7 @@ export default function AccessScanner() {
     <View className="flex-1 bg-background">
       <AppHeader title="Scan Access QR" showBack />
       <View className="flex-1">
-        <CameraView
+        <AccessibleCameraView
           accessibilityLabel="Scanning for GuildPass access QR code"
           accessibilityHint="Point the camera at a GuildPass QR code to start access verification"
           accessibilityLiveRegion="polite"

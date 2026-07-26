@@ -8,6 +8,7 @@ export type AccessHistoryStatus = "granted" | "denied" | "error";
 export type AccessHistoryEntry = {
   id: string;
   guildId: string;
+  guildName?: string;
   resourceId: string;
   resourceName: string;
   status: AccessHistoryStatus;
@@ -19,6 +20,7 @@ export type AccessHistoryEntry = {
 
 type RecordCheckInput = {
   guildId: string;
+  guildName?: string;
   resourceId: string;
   resourceName?: string;
   result?: AccessCheckResult;
@@ -39,13 +41,14 @@ let entrySequence = 0;
 export const useAccessHistoryStore = create<AccessHistoryState>((set, get) => ({
   entries: [],
 
-  recordCheck: ({ guildId, resourceId, resourceName, result }) => {
+  recordCheck: ({ guildId, guildName, resourceId, resourceName, result }) => {
     const checkedAt = new Date().toISOString();
     const status = result ? (result.hasAccess ? "granted" : "denied") : "error";
 
     const entry: AccessHistoryEntry = {
       id: `${checkedAt}:${guildId}:${resourceId}:${entrySequence}`,
       guildId,
+      guildName: safeName(guildName, guildId),
       resourceId,
       resourceName: safeName(resourceName, resourceId),
       status,

@@ -7,6 +7,7 @@ import { useAccessCheck } from "../../src/features/access/useAccessCheck";
 
 const guildPassClientMock = vi.hoisted(() => ({
   checkAccess: vi.fn(),
+  getRoles: vi.fn(),
 }));
 
 vi.mock("../../src/lib/guildpassClient", () => ({
@@ -14,6 +15,16 @@ vi.mock("../../src/lib/guildpassClient", () => ({
     access: {
       checkAccess: guildPassClientMock.checkAccess,
     },
+    roles: {
+      getRoles: guildPassClientMock.getRoles,
+    },
+  },
+}));
+
+vi.mock("@react-native-community/netinfo", () => ({
+  default: {
+    addEventListener: vi.fn(() => () => {}),
+    fetch: vi.fn().mockResolvedValue({ isConnected: true, isInternetReachable: true }),
   },
 }));
 
@@ -54,6 +65,7 @@ function renderAccessCheckHook() {
 describe("useAccessCheck mutation flow", () => {
   beforeEach(() => {
     guildPassClientMock.checkAccess.mockReset().mockResolvedValue(ACCESS_GRANTED_FIXTURE);
+    guildPassClientMock.getRoles.mockReset().mockResolvedValue([]);
   });
 
   it("does not call checkAccess until the caller explicitly submits params", () => {
@@ -70,7 +82,9 @@ describe("useAccessCheck mutation flow", () => {
       res = await result.current.mutateAsync(ACCESS_CHECK_PARAMS);
     });
 
-    expect(res).toStrictEqual(ACCESS_GRANTED_FIXTURE);
+    expect(res).toMatchObject(ACCESS_GRANTED_FIXTURE);
+    expect(res.verificationMode).toBe("online");
+    expect(res.syncStatus).toBe("confirmed_online");
     expect(guildPassClientMock.checkAccess).toHaveBeenCalledTimes(1);
     expect(guildPassClientMock.checkAccess).toHaveBeenCalledWith(ACCESS_CHECK_PARAMS);
   });
