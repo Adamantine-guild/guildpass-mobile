@@ -5,9 +5,14 @@ env:
 # E2E Test: Access Scanner Rescan Path
 # Validates: User sees specific rejection message and can tap "Scan Again" to resume scanning
 
-- launchApp
+- launchApp:
+    clearState: true
+    permissions:
+      camera: allow
 - tapOn:
     id: "onboarding-get-started-button"
+- tapOn:
+    id: "show-manual-entry-button"
 - tapOn:
     id: "wallet-address-input"
 - inputText: "0x1234567890123456789012345678901234567890"
@@ -15,12 +20,21 @@ env:
     id: "wallet-connect-button"
 
 # Wait for navigation to complete
-- assertVisible:
-    text: "Guilds"
+- extendedWaitUntil:
+    visible:
+      id: "guilds-screen"
+    timeout: 10000
 
-# Navigate to scanner
+# Navigate to scanner through access check
+- pressKey: "back"
+- assertVisible:
+    id: "profile-connected"
 - tapOn:
-    text: "Scan Access QR"
+    id: "navigate-access-check-button"
+- assertVisible:
+    id: "access-check-screen"
+- tapOn:
+    id: "scan-qr-button"
 
 # Assert scanner is visible
 - assertVisible:
@@ -28,7 +42,7 @@ env:
 
 # Tap the dev-only button to simulate a failed scan
 - tapOn:
-    id: "test-fail-scan"
+    id: "test-expired-qr-scan"
 
 # Assert rejection UI and specific reason
 - assertVisible:
