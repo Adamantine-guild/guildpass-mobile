@@ -7,9 +7,9 @@ import * as Linking from "expo-linking";
 import { AppHeader } from "../src/components/AppHeader";
 import { Button } from "../src/components/Button";
 import { Card } from "../src/components/Card";
-import { verifyAndParseAccessQrPayload, QrValidationResult } from "../src/features/access/verifyQrPayload";
-import { describeQrSignatureError, QR_SIGNATURE_ERROR_CODES, QrSignatureErrorCode } from "../src/features/access/qrSignature";
-import { describeQrPayloadError, QR_PAYLOAD_ERROR_CODES, QrPayloadErrorCode } from "../src/features/access/qrPayload";
+import { verifyAndParseAccessQrPayload } from "../src/features/access/verifyQrPayload";
+import { describeQrSignatureError, QR_SIGNATURE_ERROR_CODES, QrSignatureErrorCode, QrSignatureError } from "../src/features/access/qrSignature";
+import { describeQrPayloadError, QR_PAYLOAD_ERROR_CODES, QrPayloadErrorCode, QrPayloadError } from "../src/features/access/qrPayload";
 import { AccessHistoryList } from "../src/components/AccessHistoryList";
 import { useAccessHistoryStore } from "../src/features/access/accessHistory.store";
 
@@ -41,13 +41,11 @@ export default function AccessScanner() {
     setScanError(null);
     AccessibilityInfo.announceForAccessibility("Processing access QR code.");
 
-    const result = await verifyAndParseAccessQrPayload(data);
-
     try {
       AccessibilityInfo.announceForAccessibility("Processing access QR code.");
-      await verifyAndParseAccessQrPayload(data);
+      const result = await verifyAndParseAccessQrPayload(data);
       setVerificationSuccess(true);
-      AccessibilityInfo.announceForAccessibility("Signature verified. Opening access check.");
+      AccessibilityInfo.announceForAccessibility("QR code accepted. Opening access check.");
       
       setTimeout(() => {
         setVerificationSuccess(false);
@@ -74,8 +72,6 @@ export default function AccessScanner() {
         } else {
           errorMessage = error.message;
         }
-      } else if (error instanceof Error) {
-        errorMessage = error.message;
       }
 
       setScanError({ message: errorMessage, isUntrusted });
