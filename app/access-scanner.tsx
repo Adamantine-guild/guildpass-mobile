@@ -1,5 +1,5 @@
-import { View, Text, ActivityIndicator, AccessibilityInfo } from "react-native";
-import React, { useRef, useState } from "react";
+import { View, Text, ActivityIndicator, AccessibilityInfo, Animated, Platform } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
 import { useRouter } from "expo-router";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import type { BarcodeScanningResult } from "expo-camera";
@@ -8,7 +8,7 @@ import { AppHeader } from "../src/components/AppHeader";
 import { Button } from "../src/components/Button";
 import { Card } from "../src/components/Card";
 import { verifyAndParseAccessQrPayload } from "../src/features/access/verifyQrPayload";
-import { describeQrSignatureError, QrSignatureError } from "../src/features/access/qrSignature";
+import { describeQrSignatureError, QrSignatureError, QR_SIGNATURE_ERROR_CODES } from "../src/features/access/qrSignature";
 import {
   ACCESS_QR_TYPE,
   ACCESS_QR_VERSION,
@@ -49,10 +49,29 @@ const TEST_QR_PAYLOADS = {
   malformedJson: "{ this is not a GuildPass QR payload",
 };
 
+const AUTO_RESET_DELAY_MS = 3000;
+
 const isUntrustedPayloadError = (error: QrPayloadError) =>
   error.code === QR_PAYLOAD_ERROR_CODES.INVALID_SIGNATURE ||
   error.code === QR_PAYLOAD_ERROR_CODES.UNSUPPORTED_VERSION ||
   error.code === QR_PAYLOAD_ERROR_CODES.INVALID_KID;
+
+/** Determines whether a scan error should auto-reset or require manual dismissal. */
+const isRecoverableError = (error: unknown): boolean => {
+  if (error instanceof QrSignatureError) {
+    // KEY_REGISTRY_EXPIRED and PUBLIC_KEY_UNAVAILABLE are network-recoverable;
+    // all other signature errors indicate untrusted/malicious QR codes.
+    return (
+      error.code === QR_SIGNATURE_ERROR_CODES.KEY_REGISTRY_EXPIRED ||
+      error.code === QR_SIGNATURE_ERROR_CODES.PUBLIC_KEY_UNAVAILABLE
+    );
+  }
+  if (error instanceof QrPayloadError) {
+    return !isUntrustedPayloadError(error);
+  }
+  // Unexpected errors are treated as recoverable (likely transient).
+  return true;
+};
 
 export default function AccessScanner() {
   const router = useRouter();
@@ -63,8 +82,52 @@ export default function AccessScanner() {
   const [isProcessingScan, setIsProcessingScan] = useState(false);
   const [verificationSuccess, setVerificationSuccess] = useState(false);
   const scanInProgressRef = useRef(false);
+
+  // Animation values
+  const successScale = useRef(new Animated.Value(0)).current;
+  const successOpacity = useRef(new Animated.Value(0)).current;
+  const checkmarkScale = useRef(new Animated.Value(0)).current;
+  const errorSlide = useRef(new Animated.Value(20)).current;
+  const errorOpacity = useRef(new Animated.Value(0)).current;
+
   const entries = useAccessHistoryStore((state) => state.entries);
   const clearHistory = useAccessHistoryStore((state) => state.clearHistory);
+
+  // Auto-reset recoverable errors after a short delay
+  useEffect(() => {
+    if (!scanError || scanError.isUntrusted) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      scanInProgressRef.current = false;
+      setScanError(null);
+      setIsProcessingScan(false);
+      errorSlide.setValue(20);
+      errorOpacity.setValue(0);
+    }, AUTO_RESET_DELAY_MS);
+
+    return () => clearTimeout(timer);
+  }, [scanError]);
+
+  // Animate error card entrance
+  useEffect(() => {
+    if (scanError) {
+      Animated.parallel([
+        Animated.spring(errorSlide, {
+          toValue: 0,
+          friction: 8,
+          tension: 100,
+          useNativeDriver: true,
+        }),
+        Animated.timing(errorOpacity, {
+          toValue: 1,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [scanError, errorSlide, errorOpacity]);
 
   const handleScanData = async (data: string) => {
     if (scanInProgressRef.current) {
@@ -83,20 +146,51 @@ export default function AccessScanner() {
       setVerificationSuccess(true);
       AccessibilityInfo.announceForAccessibility("QR code accepted. Opening access check.");
 
-      setTimeout(() => {
+      // Animate success: scale in the card, then scale the checkmark
+      successScale.setValue(0);
+      successOpacity.setValue(0);
+      checkmarkScale.setValue(0);
+
+      Animated.sequence([
+        Animated.parallel([
+          Animated.spring(successScale, {
+            toValue: 1,
+            friction: 6,
+            tension: 80,
+            useNativeDriver: true,
+          }),
+          Animated.timing(successOpacity, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.spring(checkmarkScale, {
+          toValue: 1,
+          friction: 4,
+          tension: 120,
+          useNativeDriver: true,
+        }),
+        Animated.timing(successOpacity, {
+          toValue: 0,
+          duration: 400,
+          delay: 800,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
         setVerificationSuccess(false);
         router.replace({ pathname: "/access-check", params: { qrPayload: data } });
-      }, 1500);
+      });
     } catch (error) {
       let errorMessage = "Unable to read QR payload.";
       let isUntrusted = false;
 
       if (error instanceof QrSignatureError) {
         errorMessage = describeQrSignatureError(error.code);
-        isUntrusted = true;
+        isUntrusted = !isRecoverableError(error);
       } else if (error instanceof QrPayloadError) {
         errorMessage = describeQrPayloadError(error.code);
-        isUntrusted = isUntrustedPayloadError(error);
+        isUntrusted = !isRecoverableError(error);
       }
 
       setScanError({ message: errorMessage, isUntrusted });
@@ -114,6 +208,15 @@ export default function AccessScanner() {
     scanInProgressRef.current = false;
     setScanError(null);
     setIsProcessingScan(false);
+    errorSlide.setValue(20);
+    errorOpacity.setValue(0);
+  };
+
+  const getPermissionInstructions = (): string => {
+    if (Platform.OS === "ios") {
+      return "Open Settings > Privacy & Security > Camera, and enable camera access for GuildPass.";
+    }
+    return "Open Settings > Apps > GuildPass > Permissions, and enable camera access.";
   };
 
   if (!permission) {
@@ -136,7 +239,7 @@ export default function AccessScanner() {
     const permissionMessage = permissionDenied
       ? permission.canAskAgain
         ? "Camera permission was denied. Please allow camera access to scan QR codes."
-        : "Camera permission was permanently denied. Open Settings to enable camera access for GuildPass to scan QR codes."
+        : `Camera permission was permanently denied. ${getPermissionInstructions()}`
       : "GuildPass needs camera permission to scan access check QR codes.";
 
     return (
@@ -165,7 +268,6 @@ export default function AccessScanner() {
             {permission.canAskAgain ? (
               <Button
                 title="Allow Camera Access"
-                accessibilityRole="button"
                 accessibilityLabel="Allow Camera Access"
                 onPress={requestPermission}
               />
@@ -185,19 +287,28 @@ export default function AccessScanner() {
   if (isProcessingScan) {
     return (
       <View
-        accessibilityLabel="Processing access QR code"
+        accessibilityLabel="Verifying access QR code"
         accessibilityState={{ busy: true }}
         className="flex-1 bg-background dark:bg-slate-900 justify-center items-center"
       >
         <AppHeader title="Scan Access QR" showBack />
-        <ActivityIndicator
-          size="large"
-          accessibilityLabel="Processing access QR code"
-          accessibilityLiveRegion="polite"
-        />
-        <Text accessibilityLiveRegion="polite" className="mt-4 text-text dark:text-slate-100">
-          Processing...
-        </Text>
+        <View className="flex-1 justify-center items-center px-6">
+          <ActivityIndicator
+            size="large"
+            accessibilityLabel="Verifying access QR code"
+            accessibilityLiveRegion="polite"
+            className="mb-6"
+          />
+          <Text
+            accessibilityLiveRegion="polite"
+            className="text-text dark:text-slate-100 text-lg font-semibold text-center mb-2"
+          >
+            Verifying QR code
+          </Text>
+          <Text className="text-text-muted dark:text-slate-400 text-sm text-center">
+            Checking signature and security...
+          </Text>
+        </View>
       </View>
     );
   }
@@ -205,14 +316,26 @@ export default function AccessScanner() {
   if (verificationSuccess) {
     return (
       <View
-        accessibilityLabel="Signature verified"
-        accessibilityState={{ busy: true }}
+        accessibilityLabel="QR code verified successfully"
         className="flex-1 bg-background dark:bg-slate-900 justify-center items-center"
       >
         <AppHeader title="Scan Access QR" showBack />
-        <View className="flex-1 px-4 py-6 justify-center w-full">
+        <Animated.View
+          className="flex-1 px-4 py-6 justify-center w-full"
+          style={{
+            opacity: successOpacity,
+            transform: [{ scale: successScale }],
+          }}
+        >
           <Card className="border-success dark:border-green-600 bg-success/5 dark:bg-green-900/30 items-center py-8">
-            <Text className="text-success dark:text-green-400 text-4xl mb-4 font-bold">✓</Text>
+            <Animated.Text
+              className="text-success dark:text-green-400 text-5xl mb-4 font-bold"
+              style={{
+                transform: [{ scale: checkmarkScale }],
+              }}
+            >
+              ✓
+            </Animated.Text>
             <Text className="text-success dark:text-green-400 font-bold text-xl">
               Signature verified
             </Text>
@@ -220,58 +343,81 @@ export default function AccessScanner() {
               Redirecting to access check...
             </Text>
           </Card>
-        </View>
+        </Animated.View>
       </View>
     );
   }
 
   if (scanError) {
     const isUntrusted = scanError.isUntrusted;
+    const isAutoResetting = !isUntrusted;
 
     return (
       <View className="flex-1 bg-background dark:bg-slate-900">
         <AppHeader title="Scan Access QR" showBack />
         <View className="flex-1 px-4 py-6">
-          <Card
-            className={
-              isUntrusted
-                ? "border-amber-500 bg-amber-500/10 dark:border-amber-600 dark:bg-amber-900/30"
-                : "border-error bg-error/5 dark:border-red-600 dark:bg-red-900/30"
-            }
-            testID={isUntrusted ? "access-scanner-untrusted-error" : "access-scanner-error"}
+          <Animated.View
+            style={{
+              transform: [{ translateY: errorSlide }],
+              opacity: errorOpacity,
+            }}
           >
-            <Text
-              accessibilityRole="alert"
-              accessibilityLiveRegion="assertive"
+            <Card
               className={
                 isUntrusted
-                  ? "text-amber-600 dark:text-amber-400 font-bold text-lg"
-                  : "text-error dark:text-red-400 font-bold text-lg"
+                  ? "border-amber-500 bg-amber-500/10 dark:border-amber-600 dark:bg-amber-900/30"
+                  : "border-error bg-error/5 dark:border-red-600 dark:bg-red-900/30"
               }
-              testID="access-scanner-error-title"
+              testID={isUntrusted ? "access-scanner-untrusted-error" : "access-scanner-error"}
             >
-              {isUntrusted ? "Untrusted QR code" : "QR code rejected"}
-            </Text>
-            <Text
-              accessibilityRole="alert"
-              accessibilityLiveRegion="assertive"
-              className={
-                isUntrusted
-                  ? "text-amber-700/80 dark:text-amber-300/80 text-sm mt-1 mb-4"
-                  : "text-error/80 dark:text-red-300/80 text-sm mt-1 mb-4"
-              }
-              testID="access-scanner-error-message"
-            >
-              {scanError.message}
-            </Text>
-            <Button
-              title="Scan Again"
-              accessibilityRole="button"
-              accessibilityLabel="Scan Again"
-              onPress={handleScanAgain}
-              variant="outline"
-            />
-          </Card>
+              <View className="flex-row items-center mb-2">
+                <Text
+                  className={
+                    isUntrusted
+                      ? "text-amber-600 dark:text-amber-400 text-2xl mr-2"
+                      : "text-error dark:text-red-400 text-2xl mr-2"
+                  }
+                >
+                  {isUntrusted ? "⚠" : "✗"}
+                </Text>
+                <Text
+                  accessibilityRole="alert"
+                  accessibilityLiveRegion="assertive"
+                  className={
+                    isUntrusted
+                      ? "text-amber-600 dark:text-amber-400 font-bold text-lg flex-1"
+                      : "text-error dark:text-red-400 font-bold text-lg flex-1"
+                  }
+                  testID="access-scanner-error-title"
+                >
+                  {isUntrusted ? "Untrusted QR code" : "QR code rejected"}
+                </Text>
+              </View>
+              <Text
+                accessibilityRole="alert"
+                accessibilityLiveRegion="assertive"
+                className={
+                  isUntrusted
+                    ? "text-amber-700/80 dark:text-amber-300/80 text-sm mb-2"
+                    : "text-error/80 dark:text-red-300/80 text-sm mb-2"
+                }
+                testID="access-scanner-error-message"
+              >
+                {scanError.message}
+              </Text>
+              {isAutoResetting && (
+                <Text className="text-text-muted dark:text-slate-400 text-xs mb-4">
+                  Scanner will automatically resume...
+                </Text>
+              )}
+              <Button
+                title={isAutoResetting ? "Scan Again Now" : "Scan Again"}
+                accessibilityLabel={isAutoResetting ? "Scan Again Now" : "Scan Again"}
+                onPress={handleScanAgain}
+                variant="outline"
+              />
+            </Card>
+          </Animated.View>
         </View>
       </View>
     );
