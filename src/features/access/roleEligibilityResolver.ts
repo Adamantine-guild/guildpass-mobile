@@ -32,7 +32,15 @@ export type ResolveRoleEligibilityInput = {
   timeouts?: RpcConfig["timeouts"];
 };
 
-type EthCallFn = (rpcUrl: string, payload: unknown) => Promise<unknown>;
+export type ResolveRoleEligibilityChainInput = {
+  walletAddress: string;
+  chainId: number;
+  requirements: AccessRequirement[];
+  /** Optional override to bypass rpcConfig (useful in tests). */
+  rpcs?: string[];
+  /** Optional override to bypass default timeouts/backoff (useful in tests). */
+  timeouts?: RpcConfig["timeouts"];
+};
 
 type JsonRpcSuccess = { result?: unknown };
 type JsonRpcError = { error?: { message?: string } };
@@ -57,7 +65,20 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   });
 }
 
-function buildRoleRequirementCallData(requirement: AccessRequirement): {
+function toChainErrorResolution(
+  chainId: number,
+  error: unknown,
+): PerChainRoleEligibilityResolution {
+  const msg = error instanceof Error ? error.message : String(error);
+  const isTimeout = /timed out/i.test(msg) || /Timeout/i.test(msg);
+  return {
+    chainId,
+    status: isTimeout ? "timed-out" : "error",
+    errorMessage: msg,
+  };
+}
+
+function buildRoleRequirementCallData(requirement: AccessRequirement, walletAddress: string): {
   to: string;
   data: string;
 } {
@@ -96,15 +117,18 @@ function buildRoleRequirementCallData(requirement: AccessRequirement): {
     throw new Error(`Unsupported ROLE id encoding for role requirement: ${roleId}`);
   })();
 
-  const addr = (() => {
-    if (!/^0x[a-fA-F0-9]{40}$/.test(requirement.address ?? "")) {
-      // best-effort: allow lowercasing without strict validation
-      throw new Error(`Invalid ROLE contract address: ${requirement.address}`);
+  if (!/^0x[a-fA-F0-9]{40}$/.test(requirement.address ?? "")) {
+    throw new Error(`Invalid ROLE contract address: ${requirement.address}`);
+  }
+
+  const account = (() => {
+    if (!/^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
+      throw new Error(`Invalid wallet address: ${walletAddress}`);
     }
-    return requirement.address!.slice(2).toLowerCase().padStart(64, "0");
+    return walletAddress.slice(2).toLowerCase().padStart(64, "0");
   })();
 
-  const data = `${HAS_ROLE_SELECTOR}${bytes32}${addr}`;
+  const data = `${HAS_ROLE_SELECTOR}${bytes32}${account}`;
   return { to, data };
 }
 
@@ -165,7 +189,7 @@ async function resolveChainRoleEligibility(params: {
 
     try {
       const roleChecks = supportedRequirements.map(async (req) => {
-        const { to, data } = buildRoleRequirementCallData(req);
+        const { to, data } = buildRoleRequirementCallData(req, walletAddress);
         const hasRole = await withTimeout(
           rpcEthCall(rpcUrl, to, data),
           timeouts.roleResolverRpcAttemptTimeoutMs,
@@ -208,6 +232,26 @@ async function resolveChainRoleEligibility(params: {
   return { chainId, status: "error", errorMessage: "No RPC endpoints configured" };
 }
 
+export async function resolveRoleEligibilityForChain(
+  input: ResolveRoleEligibilityChainInput,
+): Promise<PerChainRoleEligibilityResolution> {
+  const {
+    walletAddress,
+    chainId,
+    requirements,
+    rpcs = getRpcsForChain(chainId),
+    timeouts = rpcConfig.timeouts,
+  } = input;
+
+  return resolveChainRoleEligibility({
+    walletAddress,
+    chainId,
+    roleRequirements: requirements,
+    rpcs: rpcs.filter(Boolean),
+    timeouts,
+  }).catch((e) => toChainErrorResolution(chainId, e));
+}
+
 export async function resolveRoleEligibilityForChains(
   input: ResolveRoleEligibilityInput,
 ): Promise<PerChainRoleEligibilityResolution[]> {
@@ -220,25 +264,15 @@ export async function resolveRoleEligibilityForChains(
     byChain.set(chainId, arr);
   }
 
-  const perChainTasks: Array<Promise<PerChainRoleEligibilityResolution>> = [];
+  const perChainTasks: Promise<PerChainRoleEligibilityResolution>[] = [];
   for (const [chainId, roleRequirements] of byChain.entries()) {
-    const rpcs = (rpcsByChain[chainId] ?? getRpcsForChain(chainId)).filter(Boolean);
-
     perChainTasks.push(
-      resolveChainRoleEligibility({
+      resolveRoleEligibilityForChain({
         walletAddress,
         chainId,
-        roleRequirements,
-        rpcs,
+        requirements: roleRequirements,
+        rpcs: rpcsByChain[chainId],
         timeouts,
-      }).catch((e) => {
-        const msg = e instanceof Error ? e.message : String(e);
-        const isTimeout = /timed out/i.test(msg) || /Timeout/i.test(msg);
-        return {
-          chainId,
-          status: isTimeout ? "timed-out" : "error",
-          errorMessage: msg,
-        };
       }),
     );
   }
