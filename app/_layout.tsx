@@ -8,6 +8,7 @@ import { initConnectivityService } from "../src/features/network/connectivitySer
 import { initSyncManager, triggerSync } from "../src/features/sync/syncManager";
 import { mutationReplayer } from "../src/lib/mutationReplayer";
 import { ErrorBoundary } from "../src/components/ErrorBoundary";
+import { ScreenErrorBoundary } from "../src/components/ScreenErrorBoundary";
 import { SyncCorrectionOverlay } from "../src/components/SyncCorrectionOverlay";
 import { SyncStatusBanner } from "../src/components/SyncStatusBanner";
 import { OfflineBanner } from "../src/components/OfflineBanner";
@@ -41,7 +42,7 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
 
   return (
-    <ErrorBoundary>
+    <ErrorBoundary context="app-root">
       <SensitiveStorageMigrationGate>
         <SecurityInit />
         <EmbeddedWalletProvider>
@@ -66,26 +67,28 @@ export default function RootLayout() {
             <View className="flex-1 bg-background dark:bg-slate-900">
               <WalletConnectProvider>
                 <DeepLinkHandler />
-                <Stack
-                  screenOptions={{
-                    headerShown: false,
-                    contentStyle: {
-                      backgroundColor: colorScheme === "dark" ? "#0f172a" : "#f8fafc",
-                    },
-                  }}
-                >
-                  <Stack.Screen name="index" />
-                  <Stack.Screen name="onboarding" />
-                  <Stack.Screen name="profile" />
-                  <Stack.Screen name="guilds" />
-                  <Stack.Screen name="guilds/[guildId]" />
-                  <Stack.Screen name="access-check" />
-                  <Stack.Screen name="access-scanner" />
-                  <Stack.Screen name="settings" />
-                  <Stack.Screen name="push-notification-setup" />
-                  <Stack.Screen name="pending-changes" options={{ presentation: "modal" }} />
-                  <Stack.Screen name="deep-link-error" />
-                </Stack>
+                <ScreenErrorBoundary screenName="app-stack">
+                  <Stack
+                    screenOptions={{
+                      headerShown: false,
+                      contentStyle: {
+                        backgroundColor: colorScheme === "dark" ? "#0f172a" : "#f8fafc",
+                      },
+                    }}
+                  >
+                    <Stack.Screen name="index" />
+                    <Stack.Screen name="onboarding" />
+                    <Stack.Screen name="profile" />
+                    <Stack.Screen name="guilds" />
+                    <Stack.Screen name="guilds/[guildId]" />
+                    <Stack.Screen name="access-check" />
+                    <Stack.Screen name="access-scanner" />
+                    <Stack.Screen name="settings" />
+                    <Stack.Screen name="push-notification-setup" />
+                    <Stack.Screen name="pending-changes" options={{ presentation: "modal" }} />
+                    <Stack.Screen name="deep-link-error" />
+                  </Stack>
+                </ScreenErrorBoundary>
                 <SyncCorrectionOverlay />
                 <SyncStatusBanner />
                 <OfflineBanner />
