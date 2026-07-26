@@ -42,11 +42,9 @@ export default function AccessScanner() {
     setScanError(null);
     AccessibilityInfo.announceForAccessibility("Processing access QR code.");
 
-    const result = await verifyAndParseAccessQrPayload(data);
-
     try {
       AccessibilityInfo.announceForAccessibility("Processing access QR code.");
-      await verifyAndParseAccessQrPayload(data);
+      const result = await verifyAndParseAccessQrPayload(data);
       setVerificationSuccess(true);
       AccessibilityInfo.announceForAccessibility("Signature verified. Opening access check.");
     try {
@@ -80,8 +78,6 @@ export default function AccessScanner() {
         } else {
           errorMessage = error.message;
         }
-      } else if (error instanceof Error) {
-        errorMessage = error.message;
       }
 
       setScanError({ message: errorMessage, isUntrusted });
