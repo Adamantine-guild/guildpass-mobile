@@ -1,4 +1,4 @@
-import { WalletConnector, WalletConnectorType } from "./walletConnector.types";
+import { WalletConnector } from "./walletConnector.types";
 
 /**
  * Manual connector — wraps a pre-validated address so the connector interface
@@ -21,30 +21,71 @@ export function createManualConnector(address: string): WalletConnector {
 }
 
 /**
- * WalletConnect stub — wire up the real WC SDK when the package is added.
- * Throws until a real implementation is provided.
+ * WalletConnect connector factory.
+ *
+ * The connector receives a reference to the WC provider (EIP-1193) so
+ * that it can call `eth_requestAccounts` / `eth_accounts` / `disconnect`.
+ * The caller is responsible for opening the WC modal before calling
+ * `connect()`, and for disposing of the WC session on `disconnect()`.
  */
-export function createWalletConnectConnector(): WalletConnector {
-  const notImplemented = (): never => {
-    throw new Error("WalletConnect SDK not yet configured. Add @walletconnect/modal-react-native and a project ID.");
-  };
+export function createWalletConnectConnector(provider: {
+  request(args: { method: string }): Promise<unknown>;
+  disconnect(): Promise<void>;
+}): WalletConnector {
   return {
     type: "walletconnect",
-    connect: notImplemented,
-    disconnect: notImplemented,
-    reconnect: notImplemented,
-    getAccounts: notImplemented,
+    async connect() {
+      const accounts = (await provider.request({
+        method: "eth_requestAccounts",
+      })) as string[];
+      if (!accounts.length) {
+        throw new Error("WalletConnect: no accounts returned");
+      }
+      return accounts;
+    },
+    async disconnect() {
+      await provider.disconnect();
+    },
+    async reconnect() {
+      const accounts = (await provider.request({
+        method: "eth_accounts",
+      })) as string[];
+      return accounts;
+    },
+    async getAccounts() {
+      const accounts = (await provider.request({
+        method: "eth_accounts",
+      })) as string[];
+      return accounts;
+    },
   };
 }
 
-/** Registry of available connector factories */
-const connectorFactories: Record<WalletConnectorType, (() => WalletConnector) | null> = {
-  manual: null, // constructed via createManualConnector(address)
-  walletconnect: createWalletConnectConnector,
-  coinbase: null, // future: createCoinbaseConnector
-  metamask: null, // future: createMetaMaskConnector
-};
-
-export function isConnectorTypeSupported(type: WalletConnectorType): boolean {
-  return connectorFactories[type] !== null;
+/**
+ * Embedded-wallet connector — wraps the EVM address the embedded-wallet provider
+ * has already provisioned, so the embedded path joins the same connector flow as
+ * every other wallet instead of writing to the store on its own.
+ *
+ * Shaped like the manual connector because the address is likewise already known:
+ * the provider's sign-in happens in `EmbeddedWalletOnboarding`, and its only
+ * application output is that address.
+ */
+export function createEmbeddedConnector(address: string): WalletConnector {
+  return {
+    type: "embedded",
+    async connect() {
+      return [address];
+    },
+    async disconnect() {},
+    async reconnect() {
+      return [address];
+    },
+    async getAccounts() {
+      return [address];
+    },
+  };
 }
+
+// Connector support is answered by the registry — see walletConnectorRegistry.ts.
+// Re-exported here so existing importers of this module keep working.
+export { isConnectorTypeSupported } from "./walletConnectorRegistry";

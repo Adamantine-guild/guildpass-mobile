@@ -49,8 +49,17 @@ export const useGuilds = () => {
 
   const useGuild = (guildId: string) => {
     return useQuery({
-      queryKey: ["guild", guildId],
-      queryFn: () => guildPassClient.guilds.getGuild({ guildId }),
+      queryKey: queryKeys.guild.byId(guildId),
+      queryFn: async () => {
+        try {
+          return await guildPassClient.guilds.getGuild({ guildId });
+        } catch (error) {
+          if (error instanceof Error && /not found/i.test(error.message)) {
+            throw new GuildNotFoundError(guildId);
+          }
+          throw error;
+        }
+      },
       enabled: !!guildId,
       networkMode: "offlineFirst",
     });
@@ -58,7 +67,7 @@ export const useGuilds = () => {
 
   const useGuildConfig = (guildId: string) => {
     return useQuery({
-      queryKey: ["guild-config", guildId],
+      queryKey: queryKeys.guildConfig.byId(guildId),
       queryFn: () => guildPassClient.guilds.getGuildConfig({ guildId }),
       enabled: !!guildId,
       networkMode: "offlineFirst",
@@ -67,7 +76,7 @@ export const useGuilds = () => {
 
   const useRoles = (guildId: string) => {
     return useQuery({
-      queryKey: ["guild-roles", guildId],
+      queryKey: queryKeys.guildRoles.byId(guildId),
       queryFn: () => guildPassClient.roles.getRoles({ guildId }),
       enabled: !!guildId,
       networkMode: "offlineFirst",

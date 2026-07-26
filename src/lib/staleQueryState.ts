@@ -13,10 +13,7 @@ export type StaleQueryState = {
   isOffline: boolean;
 };
 
-export function getStaleQueryState(
-  query: StaleQueryInput,
-  isOffline: boolean,
-): StaleQueryState {
+export function getStaleQueryState(query: StaleQueryInput, isOffline: boolean): StaleQueryState {
   const hasData = query.data !== undefined && query.data !== null;
   const lastSyncedAt = query.dataUpdatedAt ? new Date(query.dataUpdatedAt) : null;
   const isExpired = query.isStale ?? false;

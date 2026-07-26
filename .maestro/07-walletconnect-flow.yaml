@@ -1,0 +1,77 @@
+appId: xyz.guildpass.mobile
+---
+# E2E Test: WalletConnect UI & Manual Fallback
+# Validates: WalletConnect button is present, manual entry fallback works,
+# connected state shows connection kind, and disconnect clears session.
+#
+# Note: Full WalletConnect modal interaction requires an external wallet app
+# and cannot be automated via Maestro. This test validates the UI scaffolding
+# and the end-to-end manual-fallback flow.
+
+- launchApp:
+    clearState: true
+
+# ── Step 1: Onboarding → Profile ──────────────────────────────────────
+- tapOn:
+    id: "onboarding-get-started-button"
+
+# ── Step 2: Verify WalletConnect UI elements are present ───────────────
+- assertVisible:
+    id: "wallet-connect-form"
+- assertVisible:
+    id: "walletconnect-connect-button"
+- assertVisible:
+    text: "Connect with WalletConnect"
+
+# ── Step 3: Verify manual entry fallback toggle ────────────────────────
+- assertVisible:
+    id: "show-manual-entry-button"
+- assertVisible:
+    text: "Enter address manually"
+
+# ── Step 4: Show manual entry form ─────────────────────────────────────
+- tapOn:
+    id: "show-manual-entry-button"
+- assertVisible:
+    id: "wallet-address-input"
+- assertVisible:
+    id: "wallet-connect-button"
+
+# ── Step 5: Enter a valid address and connect ──────────────────────────
+- tapOn:
+    id: "wallet-address-input"
+- inputText: "0xAbCdEf1234567890aBcDeF1234567890AbCdEf1234"
+- tapOn:
+    id: "wallet-connect-button"
+
+# ── Step 6: Verify connection lands on guilds, then return to profile ───
+- extendedWaitUntil:
+    visible:
+      id: "guilds-screen"
+    timeout: 10000
+- pressKey: "back"
+- assertVisible:
+    id: "profile-connected"
+- assertVisible:
+    id: "connected-wallet-address"
+- assertVisible:
+    text: "Manual Entry"
+
+# ── Step 7: Navigate to guilds and back ────────────────────────────────
+- tapOn:
+    id: "navigate-guilds-button"
+- assertVisible:
+    id: "guilds-screen"
+- pressKey: "back"
+
+# ── Step 8: Disconnect ─────────────────────────────────────────────────
+- assertVisible:
+    id: "profile-screen"
+- tapOn:
+    id: "wallet-disconnect-button"
+
+# ── Step 9: Verify back at connect form ────────────────────────────────
+- assertVisible:
+    id: "wallet-connect-form"
+- assertVisible:
+    id: "walletconnect-connect-button"

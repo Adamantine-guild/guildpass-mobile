@@ -78,18 +78,18 @@ The application is built on a robust, feature-driven foundation designed for lon
 - **Routing**: [Expo Router](https://docs.expo.dev/router/introduction/) for type-safe, file-based navigation.
 - **State**: [Zustand](https://github.com/pmndrs/zustand) for client state and [TanStack Query](https://tanstack.com/query) for server synchronization.
 - **Styling**: [NativeWind](https://www.nativewind.dev/) for high-performance Tailwind CSS utility styling.
-- **SDK**: Seamless integration with the core [@guildpass/sdk](../guildpass-sdk).
+- **SDK**: Seamless integration with the core [@guildpass/sdk](https://github.com/Adamantine-Guild/guildpass-sdk).
 
 ### Project structure
 
-| Path                   | Purpose                                      |
-| ---------------------- | -------------------------------------------- |
-| `app/`                 | Expo Router file-based pages and layouts     |
-| `app/access-scanner.tsx` | QR code scanner screen using expo-camera   |
-| `src/features/access/` | Access check hooks and QR payload validation |
-| `src/`                 | Feature modules, hooks, stores, and services |
-| `docs/`                | Architecture and integration guides          |
-| `tests/`               | Vitest unit tests                            |
+| Path                     | Purpose                                      |
+| ------------------------ | -------------------------------------------- |
+| `app/`                   | Expo Router file-based pages and layouts     |
+| `app/access-scanner.tsx` | QR code scanner screen using expo-camera     |
+| `src/features/access/`   | Access check hooks and QR payload validation |
+| `src/`                   | Feature modules, hooks, stores, and services |
+| `docs/`                  | Architecture and integration guides          |
+| `tests/`                 | Vitest unit tests                            |
 
 ## 🧪 Testing
 
@@ -117,6 +117,7 @@ pnpm format
 GuildPass Mobile uses [Maestro](https://maestro.mobile.dev/) for E2E testing. Maestro provides deterministic, device-level testing for Expo apps.
 
 **Install Maestro:**
+
 ```bash
 # macOS/Linux
 curl -Ls "https://get.maestro.mobile.dev" | bash
@@ -127,6 +128,7 @@ curl -Ls "https://get.maestro.mobile.dev" | bash
 ```
 
 **Run E2E Tests:**
+
 ```bash
 # 1. Build the app for your platform
 npx expo run:ios    # or npx expo run:android
@@ -145,6 +147,7 @@ maestro studio
 ```
 
 **E2E Test Coverage:**
+
 - ✅ Onboarding to profile navigation
 - ✅ Manual wallet entry
 - ✅ Guild list and guild detail navigation
@@ -157,11 +160,11 @@ See [`.maestro/README.md`](.maestro/README.md) for detailed E2E testing document
 
 GuildPass Mobile uses **EAS Build** with three distinct profiles:
 
-| Profile       | Distribution  | Channel        | Use Case                     |
-|---------------|---------------|----------------|------------------------------|
-| `development` | Internal      | `development`  | Local dev & debug builds     |
-| `preview`     | Internal      | `preview`      | QA / TestFlight / Beta       |
-| `production`  | Store         | `production`   | App Store & Play Store       |
+| Profile       | Distribution | Channel       | Use Case                 |
+| ------------- | ------------ | ------------- | ------------------------ |
+| `development` | Internal     | `development` | Local dev & debug builds |
+| `preview`     | Internal     | `preview`     | QA / TestFlight / Beta   |
+| `production`  | Store        | `production`  | App Store & Play Store   |
 
 ```bash
 # Development build (APK / debug)
@@ -186,6 +189,7 @@ Copy `.env.example` to `.env` and fill in your values. Environment variables pre
 
 **Configuration Validation:**
 The application uses a typed configuration layer to validate environment variables on startup.
+
 - `EXPO_PUBLIC_API_URL` and `EXPO_PUBLIC_CHAIN_ID` are required and strictly validated.
 - If they are missing or invalid, the app will throw a clear developer-facing error in development, preventing silent, unsafe fallbacks to production defaults.
 
@@ -196,17 +200,25 @@ QR access checks use a JSON payload encoded directly in the QR code:
 ```json
 {
   "type": "guildpass.access-check",
-  "version": 1,
+  "version": 2,
   "guildId": "guild_abc",
   "resourceId": "vip-door",
   "walletAddress": "0x1234567890123456789012345678901234567890",
-  "expiresAt": "2026-06-23T12:05:00.000Z"
+  "expiresAt": "2026-06-23T12:05:00.000Z",
+  "kid": "key_2026",
+  "signature": "3045022100e...20b"
 }
 ```
 
-`type`, `version`, `guildId`, and `resourceId` are required. `walletAddress` and `expiresAt`
+`type`, `version`, `guildId`, `resourceId`, `kid`, and `signature` are required. `walletAddress` and `expiresAt`
 are optional. Unsupported types or versions, malformed JSON, missing required fields, invalid
-wallet addresses, and expired payloads are rejected before the access check is submitted.
+wallet addresses, expired payloads, and cryptographically invalid signatures are rejected before the access check is submitted.
+
+### Version 1 Compatibility Policy
+As of the rollout of cryptographic signatures in `version: 2`, legacy `version: 1` unsigned payloads are **strictly rejected**. This completely closes downgrade attacks where a malicious actor strips the signature and changes the version to 1 to bypass security controls. All issuers must use `version: 2`.
+
+### Cryptographic Signatures
+The `signature` field is a DER-encoded, hex-secp256k1 signature over a deterministic, newline-delimited canonicalization of the payload fields (in order: `type`, `version`, `guildId`, `resourceId`, `walletAddress`, `expiresAt`, `kid`). This signature is verified locally using the issuer's public key (fetched from the GuildPass backend and cached per `kid`).
 
 ## � Deep Linking
 
@@ -215,29 +227,33 @@ GuildPass Mobile supports deep linking, allowing external links to open specific
 ### Supported Link Formats
 
 #### Guild Detail
+
 - **Custom Scheme**: `guildpass://guild/{guildId}`
 - **Universal Link**: `https://guildpass.xyz/guild/{guildId}`
 - **Example**: `guildpass://guild/alpha-guild`
 
 #### Access Check
+
 - **Custom Scheme**: `guildpass://access-check?guildId={id}&resourceId={id}&walletAddress={address}`
 - **Universal Link**: `https://guildpass.xyz/access-check?guildId={id}&resourceId={id}&walletAddress={address}`
 - **Example**: `guildpass://access-check?guildId=alpha-guild&resourceId=secret-channel&walletAddress=0x1234...`
 
 ### Parameter Validation
+
 - Guild detail links require a valid `guildId`
 - Access check links require both `guildId` and `resourceId` parameters
 - `walletAddress` is optional for access check; if not provided, the app uses the connected wallet
 - Invalid or malformed links redirect to a user-friendly error screen
 
 ### Cold Start Support
+
 Deep links work when the app is cold-started (not already running). The app will launch and navigate to the appropriate screen.
 
 ## 🗺️ Roadmap
 
 - [ ] **Native Wallet Integration**: Support for WalletConnect, MetaMask, and Coinbase Wallet.
 - [ ] **Smart Onboarding**: Social login and embedded wallets for non-crypto native users.
-- [ ] **Push Notifications**: Real-time alerts for role updates and access grants.
+- [x] **Push Notifications**: Real-time alerts for role updates and access grants.
 - [x] **QR Access Verification**: Scan GuildPass QR codes to verify token-gated resource access from the mobile app.
 - [ ] **Offline Resilience**: Advanced caching layer for viewing memberships without connectivity.
 

@@ -1,21 +1,78 @@
 appId: xyz.guildpass.mobile
 ---
-# E2E Test: Manual Wallet Entry
-# Validates: User can manually enter a wallet address and connect
+# E2E Test: Manual Wallet Entry with Validation
+# Validates:
+#   1. Invalid addresses show specific error text and disable submission
+#   2. A valid address can be entered and connected
 
-- launchApp
+- launchApp:
+    clearState: true
 - tapOn:
     id: "onboarding-get-started-button"
 - assertVisible:
     id: "wallet-connect-form"
+
+# ── Show manual entry form ─────────────────────────────────────────────
+- tapOn:
+    id: "show-manual-entry-button"
+- assertVisible:
+    id: "wallet-address-input"
+
+# ── Test 1: Missing 0x prefix ─────────────────────────────────────────
 - tapOn:
     id: "wallet-address-input"
+- inputText: "123456789012345678901234567890123456789012"
+- tapOn:
+    id: "wallet-connect-button"
+    optional: true
+# The button should be disabled — we verify by checking the error surfaced
+# on blur. Re-tap input to trigger blur on the field.
+- tapOn:
+    id: "wallet-address-input"
+- assertVisible:
+    text: "Must start with 0x"
+
+# ── Clear input ────────────────────────────────────────────────────────
+- eraseText: 100
+
+# ── Test 2: Wrong length (has 0x but too short) ───────────────────────
+- inputText: "0x1234"
+- tapOn:
+    id: "wallet-connect-button"
+    optional: true
+- tapOn:
+    id: "wallet-address-input"
+- assertVisible:
+    text: "Must be 42 characters"
+
+# ── Clear input ────────────────────────────────────────────────────────
+- eraseText: 100
+
+# ── Test 3: Non-hex characters ─────────────────────────────────────────
+- inputText: "0xGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG"
+- tapOn:
+    id: "wallet-connect-button"
+    optional: true
+- tapOn:
+    id: "wallet-address-input"
+- assertVisible:
+    text: "Must only contain hex characters"
+
+# ── Clear input ────────────────────────────────────────────────────────
+- eraseText: 100
+
+# ── Test 4: Enter a valid address and connect ──────────────────────────
 - inputText: "0x1234567890123456789012345678901234567890"
 - tapOn:
     id: "wallet-connect-button"
+- extendedWaitUntil:
+    visible:
+      id: "guilds-screen"
+    timeout: 10000
+- pressKey: "back"
 - assertVisible:
     id: "profile-connected"
 - assertVisible:
     id: "connected-wallet-address"
 - assertVisible:
-    text: "0x1234567890123456789012345678901234567890"
+    text: "0x1234…7890"

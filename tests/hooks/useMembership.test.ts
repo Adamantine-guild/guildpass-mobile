@@ -13,11 +13,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  createSdkMock,
-  resetSdkMock,
-  mockSdkModule,
-} from "../fixtures/sdk.mock";
+import { createSdkMock, resetSdkMock } from "../fixtures/sdk.mock";
 import {
   MEMBERSHIP_ACTIVE_FIXTURE,
   MEMBERSHIP_INACTIVE_FIXTURE,
@@ -31,8 +27,14 @@ import {
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock("@guildpass/sdk", mockSdkModule);
-vi.mock("expo-constants", () => ({ default: { expoConfig: { extra: {} } } }));
+vi.mock("@guildpass/sdk", async () => {
+  // @ts-expect-error Vitest runs this async mock factory through Vite.
+  const { mockSdkModule } = await import("../fixtures/sdk.mock");
+  return mockSdkModule();
+});
+vi.mock("expo-constants", () => ({
+  default: { expoConfig: { extra: { apiUrl: "https://api.guildpass.test", chainId: 1 } } },
+}));
 
 import { guildPassClient } from "../../src/lib/guildpassClient";
 
@@ -185,13 +187,11 @@ describe("useMembership – getUserRoles", () => {
     expect(result).toStrictEqual(USER_ROLES_FIXTURE);
     expect(Array.isArray(result)).toBe(true);
 
-    result.forEach(
-      (role: { id: string; name: string; guildId: string; walletAddress: string }) => {
-        expect(typeof role.id).toBe("string");
-        expect(typeof role.name).toBe("string");
-        expect(role.walletAddress).toBe(TEST_WALLET_ADDRESS);
-      },
-    );
+    result.forEach((role: { id: string; name: string; guildId: string; walletAddress: string }) => {
+      expect(typeof role.id).toBe("string");
+      expect(typeof role.name).toBe("string");
+      expect(role.walletAddress).toBe(TEST_WALLET_ADDRESS);
+    });
   });
 
   it("returns an empty array when the wallet holds no roles in that guild", async () => {
@@ -216,7 +216,9 @@ describe("useMembership – getUserRoles", () => {
   });
 
   it("does not call SDK when walletAddress is falsy (enabled guard)", () => {
-    const shouldFetch = !!("" as string) && !!"guild_abc";
+    const walletAddress = "";
+    const guildId = "guild_abc";
+    const shouldFetch = !!walletAddress && !!guildId;
     expect(shouldFetch).toBe(false);
     expect(sdk.roles.getUserRoles).not.toHaveBeenCalled();
   });

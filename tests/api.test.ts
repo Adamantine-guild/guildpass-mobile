@@ -8,12 +8,18 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { createSdkMock, resetSdkMock, mockSdkModule } from "./fixtures/sdk.mock";
+import { createSdkMock, resetSdkMock } from "./fixtures/sdk.mock";
 import { GUILD_DETAIL_FIXTURE } from "./fixtures/guild.fixtures";
 import { ACCESS_GRANTED_FIXTURE, ACCESS_CHECK_PARAMS } from "./fixtures/access.fixtures";
 
-vi.mock("@guildpass/sdk", mockSdkModule);
-vi.mock("expo-constants", () => ({ default: { expoConfig: { extra: {} } } }));
+vi.mock("@guildpass/sdk", async () => {
+  // @ts-expect-error Vitest runs this async mock factory through Vite.
+  const { mockSdkModule } = await import("./fixtures/sdk.mock");
+  return mockSdkModule();
+});
+vi.mock("expo-constants", () => ({
+  default: { expoConfig: { extra: { apiUrl: "https://api.guildpass.test", chainId: 1 } } },
+}));
 
 import { guildPassClient } from "../src/lib/guildpassClient";
 

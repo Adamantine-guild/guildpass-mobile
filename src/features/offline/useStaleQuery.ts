@@ -11,12 +11,10 @@ export type { StaleQueryInput, StaleQueryState, StaleReason } from "../../lib/st
 export function useStaleQuery(query: StaleQueryInput): StaleQueryState {
   const { isOffline } = useNetworkStatus();
 
-  return useMemo(() => getStaleQueryState(query, isOffline), [
-    query.data,
-    query.dataUpdatedAt,
-    query.isStale,
-    isOffline,
-  ]);
+  return useMemo(
+    () => getStaleQueryState(query, isOffline),
+    [query.data, query.dataUpdatedAt, query.isStale, isOffline],
+  );
 }
 
 export function useCombinedStaleState(queries: StaleQueryInput[]): StaleQueryState {

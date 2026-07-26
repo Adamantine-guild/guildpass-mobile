@@ -20,12 +20,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  createSdkMock,
-  resetSdkMock,
-  mockSdkModule,
-  type SdkMock,
-} from "./fixtures/sdk.mock";
+import { createSdkMock, resetSdkMock } from "./fixtures/sdk.mock";
+import type { SdkMock } from "./fixtures/sdk.mock";
 import {
   GUILD_DETAIL_FIXTURE,
   GUILD_CONFIG_FIXTURE,
@@ -50,8 +46,14 @@ import {
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock("@guildpass/sdk", mockSdkModule);
-vi.mock("expo-constants", () => ({ default: { expoConfig: { extra: {} } } }));
+vi.mock("@guildpass/sdk", async () => {
+  // @ts-expect-error Vitest runs this async mock factory through Vite.
+  const { mockSdkModule } = await import("./fixtures/sdk.mock");
+  return mockSdkModule();
+});
+vi.mock("expo-constants", () => ({
+  default: { expoConfig: { extra: { apiUrl: "https://api.guildpass.test", chainId: 1 } } },
+}));
 
 import { guildPassClient } from "../src/lib/guildpassClient";
 import { GuildPassClient } from "@guildpass/sdk";
@@ -113,9 +115,7 @@ describe("SDK Contract – guilds namespace", () => {
   // ── getGuild argument contract ────────────────────────────────────────────
 
   it("getGuild accepts { guildId: string } and resolves", async () => {
-    await expect(
-      guildPassClient.guilds.getGuild({ guildId: "guild_abc" }),
-    ).resolves.toBeDefined();
+    await expect(guildPassClient.guilds.getGuild({ guildId: "guild_abc" })).resolves.toBeDefined();
 
     expect(sdk.guilds.getGuild).toHaveBeenCalledWith({ guildId: "guild_abc" });
   });

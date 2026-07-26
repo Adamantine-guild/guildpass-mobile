@@ -13,11 +13,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { QueryClient } from "@tanstack/react-query";
-import {
-  createSdkMock,
-  resetSdkMock,
-  mockSdkModule,
-} from "../fixtures/sdk.mock";
+import { createSdkMock, resetSdkMock } from "../fixtures/sdk.mock";
 import {
   GUILD_DETAIL_FIXTURE,
   GUILD_CONFIG_FIXTURE,
@@ -31,9 +27,14 @@ import {
 // Mock the SDK before importing the module under test
 // ---------------------------------------------------------------------------
 
-vi.mock("@guildpass/sdk", mockSdkModule);
-// expo-constants has no effect in a Node test environment
-vi.mock("expo-constants", () => ({ default: { expoConfig: { extra: {} } } }));
+vi.mock("@guildpass/sdk", async () => {
+  // @ts-expect-error Vitest runs this async mock factory through Vite.
+  const { mockSdkModule } = await import("../fixtures/sdk.mock");
+  return mockSdkModule();
+});
+vi.mock("expo-constants", () => ({
+  default: { expoConfig: { extra: { apiUrl: "https://api.guildpass.test", chainId: 1 } } },
+}));
 
 // Import after mocks are registered
 import { guildPassClient } from "../../src/lib/guildpassClient";
@@ -60,6 +61,22 @@ function makeQueryClient() {
     defaultOptions: { queries: { retry: false } },
   });
 }
+
+// Import the error class after mocks are registered
+import { GuildNotFoundError } from "../../src/features/guilds/useGuilds";
+
+// ---------------------------------------------------------------------------
+// GuildNotFoundError
+// ---------------------------------------------------------------------------
+
+describe("GuildNotFoundError", () => {
+  it("extends Error and has the correct name and message", () => {
+    const error = new GuildNotFoundError("guild_404");
+    expect(error).toBeInstanceOf(Error);
+    expect(error.name).toBe("GuildNotFoundError");
+    expect(error.message).toMatch(/guild_404/);
+  });
+});
 
 // ---------------------------------------------------------------------------
 // getGuildsByWalletAddress
@@ -185,6 +202,44 @@ describe("useGuilds – getGuild", () => {
     expect(expectedQueryKey).toStrictEqual(["guild", "guild_abc"]);
   });
 
+  it("surfaces GuildNotFoundError when the SDK responds with 'Guild not found'", async () => {
+    const guildId = "nonexistent";
+    sdk.guilds.getGuild.mockRejectedValueOnce(new Error("Guild not found"));
+
+    // Simulate the queryFn wrapping used by the hook
+    const queryFn = async () => {
+      try {
+        return await guildPassClient.guilds.getGuild({ guildId });
+      } catch (error) {
+        if (error instanceof Error && /not found/i.test(error.message)) {
+          throw new GuildNotFoundError(guildId);
+        }
+        throw error;
+      }
+    };
+
+    await expect(queryFn()).rejects.toThrow(GuildNotFoundError);
+  });
+
+  it("preserves generic SDK errors (e.g. network failures) unchanged", async () => {
+    const guildId = "guild_abc";
+    const networkError = new Error("Network request failed");
+    sdk.guilds.getGuild.mockRejectedValueOnce(networkError);
+
+    const queryFn = async () => {
+      try {
+        return await guildPassClient.guilds.getGuild({ guildId });
+      } catch (error) {
+        if (error instanceof Error && /not found/i.test(error.message)) {
+          throw new GuildNotFoundError(guildId);
+        }
+        throw error;
+      }
+    };
+
+    await expect(queryFn()).rejects.toThrow("Network request failed");
+  });
+
   it("does not call the SDK when guildId is an empty string (enabled guard)", async () => {
     // The hook uses `enabled: !!guildId`. Simulate the guard by checking that
     // we would not invoke the SDK for an empty string.
@@ -288,9 +343,9 @@ describe("useGuilds – getRoles", () => {
   it("surfaces SDK rejection as a rejected promise", async () => {
     sdk.roles.getRoles.mockRejectedValueOnce(new Error("Guild not found"));
 
-    await expect(
-      guildPassClient.roles.getRoles({ guildId: "non_existent" }),
-    ).rejects.toThrow("Guild not found");
+    await expect(guildPassClient.roles.getRoles({ guildId: "non_existent" })).rejects.toThrow(
+      "Guild not found",
+    );
   });
 
   it("documents the expected query key: ['guild-roles', guildId]", () => {

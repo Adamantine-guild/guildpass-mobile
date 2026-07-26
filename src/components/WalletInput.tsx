@@ -5,6 +5,7 @@ import { Card } from "./Card";
 type WalletInputProps = {
   value: string;
   onChangeText: (text: string) => void;
+  onBlur?: () => void;
   placeholder?: string;
   error?: string | null;
   testID?: string;
@@ -13,6 +14,7 @@ type WalletInputProps = {
 export const WalletInput = ({
   value,
   onChangeText,
+  onBlur,
   placeholder = "0x...",
   error = null,
   testID,
@@ -23,6 +25,7 @@ export const WalletInput = ({
       <TextInput
         value={value}
         onChangeText={onChangeText}
+        onBlur={onBlur}
         placeholder={placeholder}
         accessibilityLabel="Wallet Address"
         accessibilityHint="Enter your wallet address starting with 0x"

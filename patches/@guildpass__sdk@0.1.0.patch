@@ -1,0 +1,3516 @@
+diff --git a/package.json b/package.json
+index 7036a3040546cb9ac7dbc0a1f102bb84062d70cd..1a0d1d753d95e6dc56b125fb58c1189533994a29 100644
+--- a/package.json
++++ b/package.json
+@@ -2,40 +2,14 @@
+   "name": "@guildpass/sdk",
+   "version": "0.1.0",
+   "description": "The official TypeScript SDK for GuildPass, a Web3 membership and access-control protocol.",
+-  "main": "./dist/index.js",
++  "main": "./src/index.ts",
+   "module": "./dist/index.mjs",
+-  "types": "./dist/index.d.ts",
+-  "exports": {
+-    ".": {
+-      "types": "./dist/index.d.ts",
+-      "require": "./dist/index.js",
+-      "import": "./dist/index.mjs"
+-    },
+-    "./client": {
+-      "types": "./dist/client.d.ts",
+-      "require": "./dist/client.js",
+-      "import": "./dist/client.mjs"
+-    },
+-    "./errors": {
+-      "types": "./dist/errors.d.ts",
+-      "require": "./dist/errors.js",
+-      "import": "./dist/errors.mjs"
+-    },
+-    "./utils": {
+-      "types": "./dist/utils.d.ts",
+-      "require": "./dist/utils.js",
+-      "import": "./dist/utils.mjs"
+-    },
+-    "./types": {
+-      "types": "./dist/types.d.ts",
+-      "require": "./dist/types.js",
+-      "import": "./dist/types.mjs"
+-    }
+-  },
++  "types": "./src/index.ts",
+   "files": [
+     "dist",
+     "README.md",
+-    "LICENSE"
++    "LICENSE",
++    "src"
+   ],
+   "scripts": {
+     "dev": "tsup --watch",
+diff --git a/src/access/access.service.ts b/src/access/access.service.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..2bf73ad004f23a76721e714a872f73a7fa7a6fa9
+--- /dev/null
++++ b/src/access/access.service.ts
+@@ -0,0 +1,151 @@
++﻿// GuildPass SDK: Import external module dependencies.
++import { HttpClient } from '../http/httpClient';
++// GuildPass SDK: Pull in package or module bindings.
++import {
++  validateAddress,
++  validateGuildId,
++  validateResourceId,
++  validateRoleId,
++} from '../utils/validation';
++import { normaliseAddress } from '../utils/address';
++import { assertValidResponse } from '../validation/assertResponse';
++import { isAccessCheckResult } from '../validation/responseGuards';
++import type { RequestOptions } from '../types/common';
++// GuildPass SDK: Import external module dependencies.
++import { AccessCheckParams, AccessCheckResult, RoleAccessCheckParams, AccessCheckBatchOptions, AccessCheckBatchResult } from './access.types';
++
++// GuildPass SDK: Exported component definition.
++export class AccessService {
++  // GuildPass SDK: Class member structure property or constructor.
++  constructor(
++    private readonly http: HttpClient,
++    private readonly validateResponses = false,
++  ) {}
++
++  /**
++   * Checks whether a wallet has access to a gated resource.
++   */
++  // GuildPass SDK: Class member structure property or constructor.
++  public async checkAccess(params: AccessCheckParams, options?: RequestOptions): Promise<AccessCheckResult> {
++    // GuildPass SDK: Variable binding initialization.
++    const { walletAddress, guildId, resourceId } = params;
++
++    validateAddress(walletAddress);
++    validateGuildId(guildId);
++    validateResourceId(resourceId);
++
++    // GuildPass SDK: Return evaluated output value.
++    const result = await this.http.get<AccessCheckResult>(`/access/check`, {
++      // GuildPass SDK: Execution block boundary initialization.
++      params: {
++        address: normaliseAddress(walletAddress),
++        guildId,
++        resourceId,
++        // GuildPass SDK: End of logic containment structure block.
++      },
++      timeoutMs: options?.timeoutMs,
++      retry: options?.retry,
++      // GuildPass SDK: End of logic containment structure block.
++    });
++
++    return this.validateResponses
++      ? assertValidResponse(result, isAccessCheckResult, 'AccessCheckResult')
++      : result;
++    // GuildPass SDK: End of logic containment structure block.
++  }
++
++  /**
++   * Checks access for multiple resources or wallets concurrently.
++   */
++  public async checkAccessBatch(
++    items: AccessCheckParams[],
++    options?: AccessCheckBatchOptions & RequestOptions
++  ): Promise<AccessCheckBatchResult[]> {
++    this.validateBatchOptions(items, options);
++    const concurrency = options?.concurrency ?? 5;
++    const failFast = options?.failFast ?? false;
++
++    const results: AccessCheckBatchResult[] = new Array(items.length);
++    let hasFailed = false;
++
++    const execute = async (item: AccessCheckParams, index: number) => {
++      if (hasFailed && failFast) return;
++      try {
++        const result = await this.checkAccess(item, options);
++        results[index] = { input: item, status: 'fulfilled', value: result };
++      } catch (error) {
++        if (failFast) hasFailed = true;
++        results[index] = {
++          input: item,
++          status: 'rejected',
++          error: error instanceof Error ? error : new Error(String(error))
++        };
++        if (failFast) throw error;
++      }
++    };
++
++    const queue = items.map((item, index) => ({ item, index }));
++    const workers = Array(Math.min(concurrency, items.length)).fill(null).map(async () => {
++      while (queue.length > 0) {
++        if (failFast && hasFailed) break;
++        const current = queue.shift();
++        if (current) {
++          await execute(current.item, current.index);
++        }
++      }
++    });
++
++    await Promise.all(workers);
++    return results;
++  }
++
++  /**
++   * Checks whether a wallet has a specific role in a guild.
++   */
++  // GuildPass SDK: Class member structure property or constructor.
++  private validateBatchOptions(items: AccessCheckParams[], options?: AccessCheckBatchOptions): void {
++    const concurrency = options?.concurrency ?? 5;
++    if (!Number.isInteger(concurrency) || concurrency < 1 || !Number.isFinite(concurrency)) {
++      throw new Error("concurrency must be a positive finite integer");
++    }
++    if (concurrency > 50) {
++      throw new Error("concurrency must not exceed 50");
++    }
++    if (!items || items.length === 0) {
++      throw new Error("items array must not be empty");
++    }
++  }
++
++  public async checkRoleAccess(
++    params: RoleAccessCheckParams,
++    options?: RequestOptions,
++  ): Promise<boolean> {
++    // GuildPass SDK: Local block-scoped constant reference.
++    const { walletAddress, guildId, roleId } = params;
++
++    validateAddress(walletAddress);
++    validateGuildId(guildId);
++    validateRoleId(roleId);
++
++    // GuildPass SDK: Define internal reference identifier.
++    const result = await this.http.get<{ hasRole: boolean }>(`/access/role-check`, {
++      ...options,
++      // GuildPass SDK: Execution block boundary initialization.
++      params: {
++        address: normaliseAddress(walletAddress),
++        guildId,
++        roleId,
++        // GuildPass SDK: End of logic containment structure block.
++      },
++      timeoutMs: options?.timeoutMs,
++      retry: options?.retry,
++      // GuildPass SDK: End of logic containment structure block.
++    });
++
++    // GuildPass SDK: Terminate function block execution and return.
++    return result.hasRole;
++    // GuildPass SDK: End of logic containment structure block.
++  }
++  // GuildPass SDK: End of logic containment structure block.
++}
++
+diff --git a/src/access/access.types.ts b/src/access/access.types.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..44a5171bb879f88d7f649a36dfccf7522f7561f0
+--- /dev/null
++++ b/src/access/access.types.ts
+@@ -0,0 +1,39 @@
++// GuildPass SDK: Exposed interface structure.
++export type AccessCheckParams = {
++  walletAddress: string;
++  guildId: string;
++  resourceId: string;
++  // GuildPass SDK: End of logic containment structure block.
++};
++
++// GuildPass SDK: Core operational type definition.
++export type RoleAccessCheckParams = {
++  walletAddress: string;
++  guildId: string;
++  roleId: string;
++  // GuildPass SDK: End of logic containment structure block.
++};
++
++// GuildPass SDK: Exported function execution unit.
++export type AccessCheckResult = {
++  hasAccess: boolean;
++  walletAddress: string;
++  guildId: string;
++  resourceId: string;
++  requiredRoles: string[];
++  matchedRoles: string[];
++  reason?: string;
++  // GuildPass SDK: End of logic containment structure block.
++};
++
++export type AccessCheckBatchOptions = {
++  concurrency?: number;
++  failFast?: boolean;
++};
++
++export type AccessCheckBatchResult = {
++  input: AccessCheckParams;
++  status: 'fulfilled' | 'rejected';
++  value?: AccessCheckResult;
++  error?: Error;
++};
+diff --git a/src/cache/cache.types.ts b/src/cache/cache.types.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..c4f0d7bcf662386cce03675d4aa5d221084c18e7
+--- /dev/null
++++ b/src/cache/cache.types.ts
+@@ -0,0 +1,64 @@
++export interface CacheAdapter {
++  get<T>(key: string): Promise<T | null>;
++  set<T>(key: string, value: T, ttl?: number): Promise<void>;
++  delete(key: string): Promise<void>;
++  clear(): Promise<void>;
++  /** Delete all entries whose key starts with the given prefix. */
++  deleteByPrefix?(prefix: string): Promise<void>;
++}
++
++interface CacheEntry<T> {
++  value: T;
++  expiresAt: number | null;
++}
++
++/**
++ * A lightweight, zero-dependency in-memory cache adapter backed by a `Map`.
++ *
++ * TTL values are expressed in **milliseconds**. Entries with no TTL never expire.
++ *
++ * @example
++ * ```typescript
++ * const client = new GuildPassClient({
++ *   apiUrl: 'https://api.guildpass.xyz',
++ *   cache: new InMemoryCacheAdapter(),
++ *   cacheTtl: 60_000, // 60 seconds
++ * });
++ * ```
++ */
++export class InMemoryCacheAdapter implements CacheAdapter {
++  private readonly store = new Map<string, CacheEntry<unknown>>();
++
++  async get<T>(key: string): Promise<T | null> {
++    const entry = this.store.get(key) as CacheEntry<T> | undefined;
++    if (!entry) return null;
++    if (entry.expiresAt !== null && Date.now() >= entry.expiresAt) {
++      this.store.delete(key);
++      return null;
++    }
++    return entry.value;
++  }
++
++  async set<T>(key: string, value: T, ttl?: number): Promise<void> {
++    this.store.set(key, {
++      value,
++      expiresAt: ttl !== undefined ? Date.now() + ttl : null,
++    });
++  }
++
++  async delete(key: string): Promise<void> {
++    this.store.delete(key);
++  }
++
++  async clear(): Promise<void> {
++    this.store.clear();
++  }
++
++  async deleteByPrefix(prefix: string): Promise<void> {
++    for (const key of this.store.keys()) {
++      if (key.startsWith(prefix)) {
++        this.store.delete(key);
++      }
++    }
++  }
++}
+diff --git a/src/client/GuildPassClient.ts b/src/client/GuildPassClient.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..db676a6011542989c47a865e9333825fddc99563
+--- /dev/null
++++ b/src/client/GuildPassClient.ts
+@@ -0,0 +1,338 @@
++// GuildPass SDK: Pull in package or module bindings.
++import { AccessService } from '../access/access.service';
++// GuildPass SDK: Import external module dependencies.
++import { DEFAULT_CONFIG } from '../config/defaultConfig';
++// GuildPass SDK: Pull in package or module bindings.
++import { GuildPassClientConfig, validateConfig } from '../config/sdkConfig';
++// GuildPass SDK: Import external module dependencies.
++import { ContractClient } from '../contracts/contractClient';
++// GuildPass SDK: Pull in package or module bindings.
++import { GuildsService } from '../guilds/guilds.service';
++// GuildPass SDK: Import external module dependencies.
++import { HttpClient } from '../http/httpClient';
++// GuildPass SDK: Pull in package or module bindings.
++import { MembershipService } from '../membership/membership.service';
++import { SDK_VERSION } from '../config/version';
++// GuildPass SDK: Import external module dependencies.
++import { RolesService } from '../roles/roles.service';
++import { CacheAdapter } from '../cache/cache.types';
++import { normaliseAddress } from '../utils/address';
++import { validateAddress } from '../utils/validation';
++import type { AccessCheckParams, AccessCheckResult, RoleAccessCheckParams, AccessCheckBatchOptions, AccessCheckBatchResult } from '../access/access.types';
++import type { MembershipParams, Membership } from '../membership/membership.types';
++import type { GetRolesParams, GetUserRolesParams, GuildRole } from '../roles/roles.types';
++import type { GetGuildParams, Guild, GuildConfig } from '../guilds/guilds.types';
++
++/**
++ * The main GuildPass SDK this.
++ *
++ * Provides access to all GuildPass protocol services including
++ * access control, membership, roles, and guilds.
++ *
++ * ### Caching
++ *
++ * Pass a `cache` adapter to the constructor to transparently memoize all safe
++ * read operations. The built-in {@link InMemoryCacheAdapter} requires no
++ * additional dependencies, but any adapter that satisfies the
++ * {@link CacheAdapter} interface will work — including Redis:
++ *
++ * ```typescript
++ * import { GuildPassClient, InMemoryCacheAdapter } from '@guildpass/sdk';
++ *
++ * const client = new GuildPassClient({
++ *   apiUrl: 'https://api.guildpass.xyz',
++ *   cache: new InMemoryCacheAdapter(),
++ *   cacheTtl: 30_000, // 30 s default TTL for all cached responses
++ * });
++ *
++ * // Subsequent calls with the same arguments hit the cache, not the network.
++ * await this.guilds.getGuild({ guildId: 'prime-guild' }); // network
++ * await this.guilds.getGuild({ guildId: 'prime-guild' }); // cache hit
++ *
++ * // Invalidate per-guild entries after a mutation.
++ * await this.invalidateGuildCache('prime-guild');
++ * ```
++ */
++// GuildPass SDK: Exported component definition.
++export class GuildPassClient {
++  // GuildPass SDK: Class member structure property or constructor.
++  public readonly access: AccessService;
++  // GuildPass SDK: Class member structure property or constructor.
++  public readonly membership: MembershipService;
++  // GuildPass SDK: Class member structure property or constructor.
++  public readonly roles: RolesService;
++  // GuildPass SDK: Class member structure property or constructor.
++  public readonly guilds: GuildsService;
++  // GuildPass SDK: Class member structure property or constructor.
++  public readonly contracts: ContractClient;
++
++  // GuildPass SDK: Class member structure property or constructor.
++  private readonly http: HttpClient;
++  // GuildPass SDK: Class member structure property or constructor.
++  private readonly config: GuildPassClientConfig;
++  private readonly cache: CacheAdapter | undefined;
++  private readonly cacheTtl: number | undefined;
++  private readonly inFlightRequests = new Map<string, Promise<any>>();
++
++  // GuildPass SDK: Class member structure property or constructor.
++  constructor(config: GuildPassClientConfig) {
++    validateConfig(config);
++    // GuildPass SDK: Execution block boundary initialization.
++    this.config = {
++      ...DEFAULT_CONFIG,
++      ...config,
++      // GuildPass SDK: End of logic containment structure block.
++    };
++
++    this.cache = this.config.cache;
++    this.cacheTtl = this.config.cacheTtl;
++
++    this.http = new HttpClient(
++      this.config.apiUrl,
++      this.config.apiKey,
++      this.config.timeoutMs,
++      {
++        retry: this.config.retry,
++        hooks: this.config.hooks,
++        fetch: this.config.fetch,
++        metadata: {
++          sdkVersion: SDK_VERSION,
++          clientName: this.config.clientName,
++          clientVersion: this.config.clientVersion,
++          sendClientMetadata: this.config.sendClientMetadata,
++        },
++      },
++    );
++
++    const validateResponses = this.config.validateResponses ?? false;
++
++    const rawAccess = new AccessService(this.http, validateResponses);
++    const rawMembership = new MembershipService(this.http, validateResponses);
++    const rawRoles = new RolesService(this.http, validateResponses);
++    const rawGuilds = new GuildsService(this.http, validateResponses);
++
++    this.access = this.cache ? this.buildCachedAccessService(rawAccess) : rawAccess;
++    this.membership = this.cache ? this.buildCachedMembershipService(rawMembership) : rawMembership;
++    this.roles = this.cache ? this.buildCachedRolesService(rawRoles) : rawRoles;
++    this.guilds = this.cache ? this.buildCachedGuildsService(rawGuilds) : rawGuilds;
++    this.contracts = new ContractClient(this.config, this.http);
++    // GuildPass SDK: End of logic containment structure block.
++  }
++
++  // ---------------------------------------------------------------------------
++  // Cache invalidation helpers
++  // ---------------------------------------------------------------------------
++
++  /**
++   * Removes all cache entries scoped to a specific guild ID.
++   *
++   * Call this after any mutation that may affect guild data, membership, roles,
++   * or access decisions for that guild.
++   */
++  public async invalidateGuildCache(guildId: string): Promise<void> {
++    if (!this.cache) return;
++    const prefixes = [
++      `access:checkAccess:${guildId}:`,
++      `access:checkRoleAccess:${guildId}:`,
++      `membership:getMembership:${guildId}:`,
++      `roles:getRoles:${guildId}`,
++      `roles:getUserRoles:${guildId}:`,
++      `guilds:getGuild:${guildId}`,
++      `guilds:getGuildConfig:${guildId}`,
++    ];
++    try {
++      // Use deleteByPrefix if the adapter supports it; otherwise fall back to
++      // exact-key deletion (legacy behaviour that may miss nested entries).
++      if (this.cache.deleteByPrefix) {
++        await Promise.all(prefixes.map((p) => this.cache!.deleteByPrefix!(p)));
++      } else {
++        await Promise.all(prefixes.map((k) => this.cache!.delete(k)));
++      }
++    } catch (error: any) {
++      this.handleCacheError('delete', error);
++    }
++  }
++
++  /**
++   * Removes all cache entries scoped to a specific wallet address.
++   *
++   * Useful when a wallet's on-chain state has changed (e.g., token transfer).
++   */
++  public async invalidateWalletCache(walletAddress: string): Promise<void> {
++    validateAddress(walletAddress);
++    if (!this.cache) return;
++    const wallet = normaliseAddress(walletAddress);
++    try {
++      // Use deleteByPrefix to remove only wallet-scoped entries instead of
++      // clearing the entire cache. Falls back to full clear for adapters
++      // that don't support prefix deletion.
++      if (this.cache.deleteByPrefix) {
++        await this.cache.deleteByPrefix(`wallet:${wallet}:`);
++      } else {
++        await this.cache.clear();
++      }
++    } catch (error: any) {
++      this.handleCacheError(this.cache.deleteByPrefix ? 'delete' : 'clear', error);
++    }
++  }
++
++  /** Clears the entire cache. */
++  public async clearCache(): Promise<void> {
++    try {
++      await this.cache?.clear();
++    } catch (error: any) {
++      this.handleCacheError('clear', error);
++    }
++  }
++
++  // ---------------------------------------------------------------------------
++  // Public config accessor
++  // ---------------------------------------------------------------------------
++
++  /**
++   * Returns the current SDK configuration without sensitive values.
++   * Sensitive fields such as `apiKey` are omitted from this public snapshot.
++   * The SDK continues to use the real API key internally for authenticated requests.
++   */
++ public getConfig(): Omit<GuildPassClientConfig, 'apiKey'> {
++  const safeConfig = { ...this.config };
++  delete (safeConfig as any).apiKey;
++  return safeConfig;
++}
++  // ---------------------------------------------------------------------------
++  // Internal cache-wrapping factories
++  // ---------------------------------------------------------------------------
++
++  private async withCache<T>(key: string, fn: () => Promise<T>): Promise<T> {
++    try {
++      const cached = await this.cache!.get<T>(key);
++      if (cached !== null) return cached;
++    } catch (error: any) {
++      this.handleCacheError('get', error, key);
++    }
++
++    const inFlight = this.inFlightRequests.get(key);
++    if (inFlight) return inFlight;
++
++    const promise = (async () => {
++      try {
++        const result = await fn();
++        try {
++          await this.cache!.set(key, result, this.cacheTtl);
++        } catch (error: any) {
++          this.handleCacheError('set', error, key);
++        }
++        return result;
++      } finally {
++        this.inFlightRequests.delete(key);
++      }
++    })();
++
++    this.inFlightRequests.set(key, promise);
++    return promise;
++  }
++
++  /**
++   * Safely handles cache errors by notifying hooks if present.
++   * Cache failures are isolated and never prevent the SDK from functioning.
++   */
++  private handleCacheError(
++    operation: 'get' | 'set' | 'delete' | 'clear',
++    error: Error,
++    key?: string,
++  ): void {
++    if (this.config.hooks?.onCacheError) {
++      try {
++        // Asynchronous hook call is intentionally not awaited to avoid blocking
++        // the main request flow, but we wrap it in a try-catch for safety.
++        const result = this.config.hooks.onCacheError({ operation, error, key });
++        if (result instanceof Promise) {
++          result.catch((err) => {
++            console.error('GuildPass SDK: onCacheError hook failed', err);
++          });
++        }
++      } catch (err) {
++        console.error('GuildPass SDK: onCacheError hook failed', err);
++      }
++    }
++  }
++
++  private buildCachedAccessService(raw: AccessService): AccessService {
++    return Object.create(raw, {
++      checkAccess: {
++        value: async (params: AccessCheckParams): Promise<AccessCheckResult> => {
++          const wallet = normaliseAddress(params.walletAddress);
++          const key = `access:checkAccess:${params.guildId}:${params.resourceId}:${wallet}`;
++          return this.withCache(key, () => raw.checkAccess(params));
++        },
++      },
++      checkAccessBatch: {
++        value: async (
++          items: AccessCheckParams[],
++          options?: AccessCheckBatchOptions,
++        ): Promise<AccessCheckBatchResult[]> => raw.checkAccessBatch(items, options),
++      },
++      checkRoleAccess: {
++        value: async (params: RoleAccessCheckParams): Promise<boolean> => {
++          const wallet = normaliseAddress(params.walletAddress);
++          const key = `access:checkRoleAccess:${params.guildId}:${params.roleId}:${wallet}`;
++          return this.withCache(key, () => raw.checkRoleAccess(params));
++        },
++      },
++    });
++  }
++
++  private buildCachedMembershipService(raw: MembershipService): MembershipService {
++    return Object.create(raw, {
++      getMembership: {
++        value: async (params: MembershipParams): Promise<Membership> => {
++          const wallet = normaliseAddress(params.walletAddress);
++          const key = `membership:getMembership:${params.guildId}:${wallet}`;
++          return this.withCache(key, () => raw.getMembership(params));
++        },
++      },
++      isMember: {
++        value: async (params: MembershipParams): Promise<boolean> => {
++          const membership = await this.membership.getMembership(params);
++          return membership.isActive;
++        },
++      },
++    });
++  }
++
++  private buildCachedRolesService(raw: RolesService): RolesService {
++    return Object.create(raw, {
++      getRoles: {
++        value: async (params: GetRolesParams): Promise<GuildRole[]> => {
++          const key = `roles:getRoles:${params.guildId}`;
++          return this.withCache(key, () => raw.getRoles(params));
++        },
++      },
++      getUserRoles: {
++        value: async (params: GetUserRolesParams): Promise<GuildRole[]> => {
++          const wallet = normaliseAddress(params.walletAddress);
++          const key = `roles:getUserRoles:${params.guildId}:${wallet}`;
++          return this.withCache(key, () => raw.getUserRoles(params));
++        },
++      },
++    });
++  }
++
++  private buildCachedGuildsService(raw: GuildsService): GuildsService {
++    return Object.create(raw, {
++      getGuild: {
++        value: async (params: GetGuildParams): Promise<Guild> => {
++          const key = `guilds:getGuild:${params.guildId}`;
++          return this.withCache(key, () => raw.getGuild(params));
++        },
++      },
++      getGuildConfig: {
++        value: async (params: GetGuildParams): Promise<GuildConfig> => {
++          const key = `guilds:getGuildConfig:${params.guildId}`;
++          return this.withCache(key, () => raw.getGuildConfig(params));
++        },
++      },
++    });
++  }
++  // GuildPass SDK: End of logic containment structure block.
++}
+diff --git a/src/client/index.ts b/src/client/index.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..0a3176d8daced94029a682b1380390e4e32edb1a
+--- /dev/null
++++ b/src/client/index.ts
+@@ -0,0 +1 @@
++export * from './GuildPassClient';
+diff --git a/src/config/defaultConfig.ts b/src/config/defaultConfig.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..e51b7f9767cb83456818e1250e6209fd5dbf74b8
+--- /dev/null
++++ b/src/config/defaultConfig.ts
+@@ -0,0 +1,11 @@
++// GuildPass SDK: Pull in package or module bindings.
++import { GuildPassClientConfig } from './sdkConfig';
++
++// GuildPass SDK: Exposed interface structure.
++export const DEFAULT_CONFIG: Partial<GuildPassClientConfig> = {
++  apiUrl: 'https://api.guildpass.xyz',
++  chainId: 1, // Ethereum Mainnet
++  timeoutMs: 10000, // 10 seconds
++  validateResponses: false,
++  // GuildPass SDK: End of logic containment structure block.
++};
+diff --git a/src/config/networkConfig.ts b/src/config/networkConfig.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..f96fd11136ee63b7f8816040cca9c2ce640a7360
+--- /dev/null
++++ b/src/config/networkConfig.ts
+@@ -0,0 +1,48 @@
++// GuildPass SDK: Core operational type definition.
++export type NetworkConfig = {
++  chainId: number;
++  name: string;
++  rpcUrl?: string;
++  explorerUrl?: string;
++  // GuildPass SDK: End of logic containment structure block.
++};
++
++// GuildPass SDK: Exported function execution unit.
++export const SUPPORTED_NETWORKS: Record<number, NetworkConfig> = {
++  // GuildPass SDK: Execution block boundary initialization.
++  1: {
++    chainId: 1,
++    name: 'Ethereum Mainnet',
++    explorerUrl: 'https://etherscan.io',
++    // GuildPass SDK: End of logic containment structure block.
++  },
++  // GuildPass SDK: Execution block boundary initialization.
++  10: {
++    chainId: 10,
++    name: 'Optimism',
++    explorerUrl: 'https://optimistic.etherscan.io',
++    // GuildPass SDK: End of logic containment structure block.
++  },
++  // GuildPass SDK: Execution block boundary initialization.
++  137: {
++    chainId: 137,
++    name: 'Polygon',
++    explorerUrl: 'https://polygonscan.com',
++    // GuildPass SDK: End of logic containment structure block.
++  },
++  // GuildPass SDK: Execution block boundary initialization.
++  8453: {
++    chainId: 8453,
++    name: 'Base',
++    explorerUrl: 'https://basescan.org',
++    // GuildPass SDK: End of logic containment structure block.
++  },
++  // GuildPass SDK: Execution block boundary initialization.
++  42161: {
++    chainId: 42161,
++    name: 'Arbitrum One',
++    explorerUrl: 'https://arbiscan.io',
++    // GuildPass SDK: End of logic containment structure block.
++  },
++  // GuildPass SDK: End of logic containment structure block.
++};
+diff --git a/src/config/sdkConfig.ts b/src/config/sdkConfig.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..4d1393885df947ee6718fd34979cd40af1139994
+--- /dev/null
++++ b/src/config/sdkConfig.ts
+@@ -0,0 +1,267 @@
++// GuildPass SDK: Import external module dependencies.
++import { FetchLike, HttpHooks, RetryConfig } from '../http/http.types';
++import { GuildPassError } from '../errors/GuildPassError';
++import { GuildPassErrorCode } from '../errors/errorCodes';
++import { CacheAdapter } from '../cache/cache.types';
++import { ChainConfig } from '../contracts/contract.types';
++import { validateAddress } from '../utils/validation';
++
++// GuildPass SDK: Exported component definition.
++export type GuildPassClientConfig = {
++  apiUrl: string;
++  chainId?: number;
++  rpcUrl?: string;
++  contractAddress?: string;
++  /** Per-chain RPC URL and contract address overrides, keyed by chain ID. */
++  chains?: Record<number, ChainConfig>;
++  apiKey?: string;
++  timeoutMs?: number;
++  /** Global retry policy applied to all requests. Defaults to no retries. */
++  retry?: RetryConfig;
++  hooks?: HttpHooks;
++  /**
++   * Optional fetch-compatible transport for tests, tracing, proxies,
++   * custom runtimes, or environments without globalThis.fetch.
++   */
++  fetch?: FetchLike;
++  /**
++   * When true, service responses are checked against runtime shape guards
++   * before being returned, throwing a GuildPassError with code
++   * INVALID_RESPONSE if the API response is malformed. Defaults to false
++   * to preserve existing behaviour.
++   */
++  validateResponses?: boolean;
++  /**
++   * A cache adapter used to memoize read responses.
++   *
++   * Provide `new InMemoryCacheAdapter()` for a built-in solution, or supply
++   * any object that satisfies the {@link CacheAdapter} interface (e.g. a
++   * Redis adapter) for distributed caching.
++   *
++   * @example
++   * ```typescript
++   * import { GuildPassClient, InMemoryCacheAdapter } from '@guildpass/sdk';
++   *
++   * const client = new GuildPassClient({
++   *   apiUrl: 'https://api.guildpass.xyz',
++   *   cache: new InMemoryCacheAdapter(),
++   *   cacheTtl: 60_000,
++   * });
++   * ```
++   */
++  cache?: CacheAdapter;
++  /**
++   * Default TTL in **milliseconds** applied to every cached entry when
++   * a per-call TTL is not specified. Defaults to `0` (no expiry).
++   */
++  cacheTtl?: number;
++  /**
++   * Whether to send client metadata headers (`X-GuildPass-SDK-Version`,
++   * `X-GuildPass-Client`) on GuildPass API-relative requests.
++   *
++   * Defaults to `true`. Set to `false` to disable all metadata headers.
++   * Metadata headers never include API keys, wallet secrets, or tokens.
++   */
++  sendClientMetadata?: boolean;
++  /**
++   * Optional client or integration name (e.g. `"my-dapp"`, `"discord-bot"`).
++   * Appears in the `X-GuildPass-Client` header alongside the SDK version.
++   */
++  clientName?: string;
++  /**
++   * Optional client version string sent as part of `X-GuildPass-Client`.
++   * When omitted, only the client name is sent (if provided).
++   */
++  clientVersion?: string;
++  // GuildPass SDK: End of logic containment structure block.
++};
++
++export function validateConfig(config: GuildPassClientConfig): void {
++  if (!config.apiUrl) {
++    throw new GuildPassError('apiUrl is required', GuildPassErrorCode.INVALID_CONFIG);
++  }
++
++  try {
++    const url = new URL(config.apiUrl);
++    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
++      throw new Error();
++    }
++  } catch {
++    throw new GuildPassError(
++      `Invalid apiUrl: "${config.apiUrl}"`,
++      GuildPassErrorCode.INVALID_CONFIG,
++    );
++  }
++
++  if (
++    config.timeoutMs !== undefined &&
++    (typeof config.timeoutMs !== 'number' || config.timeoutMs <= 0)
++  ) {
++    throw new GuildPassError(
++      'timeoutMs must be a positive number',
++      GuildPassErrorCode.INVALID_CONFIG,
++    );
++  }
++
++  // INSERT CACHE VALIDATION
++  if (
++    config.cacheTtl !== undefined &&
++    (typeof config.cacheTtl !== 'number' || config.cacheTtl < 0 || !Number.isFinite(config.cacheTtl))
++  ) {
++    throw new GuildPassError(
++      'cacheTtl must be a non-negative finite number (milliseconds)',
++      GuildPassErrorCode.INVALID_CONFIG,
++    );
++  }
++
++  if (config.cache !== undefined) {
++    const adapter = config.cache;
++    const required = ['get', 'set', 'delete', 'clear'] as const;
++    for (const method of required) {
++      if (typeof adapter[method] !== 'function') {
++        throw new GuildPassError(
++          `cache adapter must implement ${method}(): function`,
++          GuildPassErrorCode.INVALID_CONFIG,
++        );
++      }
++    }
++  }
++  // END CACHE VALIDATION
++
++  // INSERT METADATA VALIDATION
++  if (
++    config.sendClientMetadata !== undefined &&
++    typeof config.sendClientMetadata !== 'boolean'
++  ) {
++    throw new GuildPassError(
++      'sendClientMetadata must be a boolean',
++      GuildPassErrorCode.INVALID_CONFIG,
++    );
++  }
++
++  if (
++    config.clientName !== undefined &&
++    typeof config.clientName !== 'string'
++  ) {
++    throw new GuildPassError(
++      'clientName must be a string',
++      GuildPassErrorCode.INVALID_CONFIG,
++    );
++  }
++
++  if (
++    config.clientVersion !== undefined &&
++    typeof config.clientVersion !== 'string'
++  ) {
++    throw new GuildPassError(
++      'clientVersion must be a string',
++      GuildPassErrorCode.INVALID_CONFIG,
++    );
++  }
++  // END METADATA VALIDATION
++
++  // INSERT RETRY VALIDATION
++  if (config.retry) {
++    const r = config.retry;
++
++    if (r.maxRetries !== undefined && (typeof r.maxRetries !== 'number' || !Number.isFinite(r.maxRetries) || r.maxRetries < 0)) {
++      throw new GuildPassError('retry.maxRetries must be a non-negative finite number', GuildPassErrorCode.INVALID_CONFIG);
++    }
++
++    if (r.baseDelayMs !== undefined && (typeof r.baseDelayMs !== 'number' || !Number.isFinite(r.baseDelayMs) || r.baseDelayMs < 0)) {
++      throw new GuildPassError('retry.baseDelayMs must be a non-negative finite number', GuildPassErrorCode.INVALID_CONFIG);
++    }
++
++    if (r.maxDelayMs !== undefined && (typeof r.maxDelayMs !== 'number' || !Number.isFinite(r.maxDelayMs) || r.maxDelayMs < 0)) {
++      throw new GuildPassError('retry.maxDelayMs must be a non-negative finite number', GuildPassErrorCode.INVALID_CONFIG);
++    }
++
++    if (r.baseDelayMs !== undefined && r.maxDelayMs !== undefined && r.maxDelayMs < r.baseDelayMs) {
++      throw new GuildPassError('retry.maxDelayMs cannot be less than baseDelayMs', GuildPassErrorCode.INVALID_CONFIG);
++    }
++
++    if (r.retryableStatuses !== undefined && (!Array.isArray(r.retryableStatuses) || r.retryableStatuses.length === 0 || r.retryableStatuses.some((s) => typeof s !== 'number' || !Number.isFinite(s)))) {
++      throw new GuildPassError('retryableStatuses must be a non-empty array of valid HTTP status numbers', GuildPassErrorCode.INVALID_CONFIG);
++    }
++  }
++  // END RETRY VALIDATION
++
++  validateChainsConfig(config.chains);
++
++  const transport = config.fetch ?? globalThis.fetch;
++  if (typeof transport !== 'function') {
++    throw new GuildPassError(
++      'A fetch-compatible transport is required. Provide config.fetch or use a runtime with globalThis.fetch.',
++      GuildPassErrorCode.INVALID_CONFIG,
++    );
++  }
++}
++
++function validateChainsConfig(chains?: Record<number, ChainConfig>): void {
++  if (!chains) {
++    return;
++  }
++
++  for (const [chainIdKey, chainConfig] of Object.entries(chains)) {
++    const chainId = Number(chainIdKey);
++
++    if (!Number.isSafeInteger(chainId) || chainId <= 0 || String(chainId) !== chainIdKey) {
++      throw new GuildPassError(
++        `Invalid chains[${chainIdKey}]: chain ID must be a positive safe integer`,
++        GuildPassErrorCode.INVALID_CONFIG,
++      );
++    }
++
++    if (chainConfig.rpcUrl !== undefined) {
++      validateChainRpcUrl(chainIdKey, chainConfig.rpcUrl);
++    }
++
++    if (chainConfig.contractAddress !== undefined) {
++      validateChainContractAddress(chainIdKey, chainConfig.contractAddress);
++    }
++  }
++}
++
++function validateChainRpcUrl(chainIdKey: string, rpcUrl: string): void {
++  try {
++    const url = new URL(rpcUrl);
++    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
++      throw new Error();
++    }
++  } catch {
++    throw new GuildPassError(
++      `Invalid chains[${chainIdKey}].rpcUrl: expected an http or https URL`,
++      GuildPassErrorCode.INVALID_CONFIG,
++    );
++  }
++}
++
++function validateChainContractAddress(chainIdKey: string, contractAddress: string): void {
++  try {
++    validateAddress(contractAddress);
++  } catch {
++    throw new GuildPassError(
++      `Invalid chains[${chainIdKey}].contractAddress: expected a valid EVM address`,
++      GuildPassErrorCode.INVALID_CONFIG,
++    );
++  }
++}
++/**
++ * Resolves the chain configuration for a given chain ID.
++ * Per-chain entries in `config.chains` take precedence over the top-level
++ * `rpcUrl` / `contractAddress` fallbacks.
++ * Throws `INVALID_CONFIG` only when a `chains` map is provided but does not
++ * contain an entry for the requested chain.
++ */
++export function resolveChainConfig(config: GuildPassClientConfig, chainId: number): ChainConfig {
++  if (config.chains) {
++    if (Object.prototype.hasOwnProperty.call(config.chains, chainId)) {
++      return config.chains[chainId];
++    }
++    throw new GuildPassError(
++      `No configuration found for chain ID ${chainId}`,
++      GuildPassErrorCode.INVALID_CONFIG,
++    );
++  }
++  return { rpcUrl: config.rpcUrl, contractAddress: config.contractAddress };
++}
+diff --git a/src/config/version.ts b/src/config/version.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..a636c7640d779d65132807f7aefb2d79f63661a8
+--- /dev/null
++++ b/src/config/version.ts
+@@ -0,0 +1,10 @@
++/**
++ * SDK version constant.
++ *
++ * This value is synced with package.json during the build process.
++ * Consumers can override the version header at runtime via
++ * `GuildPassClientConfig.clientVersion` if needed.
++ *
++ * @internal — do not import package.json directly; bundlers may break.
++ */
++export const SDK_VERSION = '0.1.0';
+diff --git a/src/contracts/contract.types.ts b/src/contracts/contract.types.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..c298a1cacd50169acb8925dae718bfa688f22982
+--- /dev/null
++++ b/src/contracts/contract.types.ts
+@@ -0,0 +1,94 @@
++// GuildPass SDK: Import external module dependencies.
++import { AccessRequirement } from '../types/common';
++
++/** Per-chain RPC and contract address configuration. */
++export type ChainConfig = {
++  rpcUrl?: string;
++  contractAddress?: string;
++};
++
++// GuildPass SDK: Exposed interface structure.
++export type TokenBalanceParams = {
++  walletAddress: string;
++  chainId?: number;
++  contractAddress?: string;
++  // GuildPass SDK: End of logic containment structure block.
++};
++
++/**
++ * A token balance with the metadata needed to display it: the raw on-chain
++ * integer (`raw`, base units as a decimal string), the token's `decimals`, and
++ * the human-readable `formatted` amount.
++ */
++export type FormattedTokenBalance = {
++  /** Raw balance in base units, as an exact decimal integer string. */
++  raw: string;
++  /** Number of decimals the token uses (from its `decimals()` view). */
++  decimals: number;
++  /** Human-readable balance, e.g. "1.5" for raw "1500000" with 6 decimals. */
++  formatted: string;
++};
++
++export type GuildOwnerParams = {
++  guildId: string;
++  chainId?: number;
++  contractAddress?: string;
++  // GuildPass SDK: End of logic containment structure block.
++};
++
++// GuildPass SDK: Core operational type definition.
++export type RoleRequirementParams = {
++  walletAddress: string;
++  requirement: AccessRequirement;
++  /** Chain to resolve the RPC endpoint for (TOKEN/NFT/ROLE checks only). */
++  chainId?: number;
++  // GuildPass SDK: End of logic containment structure block.
++};
++
++// ---------------------------------------------------------------------------
++// Batch call types
++// ---------------------------------------------------------------------------
++
++/**
++ * Describes a single contract call within a JSON-RPC batch request.
++ * Only read-only methods (eth_call) should be batched.
++ */
++export type BatchEthCallItem = {
++  /** The contract address to call. */
++  to: string;
++  /** The 4-byte selector + ABI-encoded arguments (pre-encoded hex string). */
++  data: string;
++};
++
++/**
++ * Result of a single item in a batch response.
++ * On success, `status` is `'success'` and `result` contains the raw hex output.
++ * On failure, `status` is `'error'` and `error` contains a descriptive message.
++ */
++export type BatchItemResult = {
++  status: 'success' | 'error';
++  result?: string;
++  error?: string;
++};
++
++/**
++ * Parameters for a batch membership token balance lookup.
++ * All items share the same chain config (and optionally contract address).
++ */
++export type TokenBalancesBatchParams = {
++  /** Wallet addresses to look up (preserves input order). */
++  walletAddresses: string[];
++  chainId?: number;
++  contractAddress?: string;
++};
++
++/**
++ * Parameters for a batch guild owner lookup.
++ * All items share the same chain config (and optionally contract address).
++ */
++export type GuildOwnersBatchParams = {
++  /** Guild IDs to look up (preserves input order). */
++  guildIds: string[];
++  chainId?: number;
++  contractAddress?: string;
++};
+diff --git a/src/contracts/contractClient.ts b/src/contracts/contractClient.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..dff465308baabeb963b75cb164d29cc682a7753c
+--- /dev/null
++++ b/src/contracts/contractClient.ts
+@@ -0,0 +1,590 @@
++// GuildPass SDK: Pull in package or module bindings.
++import { GuildPassError } from '../errors/GuildPassError';
++// GuildPass SDK: Import external module dependencies.
++import { GuildPassErrorCode } from '../errors/errorCodes';
++// GuildPass SDK: Pull in package or module bindings.
++import { validateAddress, validateGuildId } from '../utils/validation';
++// GuildPass SDK: Import external module dependencies.
++import {
++  BatchEthCallItem,
++  BatchItemResult,
++  FormattedTokenBalance,
++  GuildOwnerParams,
++  GuildOwnersBatchParams,
++  RoleRequirementParams,
++  TokenBalanceParams,
++  TokenBalancesBatchParams,
++} from './contract.types';
++// GuildPass SDK: Pull in package or module bindings.
++import {
++  BALANCE_OF_SELECTOR,
++  GET_GUILD_OWNER_SELECTOR,
++  HEX_32_BYTES_LENGTH,
++  decodeAddressResult,
++  decodeUint256Result,
++  encodeAddressArgument,
++  encodeGuildId,
++  validateAccessRequirement,
++} from './contractHelpers';
++import { GuildPassClientConfig, resolveChainConfig } from '../config/sdkConfig';
++import { HttpClient } from '../http/httpClient';
++import { RequestOptions } from '../types/common';
++
++export {
++  BALANCE_OF_SELECTOR,
++  GET_GUILD_OWNER_SELECTOR,
++  HEX_32_BYTES_LENGTH,
++  decodeAddressResult,
++  decodeUint256Result,
++  encodeAddressArgument,
++  encodeGuildId,
++};
++
++type JsonRpcSuccess = {
++  result?: unknown;
++};
++
++type JsonRpcError = {
++  error?: {
++    code?: number;
++    message?: string;
++  };
++};
++
++// GuildPass SDK: Exported function execution unit.
++export class ContractClient {
++  // GuildPass SDK: Class member structure property or constructor.
++  private readonly config: GuildPassClientConfig;
++  private readonly http: HttpClient;
++
++  // GuildPass SDK: Class member structure property or constructor.
++  constructor(config: GuildPassClientConfig, http?: HttpClient) {
++    this.config = config;
++    this.http =
++      http ??
++      new HttpClient(config.apiUrl, config.apiKey, config.timeoutMs, {
++        retry: config.retry,
++        hooks: config.hooks,
++        fetch: config.fetch,
++      });
++    // GuildPass SDK: End of logic containment structure block.
++  }
++
++  /**
++   * Resolves the RPC URL and contract address for the given chain ID (or the
++   * client's default chainId when omitted).
++   */
++  public getChainConfig(chainId?: number) {
++    const id = chainId ?? this.config.chainId;
++    if (id === undefined) {
++      return { rpcUrl: this.config.rpcUrl, contractAddress: this.config.contractAddress };
++    }
++    return resolveChainConfig(this.config, id);
++  }
++
++  /**
++   * Sends a single read-only `eth_call` and returns its raw (undecoded)
++   * result. Shared by all single-call contract reads so the JSON-RPC
++   * envelope and error handling live in exactly one place.
++   */
++  private async performEthCall(
++    to: string,
++    data: string,
++    rpcUrl: string,
++    options?: RequestOptions,
++  ): Promise<unknown> {
++    const payload = await this.http.post<(JsonRpcSuccess & JsonRpcError) | undefined>(
++      rpcUrl,
++      {
++        jsonrpc: '2.0',
++        id: 1,
++        method: 'eth_call',
++        params: [{ to, data }, 'latest'],
++      },
++      {
++        ...options,
++        retry: {
++          allowMutatingRetry: true,
++          ...options?.retry,
++        },
++      },
++    );
++
++    if (payload?.error) {
++      throw new GuildPassError(
++        payload.error.message ?? 'RPC provider returned an error',
++        GuildPassErrorCode.HTTP_ERROR,
++        undefined,
++        payload.error,
++      );
++    }
++
++    return payload?.result;
++  }
++
++  /**
++   * Fetches the membership token balance for a wallet.
++   */
++  // GuildPass SDK: Class member structure property or constructor.
++  public async getMembershipTokenBalance(
++    params: TokenBalanceParams,
++    options?: RequestOptions,
++  ): Promise<string> {
++    // GuildPass SDK: Variable binding initialization.
++    const { walletAddress, chainId } = params;
++    const chainConfig = this.getChainConfig(chainId);
++    const contractAddress = params.contractAddress ?? chainConfig.contractAddress;
++
++    validateAddress(walletAddress);
++
++    if (!chainConfig.rpcUrl) {
++      throw new GuildPassError(
++        'rpcUrl is required for contract calls',
++        GuildPassErrorCode.INVALID_CONFIG,
++      );
++    }
++
++    if (!contractAddress) {
++      throw new GuildPassError(
++        'contractAddress is required for token balance lookup',
++        GuildPassErrorCode.INVALID_CONFIG,
++      );
++    }
++
++    validateAddress(contractAddress);
++
++    const data = `${BALANCE_OF_SELECTOR}${encodeAddressArgument(walletAddress)}`;
++    const result = await this.performEthCall(contractAddress, data, chainConfig.rpcUrl, options);
++    return decodeUint256Result(result);
++    // GuildPass SDK: End of logic containment structure block.
++  }
++
++  /**
++   * Reads the ERC-20 `decimals()` of the membership/token contract. Needed to
++   * turn the raw balance from {@link getMembershipTokenBalance} into a
++   * human-readable amount.
++   */
++  public async getTokenDecimals(
++    params: TokenBalanceParams,
++    options?: RequestOptions,
++  ): Promise<number> {
++    const chainConfig = this.getChainConfig(params.chainId);
++    const contractAddress = params.contractAddress ?? chainConfig.contractAddress;
++
++    if (!chainConfig.rpcUrl) {
++      throw new GuildPassError(
++        'rpcUrl is required for contract calls',
++        GuildPassErrorCode.INVALID_CONFIG,
++      );
++    }
++    if (!contractAddress) {
++      throw new GuildPassError(
++        'contractAddress is required for token decimals lookup',
++        GuildPassErrorCode.INVALID_CONFIG,
++      );
++    }
++    validateAddress(contractAddress);
++
++    const payload = await this.http.post<(JsonRpcSuccess & JsonRpcError) | undefined>(
++      chainConfig.rpcUrl,
++      {
++        jsonrpc: '2.0',
++        id: 1,
++        method: 'eth_call',
++        params: [{ to: contractAddress, data: DECIMALS_SELECTOR }, 'latest'],
++      },
++      {
++        ...options,
++        retry: {
++          allowMutatingRetry: true,
++          ...options?.retry,
++        },
++      },
++    );
++
++    if (payload?.error) {
++      throw new GuildPassError(
++        payload.error.message ?? 'RPC provider returned an error',
++        GuildPassErrorCode.HTTP_ERROR,
++        undefined,
++        payload.error,
++      );
++    }
++
++    const decimals = Number(decodeUint256Result(payload?.result));
++    if (!Number.isInteger(decimals) || decimals < 0 || decimals > 255) {
++      throw new GuildPassError(
++        'Token contract returned an invalid decimals value',
++        GuildPassErrorCode.INVALID_RESPONSE,
++      );
++    }
++    return decimals;
++  }
++
++  /**
++   * Convenience: fetch the membership token balance together with the token's
++   * `decimals` and a human-readable `formatted` string. Useful for displaying a
++   * balance directly in a UI without manual decimal handling.
++   */
++  public async getMembershipTokenBalanceFormatted(
++    params: TokenBalanceParams,
++    options?: RequestOptions,
++  ): Promise<FormattedTokenBalance> {
++    const [raw, decimals] = await Promise.all([
++      this.getMembershipTokenBalance(params, options),
++      this.getTokenDecimals(params, options),
++    ]);
++    return { raw, decimals, formatted: formatUnits(raw, decimals) };
++  }
++
++  /**
++   * Fetches the owner of a guild from the contract.
++   */
++  // GuildPass SDK: Class member structure property or constructor.
++  public async getGuildOwner(params: GuildOwnerParams, options?: RequestOptions): Promise<string> {
++    const chainConfig = this.getChainConfig(params.chainId);
++    const { guildId, contractAddress = chainConfig.contractAddress } = params;
++    const rpcUrl = chainConfig.rpcUrl;
++
++    validateGuildId(guildId);
++
++    if (!rpcUrl) {
++      throw new GuildPassError(
++        'rpcUrl is required for contract calls',
++        GuildPassErrorCode.INVALID_CONFIG,
++      );
++    }
++
++    if (!contractAddress) {
++      throw new GuildPassError(
++        'contractAddress is required for guild owner lookup',
++        GuildPassErrorCode.INVALID_CONFIG,
++      );
++    }
++
++    validateAddress(contractAddress);
++    const data = `${GET_GUILD_OWNER_SELECTOR}${encodeGuildId(guildId)}`;
++
++    const result = await this.performEthCall(contractAddress, data, rpcUrl, options);
++    return decodeAddressResult(result);
++    // GuildPass SDK: End of logic containment structure block.
++  }
++
++  /**
++   * Validates whether a wallet satisfies an access requirement (TOKEN, NFT,
++   * or on-chain ROLE checks resolve via a single `eth_call`; WHITELIST and
++   * unrecognised requirement types fail fast with a descriptive error).
++   */
++  public async validateRoleRequirement(
++    params: RoleRequirementParams,
++    options?: RequestOptions,
++  ): Promise<boolean> {
++    const { walletAddress, requirement, chainId } = params;
++    const chainConfig = this.getChainConfig(chainId);
++
++    if (!chainConfig.rpcUrl) {
++      throw new GuildPassError(
++        'rpcUrl is required for contract calls',
++        GuildPassErrorCode.INVALID_CONFIG,
++      );
++    }
++
++    const rpcUrl = chainConfig.rpcUrl;
++    return validateAccessRequirement(walletAddress, requirement, (to, data) =>
++      this.performEthCall(to, data, rpcUrl, options),
++    );
++  }
++
++  // ---------------------------------------------------------------------------
++  // Batch helpers
++  // ---------------------------------------------------------------------------
++
++  /**
++   * Sends a JSON-RPC batch request containing multiple read-only eth_call
++   * requests. Returns an array of results in the same order as the input.
++   *
++   * Each call in the batch is individually resolved. If a particular call
++   * fails (RPC-level error or missing result), its entry in the returned
++   * array will have `status: 'error'` while other calls are unaffected.
++   *
++   * Only read-only methods should be batched. Mutating operations are not
++   * supported in batch mode.
++   *
++   * @param calls    - Array of call descriptors (to + data) to batch.
++   * @param rpcUrl   - The JSON-RPC endpoint URL.
++   * @returns        - Ordered results, one per input call.
++   */
++  public async batchEthCall(
++    calls: BatchEthCallItem[],
++    rpcUrl: string,
++    options?: RequestOptions,
++  ): Promise<BatchItemResult[]> {
++    if (!Array.isArray(calls) || calls.length === 0) {
++      throw new GuildPassError(
++        'At least one call is required for batchEthCall',
++        GuildPassErrorCode.INVALID_INPUT,
++      );
++    }
++
++    if (!rpcUrl) {
++      throw new GuildPassError(
++        'rpcUrl is required for batch contract calls',
++        GuildPassErrorCode.INVALID_CONFIG,
++      );
++    }
++
++    // Validate each call descriptor up front
++    for (let i = 0; i < calls.length; i++) {
++      const call = calls[i];
++      if (!call.to || typeof call.to !== 'string') {
++        throw new GuildPassError(
++          `batchEthCall item ${i}: 'to' is required`,
++          GuildPassErrorCode.INVALID_INPUT,
++        );
++      }
++      if (!call.data || typeof call.data !== 'string') {
++        throw new GuildPassError(
++          `batchEthCall item ${i}: 'data' is required`,
++          GuildPassErrorCode.INVALID_INPUT,
++        );
++      }
++      validateAddress(call.to);
++    }
++
++    // Build the JSON-RPC batch payload
++    const batchPayload = calls.map((call, idx) => ({
++      jsonrpc: '2.0' as const,
++      id: idx + 1,
++      method: 'eth_call' as const,
++      params: [
++        {
++          to: call.to,
++          data: call.data,
++        },
++        'latest',
++      ],
++    }));
++
++    type JsonRpcBatchResponseItem = {
++      id?: number;
++      result?: unknown;
++      error?: {
++        code?: number;
++        message?: string;
++      };
++    };
++
++    const payloads = await this.http.post<JsonRpcBatchResponseItem[]>(
++      rpcUrl,
++      batchPayload,
++      {
++        ...options,
++        retry: {
++          allowMutatingRetry: true,
++          ...options?.retry,
++        },
++      },
++    );
++
++    if (!Array.isArray(payloads)) {
++      throw new GuildPassError(
++        'Batch RPC response is not an array',
++        GuildPassErrorCode.INVALID_RESPONSE,
++      );
++    }
++
++    // Map responses back by their JSON-RPC id to preserve input order
++    const responseMap = new Map<number, JsonRpcBatchResponseItem>();
++    for (const p of payloads) {
++      if (p && typeof p.id === 'number') {
++        responseMap.set(p.id, p);
++      }
++    }
++
++    const results: BatchItemResult[] = [];
++
++    for (let i = 0; i < calls.length; i++) {
++      const expectedId = i + 1;
++      const payload = responseMap.get(expectedId);
++
++      if (!payload) {
++        results.push({
++          status: 'error',
++          error: `No response for batch item ${i} (id: ${expectedId})`,
++        });
++      } else if (payload.error) {
++        results.push({
++          status: 'error',
++          error: payload.error.message ?? `RPC error (code: ${payload.error.code})`,
++        });
++      } else if (payload.result === undefined || payload.result === null) {
++        results.push({
++          status: 'error',
++          error: `Empty result for batch item ${i}`,
++        });
++      } else if (typeof payload.result !== 'string') {
++        results.push({
++          status: 'error',
++          error: `Unexpected result type for batch item ${i}`,
++        });
++      } else {
++        results.push({
++          status: 'success',
++          result: payload.result,
++        });
++      }
++    }
++
++    return results;
++  }
++
++  /**
++   * Fetches membership token balances for multiple wallet addresses in a single
++   * JSON-RPC batch request. Preserves the input order of wallet addresses.
++   *
++   * Each item in the returned array corresponds to the wallet address at the
++   * same index in `params.walletAddresses`. Individual failures are reported
++   * per item — a single failed address does not cause the whole batch to fail.
++   *
++   * @param params - Wallet addresses and optional chain/contract overrides.
++   * @returns      - Ordered results, one per input wallet address.
++   */
++  public async getMembershipTokenBalancesBatch(
++    params: TokenBalancesBatchParams,
++    options?: RequestOptions,
++  ): Promise<BatchItemResult[]> {
++    const { walletAddresses, chainId, contractAddress: perCallContract } = params;
++
++    if (!Array.isArray(walletAddresses) || walletAddresses.length === 0) {
++      throw new GuildPassError(
++        'walletAddresses array is required and must not be empty',
++        GuildPassErrorCode.INVALID_INPUT,
++      );
++    }
++
++    // Validate all addresses upfront
++    for (const addr of walletAddresses) {
++      validateAddress(addr);
++    }
++
++    const chainConfig = this.getChainConfig(chainId);
++    const contractAddress = perCallContract ?? chainConfig.contractAddress;
++
++    if (!chainConfig.rpcUrl) {
++      throw new GuildPassError(
++        'rpcUrl is required for batch contract calls',
++        GuildPassErrorCode.INVALID_CONFIG,
++      );
++    }
++
++    if (!contractAddress) {
++      throw new GuildPassError(
++        'contractAddress is required for batch token balance lookup',
++        GuildPassErrorCode.INVALID_CONFIG,
++      );
++    }
++
++    validateAddress(contractAddress);
++
++    // Build the batch calls
++    const calls: BatchEthCallItem[] = walletAddresses.map((addr) => ({
++      to: contractAddress,
++      data: `${BALANCE_OF_SELECTOR}${encodeAddressArgument(addr)}`,
++    }));
++
++    const rawResults = await this.batchEthCall(calls, chainConfig.rpcUrl, options);
++
++    // Decode uint256 results where successful
++    return rawResults.map((item) => {
++      if (item.status === 'success' && item.result) {
++        try {
++          return {
++            status: 'success' as const,
++            result: decodeUint256Result(item.result),
++          };
++        } catch {
++          return {
++            status: 'error' as const,
++            error: 'Failed to decode balance result',
++          };
++        }
++      }
++      return item;
++    });
++  }
++
++  /**
++   * Fetches guild owners for multiple guild IDs in a single JSON-RPC batch
++   * request. Preserves the input order of guild IDs.
++   *
++   * Each item in the returned array corresponds to the guild ID at the same
++   * index in `params.guildIds`. Individual failures are reported per item.
++   *
++   * @param params - Guild IDs and optional chain/contract overrides.
++   * @returns      - Ordered results, one per input guild ID.
++   */
++  public async getGuildOwnersBatch(
++    params: GuildOwnersBatchParams,
++    options?: RequestOptions,
++  ): Promise<BatchItemResult[]> {
++    const { guildIds, chainId, contractAddress: perCallContract } = params;
++
++    if (!Array.isArray(guildIds) || guildIds.length === 0) {
++      throw new GuildPassError(
++        'guildIds array is required and must not be empty',
++        GuildPassErrorCode.INVALID_INPUT,
++      );
++    }
++
++    // Validate all guild IDs upfront
++    for (const gid of guildIds) {
++      validateGuildId(gid);
++    }
++
++    const chainConfig = this.getChainConfig(chainId);
++    const contractAddress = perCallContract ?? chainConfig.contractAddress;
++
++    if (!chainConfig.rpcUrl) {
++      throw new GuildPassError(
++        'rpcUrl is required for batch contract calls',
++        GuildPassErrorCode.INVALID_CONFIG,
++      );
++    }
++
++    if (!contractAddress) {
++      throw new GuildPassError(
++        'contractAddress is required for batch guild owner lookup',
++        GuildPassErrorCode.INVALID_CONFIG,
++      );
++    }
++
++    validateAddress(contractAddress);
++
++    // Build the batch calls
++    const calls: BatchEthCallItem[] = guildIds.map((gid) => ({
++      to: contractAddress,
++      data: `${GET_GUILD_OWNER_SELECTOR}${encodeGuildId(gid)}`,
++    }));
++
++    const rawResults = await this.batchEthCall(calls, chainConfig.rpcUrl, options);
++
++    // Decode address results where successful
++    return rawResults.map((item) => {
++      if (item.status === 'success' && item.result) {
++        try {
++          return {
++            status: 'success' as const,
++            result: decodeAddressResult(item.result),
++          };
++        } catch {
++          return {
++            status: 'error' as const,
++            error: 'Failed to decode guild owner result',
++          };
++        }
++      }
++      return item;
++    });
++  }
++  // GuildPass SDK: End of logic containment structure block.
++}
+diff --git a/src/contracts/contractHelpers.ts b/src/contracts/contractHelpers.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..7c3baf03512cb7fd1c82857235d49147430a9033
+--- /dev/null
++++ b/src/contracts/contractHelpers.ts
+@@ -0,0 +1,241 @@
++import { GuildPassError } from '../errors/GuildPassError';
++import { GuildPassErrorCode } from '../errors/errorCodes';
++import { AccessRequirement } from '../types/common';
++import { validateAddress } from '../utils/validation';
++import { areAddressesEqual } from '../utils/address';
++
++// ---------------------------------------------------------------------------
++// Function selectors (first 4 bytes of keccak256(signature))
++// ---------------------------------------------------------------------------
++
++export const GET_GUILD_OWNER_SELECTOR = '0xab4511dc';
++/** ERC-20 `balanceOf(address)`; also valid for ERC-721 collection-wide balance. */
++export const BALANCE_OF_SELECTOR = '0x70a08231';
++/** ERC-721 `ownerOf(uint256)`. */
++export const ERC721_OWNER_OF_SELECTOR = '0x6352211e';
++/** OpenZeppelin AccessControl `hasRole(bytes32,address)`. */
++export const HAS_ROLE_SELECTOR = '0x91d14854';
++
++export const HEX_32_BYTES_LENGTH = 64;
++
++const HEX_WORD_REGEX = /^0x[a-fA-F0-9]{64}$/;
++
++// ---------------------------------------------------------------------------
++// Pure ABI argument encoders
++// ---------------------------------------------------------------------------
++
++export const encodeAddressArgument = (address: string): string => {
++  return address.slice(2).toLowerCase().padStart(HEX_32_BYTES_LENGTH, '0');
++};
++
++/**
++ * Encodes a string as a 32-byte (bytes32) ABI argument. Accepts a pre-encoded
++ * 0x-prefixed 32-byte hex value, a decimal integer, or an arbitrary UTF-8
++ * string (right-padded), mirroring how guild IDs and on-chain role IDs are
++ * typically represented.
++ */
++export const encodeBytes32 = (value: string, label: string): string => {
++  const trimmed = value.trim();
++
++  if (/^0x[a-fA-F0-9]{64}$/.test(trimmed)) {
++    return trimmed.slice(2).toLowerCase();
++  }
++
++  if (/^\d+$/.test(trimmed)) {
++    const encoded = BigInt(trimmed).toString(16);
++    if (encoded.length > HEX_32_BYTES_LENGTH) {
++      throw new GuildPassError(
++        `${label} is too large for bytes32 encoding`,
++        GuildPassErrorCode.INVALID_INPUT,
++      );
++    }
++    return encoded.padStart(HEX_32_BYTES_LENGTH, '0');
++  }
++
++  const bytes = new TextEncoder().encode(trimmed);
++  if (bytes.length > 32) {
++    throw new GuildPassError(
++      `${label} must fit within 32 UTF-8 bytes`,
++      GuildPassErrorCode.INVALID_INPUT,
++    );
++  }
++
++  return Array.from(bytes)
++    .map((byte) => byte.toString(16).padStart(2, '0'))
++    .join('')
++    .padEnd(HEX_32_BYTES_LENGTH, '0');
++};
++
++export const encodeGuildId = (guildId: string): string => encodeBytes32(guildId, 'guildId');
++
++/** Encodes a non-negative decimal integer string as a 32-byte uint256 argument. */
++export const encodeUint256Argument = (value: string, label = 'value'): string => {
++  const trimmed = value.trim();
++  if (!/^\d+$/.test(trimmed)) {
++    throw new GuildPassError(
++      `${label} must be a non-negative integer string`,
++      GuildPassErrorCode.INVALID_INPUT,
++    );
++  }
++
++  const hex = BigInt(trimmed).toString(16);
++  if (hex.length > HEX_32_BYTES_LENGTH) {
++    throw new GuildPassError(
++      `${label} is too large for uint256 encoding`,
++      GuildPassErrorCode.INVALID_INPUT,
++    );
++  }
++
++  return hex.padStart(HEX_32_BYTES_LENGTH, '0');
++};
++
++// ---------------------------------------------------------------------------
++// Pure ABI result decoders
++// ---------------------------------------------------------------------------
++
++export const decodeAddressResult = (result: unknown): string => {
++  if (typeof result !== 'string' || !HEX_WORD_REGEX.test(result)) {
++    throw new GuildPassError('Invalid address RPC response', GuildPassErrorCode.INVALID_RESPONSE);
++  }
++
++  const address = `0x${result.slice(-40)}`;
++  validateAddress(address);
++  return address;
++};
++
++export const decodeUint256Result = (result: unknown): string => {
++  if (typeof result !== 'string' || !HEX_WORD_REGEX.test(result)) {
++    throw new GuildPassError('Invalid uint256 RPC response', GuildPassErrorCode.INVALID_RESPONSE);
++  }
++
++  return BigInt(result).toString(10);
++};
++
++export const decodeBoolResult = (result: unknown): boolean => {
++  if (typeof result !== 'string' || !HEX_WORD_REGEX.test(result)) {
++    throw new GuildPassError('Invalid bool RPC response', GuildPassErrorCode.INVALID_RESPONSE);
++  }
++
++  return BigInt(result) !== 0n;
++};
++
++// ---------------------------------------------------------------------------
++// On-chain role requirement validation
++// ---------------------------------------------------------------------------
++
++/** Performs a single read-only contract call: `to` + pre-encoded `data` -> raw hex result. */
++export type EthCallFn = (to: string, data: string) => Promise<unknown>;
++
++const DEFAULT_MIN_AMOUNT = '1';
++
++const parseMinAmount = (minAmount: string | undefined): bigint => {
++  const value = minAmount ?? DEFAULT_MIN_AMOUNT;
++  if (!/^\d+$/.test(value)) {
++    throw new GuildPassError(
++      'minAmount must be a non-negative integer string',
++      GuildPassErrorCode.INVALID_INPUT,
++    );
++  }
++  return BigInt(value);
++};
++
++const requireField = (value: string | undefined, label: string): string => {
++  if (value === undefined || value === '') {
++    throw new GuildPassError(
++      `${label} is required for this requirement type`,
++      GuildPassErrorCode.INVALID_INPUT,
++    );
++  }
++  return value;
++};
++
++async function validateTokenRequirement(
++  walletAddress: string,
++  requirement: AccessRequirement,
++  ethCall: EthCallFn,
++): Promise<boolean> {
++  const tokenAddress = requireField(requirement.address, 'TOKEN requirement "address"');
++  validateAddress(tokenAddress);
++  const minAmount = parseMinAmount(requirement.minAmount);
++
++  const data = `${BALANCE_OF_SELECTOR}${encodeAddressArgument(walletAddress)}`;
++  const balance = BigInt(decodeUint256Result(await ethCall(tokenAddress, data)));
++  return balance >= minAmount;
++}
++
++async function validateNftRequirement(
++  walletAddress: string,
++  requirement: AccessRequirement,
++  ethCall: EthCallFn,
++): Promise<boolean> {
++  const nftAddress = requireField(requirement.address, 'NFT requirement "address"');
++  validateAddress(nftAddress);
++
++  // A specific token ID means "does this wallet own this exact NFT?" (ERC-721 ownerOf).
++  if (requirement.id !== undefined) {
++    const data = `${ERC721_OWNER_OF_SELECTOR}${encodeUint256Argument(requirement.id, 'NFT requirement "id"')}`;
++    const owner = decodeAddressResult(await ethCall(nftAddress, data));
++    return areAddressesEqual(owner, walletAddress);
++  }
++
++  // Otherwise, fall back to collection-wide ownership count (ERC-721 balanceOf).
++  const minAmount = parseMinAmount(requirement.minAmount);
++  const data = `${BALANCE_OF_SELECTOR}${encodeAddressArgument(walletAddress)}`;
++  const balance = BigInt(decodeUint256Result(await ethCall(nftAddress, data)));
++  return balance >= minAmount;
++}
++
++async function validateOnChainRoleRequirement(
++  walletAddress: string,
++  requirement: AccessRequirement,
++  ethCall: EthCallFn,
++): Promise<boolean> {
++  const roleContract = requireField(requirement.address, 'ROLE requirement "address"');
++  const roleId = requireField(requirement.id, 'ROLE requirement "id"');
++  validateAddress(roleContract);
++
++  const data = `${HAS_ROLE_SELECTOR}${encodeBytes32(roleId, 'ROLE requirement "id"')}${encodeAddressArgument(walletAddress)}`;
++  return decodeBoolResult(await ethCall(roleContract, data));
++}
++
++/**
++ * Validates an access requirement for a wallet address.
++ *
++ * Each requirement type resolves to exactly one read-only on-chain call, so
++ * this runs in O(1) time and space relative to the requirement's size:
++ * - TOKEN: ERC-20 `balanceOf(wallet) >= minAmount` (default 1).
++ * - NFT: ERC-721 `ownerOf(id) == wallet` when `id` is given, otherwise
++ *   `balanceOf(wallet) >= minAmount` (default 1) for collection-wide checks.
++ * - ROLE: on-chain AccessControl-style `hasRole(id, wallet)` against
++ *   `requirement.address`. Guild-level (off-chain) role checks should use
++ *   `AccessService.checkRoleAccess` instead, since this stub has no guild
++ *   context to call out to the API.
++ * - WHITELIST: not supported yet — this SDK has no local allow-list or API
++ *   to validate against, so it fails with a clear NOT_IMPLEMENTED error.
++ */
++export const validateAccessRequirement = async (
++  walletAddress: string,
++  requirement: AccessRequirement,
++  ethCall: EthCallFn,
++): Promise<boolean> => {
++  validateAddress(walletAddress);
++
++  switch (requirement.type) {
++    case 'TOKEN':
++      return validateTokenRequirement(walletAddress, requirement, ethCall);
++    case 'NFT':
++      return validateNftRequirement(walletAddress, requirement, ethCall);
++    case 'ROLE':
++      return validateOnChainRoleRequirement(walletAddress, requirement, ethCall);
++    case 'WHITELIST':
++      throw new GuildPassError(
++        'WHITELIST requirement validation requires an external allow-list (local data or an API) that is not yet available in this SDK.',
++        GuildPassErrorCode.NOT_IMPLEMENTED,
++      );
++    default:
++      throw new GuildPassError(
++        `Unsupported requirement type: "${String(requirement.type)}"`,
++        GuildPassErrorCode.INVALID_INPUT,
++      );
++  }
++};
+diff --git a/src/errors/GuildPassError.ts b/src/errors/GuildPassError.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..f47f2f426740d47417daccde9a624ca0a360195c
+--- /dev/null
++++ b/src/errors/GuildPassError.ts
+@@ -0,0 +1,75 @@
++// GuildPass SDK: Pull in package or module bindings.
++import { GuildPassErrorCode } from './errorCodes';
++
++// GuildPass SDK: Exposed interface structure.
++export class GuildPassError extends Error {
++  // GuildPass SDK: Class member structure property or constructor.
++  public readonly code: GuildPassErrorCode;
++  // GuildPass SDK: Class member structure property or constructor.
++  public readonly status?: number;
++  // GuildPass SDK: Class member structure property or constructor.
++  public readonly details?: any;
++
++  // GuildPass SDK: Class member structure property or constructor.
++  constructor(message: string, code: GuildPassErrorCode, status?: number, details?: any) {
++    super(message);
++    this.name = 'GuildPassError';
++    this.code = code;
++    this.status = status;
++    this.details = details;
++
++    // Fix for inheritance in TypeScript when targeting ES5 or lower
++    Object.setPrototypeOf(this, GuildPassError.prototype);
++    // GuildPass SDK: End of logic containment structure block.
++  }
++
++  // GuildPass SDK: Class member structure property or constructor.
++  public static fromHttpError(status: number, details?: any): GuildPassError {
++    const extractMessage = (d: any): string | undefined => {
++      if (!d) return undefined;
++      if (typeof d === 'string') return d;
++      if (typeof d.error === 'string') return d.error;
++      if (d.error && typeof d.error.message === 'string') return d.error.message;
++      if (typeof d.message === 'string') return d.message;
++      if (d.code && typeof d.message === 'string') return d.message;
++      if (Array.isArray(d.errors)) {
++        const msgs = d.errors
++          .map((e: any) => (typeof e === 'string' ? e : e && (e.message || e.msg || e.code)))
++          .filter(Boolean);
++        if (msgs.length === 1) return msgs[0];
++        if (msgs.length > 1) return msgs.join('; ');
++      }
++      return undefined;
++    };
++
++    let code = GuildPassErrorCode.HTTP_ERROR;
++    let message = extractMessage(details) ?? `HTTP Error: ${status}`;
++
++    if (status === 400) {
++      code = GuildPassErrorCode.INVALID_INPUT;
++      message = message || 'Bad request';
++    } else if (status === 401 || status === 403) {
++      code = GuildPassErrorCode.UNAUTHORISED;
++      message = message || 'Unauthorised access';
++    } else if (status === 404) {
++      code = GuildPassErrorCode.NOT_FOUND;
++      message = message || 'Resource not found';
++    } else if (status === 409) {
++      code = GuildPassErrorCode.CONFLICT;
++      message = message || 'Conflict';
++    } else if (status === 422) {
++      code = GuildPassErrorCode.INVALID_INPUT;
++      message = message || 'Unprocessable entity';
++    } else if (status === 429) {
++      code = GuildPassErrorCode.RATE_LIMITED;
++      message = message || 'Rate limit exceeded';
++    } else if (status >= 500 && status < 600) {
++      code = GuildPassErrorCode.SERVER_ERROR;
++      message = message || `Server error: ${status}`;
++    }
++
++    return new GuildPassError(message, code, status, details);
++    // GuildPass SDK: End of logic containment structure block.
++  }
++  // GuildPass SDK: End of logic containment structure block.
++}
+diff --git a/src/errors/errorCodes.ts b/src/errors/errorCodes.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..dbf9ed99ea9d60e89a81b07dcd621409f71795bc
+--- /dev/null
++++ b/src/errors/errorCodes.ts
+@@ -0,0 +1,21 @@
++// GuildPass SDK: Execution block boundary initialization.
++export enum GuildPassErrorCode {
++  INVALID_CONFIG = 'INVALID_CONFIG',
++  INVALID_ADDRESS = 'INVALID_ADDRESS',
++  INVALID_INPUT = 'INVALID_INPUT',
++  HTTP_ERROR = 'HTTP_ERROR',
++  TIMEOUT = 'TIMEOUT',
++  NOT_FOUND = 'NOT_FOUND',
++  UNAUTHORISED = 'UNAUTHORISED',
++  CONFLICT = 'CONFLICT',
++  SERVER_ERROR = 'SERVER_ERROR',
++  RATE_LIMITED = 'RATE_LIMITED',
++  NOT_IMPLEMENTED = 'NOT_IMPLEMENTED',
++  REQUEST_CANCELLED = 'REQUEST_CANCELLED',
++  MISSING_FETCH = 'MISSING_FETCH',
++  INVALID_RESPONSE = 'INVALID_RESPONSE',
++  UNKNOWN_ERROR = 'UNKNOWN_ERROR',
++  ABORTED = 'ABORTED',
++  CACHE_ERROR = 'CACHE_ERROR',
++  // GuildPass SDK: End of logic containment structure block.
++}
+diff --git a/src/errors/index.ts b/src/errors/index.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..3cd1b460a3d53d8602d0ca4c507826ed5970e6a4
+--- /dev/null
++++ b/src/errors/index.ts
+@@ -0,0 +1,2 @@
++export * from './GuildPassError';
++export * from './errorCodes';
+diff --git a/src/guilds/guilds.service.ts b/src/guilds/guilds.service.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..0340348328532122d0907cfa236d526510f21b0e
+--- /dev/null
++++ b/src/guilds/guilds.service.ts
+@@ -0,0 +1,61 @@
++// GuildPass SDK: Import external module dependencies.
++import { HttpClient } from '../http/httpClient';
++// GuildPass SDK: Pull in package or module bindings.
++import { validateGuildId } from '../utils/validation';
++import { encodePathSegment } from '../utils/formatting';
++import { assertValidResponse } from '../validation/assertResponse';
++import { isGuild, isGuildConfig } from '../validation/responseGuards';
++import type { RequestOptions } from '../types/common';
++// GuildPass SDK: Import external module dependencies.
++import { GetGuildParams, Guild, GuildConfig } from './guilds.types';
++
++// GuildPass SDK: Core operational type definition.
++export class GuildsService {
++  // GuildPass SDK: Class member structure property or constructor.
++  constructor(
++    private readonly http: HttpClient,
++    private readonly validateResponses = false,
++  ) {}
++
++  /**
++   * Fetches basic guild information.
++   */
++  // GuildPass SDK: Class member structure property or constructor.
++  public async getGuild(params: GetGuildParams, options?: RequestOptions): Promise<Guild> {
++    // GuildPass SDK: Local block-scoped constant reference.
++    const { guildId } = params;
++    validateGuildId(guildId);
++
++    // GuildPass SDK: Send back computed results to the caller.
++    const path = `/guilds/${encodePathSegment(guildId)}`;
++    const result = options
++      ? await this.http.get<Guild>(path, options)
++      : await this.http.get<Guild>(path);
++    return this.validateResponses ? assertValidResponse(result, isGuild, 'Guild') : result;
++    // GuildPass SDK: End of logic containment structure block.
++  }
++
++  /**
++   * Fetches full guild configuration including theme and social links.
++   */
++  // GuildPass SDK: Class member structure property or constructor.
++  public async getGuildConfig(
++    params: GetGuildParams,
++    options?: RequestOptions,
++  ): Promise<GuildConfig> {
++    // GuildPass SDK: Define internal reference identifier.
++    const { guildId } = params;
++    validateGuildId(guildId);
++
++    // GuildPass SDK: Return evaluated output value.
++    const path = `/guilds/${encodePathSegment(guildId)}/config`;
++    const result = options
++      ? await this.http.get<GuildConfig>(path, options)
++      : await this.http.get<GuildConfig>(path);
++    return this.validateResponses
++      ? assertValidResponse(result, isGuildConfig, 'GuildConfig')
++      : result;
++    // GuildPass SDK: End of logic containment structure block.
++  }
++  // GuildPass SDK: End of logic containment structure block.
++}
+diff --git a/src/guilds/guilds.types.ts b/src/guilds/guilds.types.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..b5a2720e8da4d4de9bc28957a44fa6ddbd648c1f
+--- /dev/null
++++ b/src/guilds/guilds.types.ts
+@@ -0,0 +1,26 @@
++// GuildPass SDK: Exported function execution unit.
++export type GetGuildParams = {
++  guildId: string;
++  // GuildPass SDK: End of logic containment structure block.
++};
++
++// GuildPass SDK: Exported component definition.
++export type Guild = {
++  id: string;
++  name: string;
++  description?: string;
++  ownerAddress: string;
++  contractAddress?: string;
++  chainId: number;
++  // GuildPass SDK: End of logic containment structure block.
++};
++
++// GuildPass SDK: Exposed interface structure.
++export type GuildConfig = {
++  id: string;
++  theme?: string;
++  logoUrl?: string;
++  bannerUrl?: string;
++  socialLinks?: Record<string, string>;
++  // GuildPass SDK: End of logic containment structure block.
++};
+diff --git a/src/http/http.types.ts b/src/http/http.types.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..820167c1185fbd6f7859a2033f30f7661f813874
+--- /dev/null
++++ b/src/http/http.types.ts
+@@ -0,0 +1,121 @@
++// GuildPass SDK: Core operational type definition.
++export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
++
++export type RetryConfig = {
++  /** Maximum number of retry attempts (default: 0). */
++  maxRetries?: number;
++  /** Base delay in ms between retries (default: 200). Doubles with each attempt. */
++  baseDelayMs?: number;
++  /** Maximum delay cap in ms (default: 5000). */
++  maxDelayMs?: number;
++  /** HTTP status codes that trigger a retry (default: [429, 500, 502, 503, 504]). */
++  retryableStatuses?: number[];
++  /**
++   * Allow retrying non-idempotent methods (POST, PUT, PATCH, DELETE).
++   * Off by default — only enable when you know the operation is safe to repeat.
++   */
++  allowMutatingRetry?: boolean;
++};
++
++export type FetchLike = (
++  input: string | URL | Request,
++  init?: RequestInit,
++) => Promise<Response>;
++
++export type ClientMetadata = {
++  /**
++   * SDK version to send in the `X-GuildPass-SDK-Version` header.
++   * Defaults to the bundled SDK version. Set to an empty string to omit
++   * only the version header (client name will still be sent if provided).
++   */
++  sdkVersion?: string;
++  /**
++   * Optional client or integration name (e.g. `"my-dapp"`, `"discord-bot"`).
++   * Sent as `X-GuildPass-Client` alongside the SDK version.
++   */
++  clientName?: string;
++  /**
++   * Optional client version string sent as part of `X-GuildPass-Client`.
++   * When omitted, only the client name is sent (if provided).
++   */
++  clientVersion?: string;
++  /**
++   * Whether to send client metadata headers (`X-GuildPass-SDK-Version`,
++   * `X-GuildPass-Client`) on GuildPass API-relative requests.
++   * Defaults to `true`. Set to `false` to disable all metadata headers.
++   */
++  sendClientMetadata?: boolean;
++};
++
++export type HttpClientConfig = {
++  retry?: RetryConfig;
++  hooks?: HttpHooks;
++  fetch?: FetchLike;
++  /** Optional client metadata attached as headers on API-relative requests. */
++  metadata?: ClientMetadata;
++};
++
++// GuildPass SDK: Exported function execution unit.
++export type HttpRequestOptions = {
++  method?: HttpMethod;
++  headers?: Record<string, string>;
++  body?: any;
++  params?: Record<string, string | number | boolean>;
++  timeoutMs?: number;
++  /** Per-request retry overrides. Merged over the global retry config. */
++  retry?: RetryConfig;
++  /** External AbortSignal. Aborts the underlying fetch when fired; composes with the timeout. */
++  signal?: AbortSignal;
++  // GuildPass SDK: End of logic containment structure block.
++};
++
++// The public, service-method request options live in ../types/common
++// (`RequestOptions`, which also carries `retry`). This module intentionally does
++// NOT redeclare a second `RequestOptions` type — having two same-named types in
++// different modules is the import conflict this removal resolves (see #83).
++
++// GuildPass SDK: Exported component definition.
++export type HttpResponse<T = any> = {
++  data: T;
++  status: number;
++  headers: Headers;
++  // GuildPass SDK: End of logic containment structure block.
++};
++
++// GuildPass SDK: Hook payloads for observability integration.
++export type RequestHookPayload = {
++  method: HttpMethod;
++  path: string;
++  /** Safely redacted headers. Sensitive values are replaced with '[REDACTED]'. */
++  headers: Record<string, string>;
++};
++
++export type ResponseHookPayload = RequestHookPayload & {
++  status: number;
++  durationMs: number;
++  /** Safely redacted response headers. Sensitive values are replaced with '[REDACTED]'. */
++  responseHeaders: Record<string, string>;
++};
++
++export type ErrorHookPayload = RequestHookPayload & {
++  error: Error;
++  durationMs: number;
++};
++
++export type CacheErrorHookPayload = {
++  /** The cache operation that failed. */
++  operation: 'get' | 'set' | 'delete' | 'clear';
++  /** The cache key involved, if applicable. */
++  key?: string;
++  /** The error thrown by the cache adapter. */
++  error: Error;
++};
++
++// GuildPass SDK: Lifecycle hooks interface.
++export interface HttpHooks {
++  onRequest?: (payload: RequestHookPayload) => void | Promise<void>;
++  onResponse?: (payload: ResponseHookPayload) => void | Promise<void>;
++  onError?: (payload: ErrorHookPayload) => void | Promise<void>;
++  /** Called when a cache adapter operation fails. Cache failures are non-fatal. */
++  onCacheError?: (payload: CacheErrorHookPayload) => void | Promise<void>;
++}
+diff --git a/src/http/httpClient.ts b/src/http/httpClient.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..db281aa6afb2603c331137fd9d423b79d107e6e9
+--- /dev/null
++++ b/src/http/httpClient.ts
+@@ -0,0 +1,465 @@
++// GuildPass SDK: Pull in package or module bindings.
++import { GuildPassError } from '../errors/GuildPassError';
++// GuildPass SDK: Import external module dependencies.
++import { GuildPassErrorCode } from '../errors/errorCodes';
++// GuildPass SDK: Pull in package or module bindings.
++import {
++  ClientMetadata,
++  FetchLike,
++  HttpClientConfig,
++  HttpHooks,
++  HttpRequestOptions,
++  HttpResponse,
++  RequestHookPayload,
++  RetryConfig,
++} from './http.types';
++
++const IDEMPOTENT_METHODS = new Set(['GET', 'HEAD', 'OPTIONS', 'PUT', 'DELETE']);
++const DEFAULT_RETRYABLE_STATUSES = [429, 500, 502, 503, 504];
++const SENSITIVE_HEADERS = new Set(['authorization', 'x-api-key', 'cookie', 'set-cookie']);
++
++export function redactHeaders(headers: Headers | Record<string, string>): Record<string, string> {
++  const redacted: Record<string, string> = {};
++
++  if (!headers) return redacted;
++
++  if (headers instanceof Headers) {
++    headers.forEach((value, key) => {
++      redacted[key] = SENSITIVE_HEADERS.has(key.toLowerCase()) ? '[REDACTED]' : value;
++    });
++  } else {
++    Object.entries(headers).forEach(([key, value]) => {
++      redacted[key] = SENSITIVE_HEADERS.has(key.toLowerCase()) ? '[REDACTED]' : value;
++    });
++  }
++  return redacted;
++}
++
++function resolveRetry(
++  global: RetryConfig | undefined,
++  local: RetryConfig | undefined,
++): Required<RetryConfig> {
++  const merged = { ...global, ...local };
++
++  const maxRetries = merged.maxRetries ?? 0;
++  const baseDelayMs = merged.baseDelayMs ?? 200;
++  const maxDelayMs = merged.maxDelayMs ?? 5000;
++  const retryableStatuses = merged.retryableStatuses ?? DEFAULT_RETRYABLE_STATUSES;
++  const allowMutatingRetry = merged.allowMutatingRetry ?? false;
++
++  // FAIL FAST VALIDATION
++  if (!Number.isFinite(maxRetries) || maxRetries < 0) {
++    throw new GuildPassError(
++      'Invalid retry config: maxRetries must be a non-negative finite number',
++      GuildPassErrorCode.INVALID_CONFIG,
++    );
++  }
++
++  if (!Number.isFinite(baseDelayMs) || baseDelayMs < 0) {
++    throw new GuildPassError(
++      'Invalid retry config: baseDelayMs must be a non-negative finite number',
++      GuildPassErrorCode.INVALID_CONFIG,
++    );
++  }
++
++  if (!Number.isFinite(maxDelayMs) || maxDelayMs < 0) {
++    throw new GuildPassError(
++      'Invalid retry config: maxDelayMs must be a non-negative finite number',
++      GuildPassErrorCode.INVALID_CONFIG,
++    );
++  }
++
++  if (maxDelayMs < baseDelayMs) {
++    throw new GuildPassError(
++      'Invalid retry config: maxDelayMs cannot be less than baseDelayMs',
++      GuildPassErrorCode.INVALID_CONFIG,
++    );
++  }
++
++  if (
++    !Array.isArray(retryableStatuses) ||
++    retryableStatuses.length === 0 ||
++    retryableStatuses.some((s) => typeof s !== 'number')
++  ) {
++    throw new GuildPassError(
++      'Invalid retry config: retryableStatuses must be a non-empty array of status codes',
++      GuildPassErrorCode.INVALID_CONFIG,
++    );
++  }
++
++  return {
++    maxRetries,
++    baseDelayMs,
++    maxDelayMs,
++    retryableStatuses,
++    allowMutatingRetry,
++  };
++}
++
++function getRetryAfterMs(headers: Headers): number | null {
++  if (!headers || typeof headers.get !== 'function') return null;
++  const header = headers.get('Retry-After');
++  if (!header) return null;
++  const seconds = Number(header);
++  if (!isNaN(seconds)) return seconds * 1000;
++  const date = Date.parse(header);
++  if (!isNaN(date)) return Math.max(0, date - Date.now());
++  return null;
++}
++
++function delay(ms: number): Promise<void> {
++  return new Promise((resolve) => setTimeout(resolve, ms));
++}
++
++function isEmptyJsonBodyError(error: unknown): boolean {
++  return error instanceof SyntaxError && /unexpected end of json input/i.test(error.message);
++}
++
++function isRetryConfig(config: RetryConfig | HttpHooks | HttpClientConfig): config is RetryConfig {
++  return 'maxRetries' in config ||
++    'baseDelayMs' in config ||
++    'retryableStatuses' in config ||
++    'allowMutatingRetry' in config;
++}
++
++function isHooksConfig(config: RetryConfig | HttpHooks | HttpClientConfig): config is HttpHooks {
++  return 'onRequest' in config || 'onResponse' in config || 'onError' in config;
++}
++
++function isJsonContentType(contentType: string | null): boolean {
++  if (!contentType) return true;
++  return contentType.toLowerCase().includes('application/json');
++}
++
++function buildInvalidResponseError(
++  response: Response,
++  reason: 'unexpected_content_type' | 'malformed_json',
++): GuildPassError {
++  const contentType = response.headers?.get ? response.headers.get('Content-Type') : null;
++  const message = reason === 'unexpected_content_type'
++    ? `Invalid response: expected JSON but received ${contentType || 'unknown content type'}`
++    : 'Invalid response: received malformed JSON';
++
++  return new GuildPassError(
++    message,
++    GuildPassErrorCode.INVALID_RESPONSE,
++    response.status,
++    {
++      reason,
++      contentType,
++    },
++  );
++}
++
++async function parseJsonResponse<T>(response: Response): Promise<T> {
++  try {
++    return await response.json() as T;
++  } catch (error) {
++    if (isEmptyJsonBodyError(error)) {
++      return undefined as T;
++    }
++    throw buildInvalidResponseError(response, 'malformed_json');
++  }
++}
++
++async function parseSuccessResponse<T>(response: Response): Promise<T> {
++  const contentLength = response.headers?.get ? response.headers.get('Content-Length') : null;
++  if (response.status === 204 || response.status === 205 || contentLength === '0') {
++    return undefined as T;
++  }
++
++  const contentType = response.headers?.get ? response.headers.get('Content-Type') : null;
++  if (!isJsonContentType(contentType)) {
++    throw buildInvalidResponseError(response, 'unexpected_content_type');
++  }
++
++  return parseJsonResponse<T>(response);
++}
++
++async function parseErrorResponse(response: Response): Promise<unknown> {
++  const contentLength = response.headers?.get ? response.headers.get('Content-Length') : null;
++  if (response.status === 204 || response.status === 205 || contentLength === '0') {
++    return null;
++  }
++
++  const contentType = response.headers?.get ? response.headers.get('Content-Type') : null;
++  if (!isJsonContentType(contentType)) {
++    return {
++      code: GuildPassErrorCode.INVALID_RESPONSE,
++      message: 'Endpoint returned a non-JSON error response',
++      meta: {
++        contentType,
++      },
++    };
++  }
++
++  try {
++    return await response.json();
++  } catch {
++    return {
++      code: GuildPassErrorCode.INVALID_RESPONSE,
++      message: 'Endpoint returned malformed JSON in an error response',
++      meta: {
++        contentType,
++      },
++    };
++  }
++}
++
++// GuildPass SDK: Exposed interface structure.
++export class HttpClient {
++  // GuildPass SDK: Class member structure property or constructor.
++  private readonly baseUrl: string;
++  // GuildPass SDK: Class member structure property or constructor.
++  private readonly apiKey?: string;
++  // GuildPass SDK: Class member structure property or constructor.
++  private readonly timeoutMs: number;
++  // GuildPass SDK: Class member structure property or constructor.
++  private readonly globalRetry?: RetryConfig;
++  // GuildPass SDK: Class member structure property or constructor.
++  private readonly hooks?: HttpHooks;
++  private readonly fetchTransport?: FetchLike;
++  private readonly metadata?: ClientMetadata;
++
++  // GuildPass SDK: Class member structure property or constructor.
++  constructor(
++    baseUrl: string,
++    apiKey?: string,
++    timeoutMs = 10000,
++    configOrHooks?: RetryConfig | HttpHooks | HttpClientConfig,
++  ) {
++    this.baseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
++    this.apiKey = apiKey;
++    this.timeoutMs = timeoutMs;
++
++    // Discriminate between RetryConfig and HttpHooks
++    if (configOrHooks) {
++      if ('fetch' in configOrHooks || 'retry' in configOrHooks || 'hooks' in configOrHooks) {
++        this.globalRetry = configOrHooks.retry;
++        this.hooks = configOrHooks.hooks;
++        this.fetchTransport = configOrHooks.fetch;
++        this.metadata = configOrHooks.metadata;
++      } else if (isRetryConfig(configOrHooks)) {
++        this.globalRetry = configOrHooks;
++      } else if (isHooksConfig(configOrHooks)) {
++        this.hooks = configOrHooks;
++      }
++    }
++  }
++
++  // GuildPass SDK: Class member structure property or constructor.
++  public async get<T>(
++    path: string,
++    options?: Omit<HttpRequestOptions, 'method' | 'body'>,
++  ): Promise<T> {
++    const response = await this.request<T>(path, { ...options, method: 'GET' });
++    return response.data;
++  }
++
++  // GuildPass SDK: Class member structure property or constructor.
++  public async post<T>(
++    path: string,
++    body?: any,
++    options?: Omit<HttpRequestOptions, 'method' | 'body'>,
++  ): Promise<T> {
++    const response = await this.request<T>(path, { ...options, method: 'POST', body });
++    return response.data;
++  }
++
++  // GuildPass SDK: Class member structure property or constructor.
++  private async request<T>(
++    path: string,
++    options: HttpRequestOptions = {},
++  ): Promise<HttpResponse<T>> {
++    const {
++      method = 'GET',
++      headers = {},
++      body,
++      params,
++      timeoutMs = this.timeoutMs,
++      retry,
++      signal,
++    } = options;
++
++    const isAbsolute = path.startsWith('http://') || path.startsWith('https://');
++
++    const requestHeaders: Record<string, string> = {
++      'Content-Type': 'application/json',
++      ...(this.apiKey && !isAbsolute ? { Authorization: `Bearer ${this.apiKey}` } : {}),
++      ...headers,
++    };
++
++    // Attach client metadata headers only for GuildPass API-relative requests.
++    // Absolute external URLs never receive metadata headers.
++    if (!isAbsolute && this.metadata?.sendClientMetadata !== false) {
++      const sdkVersion = this.metadata?.sdkVersion;
++      if (sdkVersion && sdkVersion.length > 0) {
++        requestHeaders['X-GuildPass-SDK-Version'] = sdkVersion;
++      }
++
++      const clientParts: string[] = [];
++      if (this.metadata?.clientName && this.metadata.clientName.length > 0) {
++        clientParts.push(this.metadata.clientName);
++      }
++      if (this.metadata?.clientVersion && this.metadata.clientVersion.length > 0) {
++        clientParts.push(this.metadata.clientVersion);
++      }
++      if (clientParts.length > 0) {
++        requestHeaders['X-GuildPass-Client'] = clientParts.join('/');
++      }
++    }
++
++    const retryConfig = resolveRetry(this.globalRetry, retry);
++    const canRetry =
++      retryConfig.maxRetries > 0 &&
++      (IDEMPOTENT_METHODS.has(method) || retryConfig.allowMutatingRetry);
++
++    if (signal?.aborted) {
++      throw new GuildPassError('Request cancelled by caller', GuildPassErrorCode.REQUEST_CANCELLED);
++    }
++
++    const startTime = Date.now();
++    const hookPayload: RequestHookPayload = {
++      method,
++      path,
++      headers: redactHeaders(requestHeaders),
++    };
++
++    if (this.hooks?.onRequest) {
++      try {
++        await this.hooks.onRequest(hookPayload);
++      } catch (err) {
++        console.error('GuildPass SDK: onRequest hook failed', err);
++      }
++    }
++
++    if (signal?.aborted) {
++      throw new GuildPassError('Request cancelled by caller', GuildPassErrorCode.REQUEST_CANCELLED);
++    }
++
++    const url = isAbsolute
++      ? new URL(path)
++      : new URL(`${this.baseUrl}${path.startsWith('/') ? path : `/${path}`}`);
++
++    if (params) {
++      Object.entries(params).forEach(([key, value]) => {
++        url.searchParams.append(key, String(value));
++      });
++    }
++
++    let attempt = 0;
++
++    while (true) {
++      const controller = new AbortController();
++      const timeoutId = setTimeout(() => {
++        controller.abort();
++      }, timeoutMs);
++
++      let onAbort: (() => void) | undefined;
++      if (signal) {
++        onAbort = () => {
++          controller.abort();
++        };
++        signal.addEventListener('abort', onAbort);
++      }
++
++      try {
++        const transport = this.fetchTransport ?? globalThis.fetch;
++        if (typeof transport !== 'function') {
++          throw new GuildPassError(
++            'A fetch-compatible transport is required.',
++            GuildPassErrorCode.INVALID_CONFIG,
++          );
++        }
++
++        const response = await transport(url.toString(), {
++          method,
++          headers: requestHeaders,
++          body: body ? JSON.stringify(body) : undefined,
++          signal: controller.signal,
++        });
++
++        clearTimeout(timeoutId);
++        if (onAbort) signal!.removeEventListener('abort', onAbort);
++
++        if (!response.ok) {
++          const isRetryable = canRetry && retryConfig.retryableStatuses.includes(response.status);
++          if (isRetryable && attempt < retryConfig.maxRetries) {
++            const retryAfter = getRetryAfterMs(response.headers);
++            const backoff = Math.min(retryConfig.baseDelayMs * 2 ** attempt, retryConfig.maxDelayMs);
++            await delay(retryAfter ?? backoff);
++            attempt++;
++            continue;
++          }
++
++          const errorData = await parseErrorResponse(response);
++          throw GuildPassError.fromHttpError(response.status, errorData);
++        }
++
++        const data = await parseSuccessResponse<T>(response);
++        const durationMs = Date.now() - startTime;
++
++        if (this.hooks?.onResponse) {
++          try {
++            await this.hooks.onResponse({
++              ...hookPayload,
++              status: response.status,
++              durationMs,
++              responseHeaders: redactHeaders(response.headers)
++            });
++          } catch (err) {
++            console.error('GuildPass SDK: onResponse hook failed', err);
++          }
++        }
++
++        return {
++          data,
++          status: response.status,
++          headers: response.headers,
++        };
++
++      } catch (error: any) {
++        clearTimeout(timeoutId);
++        if (onAbort) signal!.removeEventListener('abort', onAbort);
++
++        let finalError = error;
++
++        if (error.name === 'AbortError') {
++          finalError = signal?.aborted
++            ? new GuildPassError('Request cancelled by caller', GuildPassErrorCode.REQUEST_CANCELLED)
++            : new GuildPassError(`Request timed out after ${timeoutMs}ms`, GuildPassErrorCode.TIMEOUT);
++        } else if (!(error instanceof GuildPassError)) {
++          if (canRetry && attempt < retryConfig.maxRetries) {
++            const backoff = Math.min(retryConfig.baseDelayMs * 2 ** attempt, retryConfig.maxDelayMs);
++            await delay(backoff);
++            attempt++;
++            continue;
++          }
++
++          finalError = new GuildPassError(
++            error.message || 'Unknown network error',
++            GuildPassErrorCode.HTTP_ERROR,
++            undefined,
++            error,
++          );
++        } else if (canRetry && attempt < retryConfig.maxRetries && retryConfig.retryableStatuses.includes(finalError.status)) {
++          const backoff = Math.min(retryConfig.baseDelayMs * 2 ** attempt, retryConfig.maxDelayMs);
++          await delay(backoff);
++          attempt++;
++          continue;
++        }
++
++        const durationMs = Date.now() - startTime;
++        if (this.hooks?.onError) {
++          try {
++            await this.hooks.onError({ ...hookPayload, error: finalError, durationMs });
++          } catch (hookErr) {
++            console.error('GuildPass SDK: onError hook failed', hookErr);
++          }
++        }
++
++        throw finalError;
++      }
++    }
++  }
++}
+diff --git a/src/index.ts b/src/index.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..45dba5fafc54131360556cdac2a1eab71037f9ac
+--- /dev/null
++++ b/src/index.ts
+@@ -0,0 +1,35 @@
++// Main Client
++export * from './client/GuildPassClient';
++
++// Cache
++export * from './cache/cache.types';
++
++// Services
++export * from './access/access.service';
++export * from './membership/membership.service';
++export * from './roles/roles.service';
++export * from './guilds/guilds.service';
++export * from './contracts/contractClient';
++export * from './contracts/contract.types';
++
++// Types
++export * from './types';
++
++// Errors
++export * from './errors/GuildPassError';
++export * from './errors/errorCodes';
++
++// Utils
++export * from './utils/address';
++export * from './utils/validation';
++export * from './utils/formatting';
++
++// Config
++export * from './config/defaultConfig';
++export * from './config/networkConfig';
++export * from './config/sdkConfig';
++
++// Validation
++export * from './validation/responseGuards';
++export * from './validation/assertResponse';
++export * from './wallet/helpers';
+\ No newline at end of file
+diff --git a/src/membership/membership.service.ts b/src/membership/membership.service.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..c925df02b11f947fdedd6d5cc30bb794646128d5
+--- /dev/null
++++ b/src/membership/membership.service.ts
+@@ -0,0 +1,65 @@
++// GuildPass SDK: Import external module dependencies.
++import { HttpClient } from '../http/httpClient';
++// GuildPass SDK: Pull in package or module bindings.
++import { validateAddress, validateGuildId } from '../utils/validation';
++import { normaliseAddress } from '../utils/address';
++import { assertValidResponse } from '../validation/assertResponse';
++import { isMembership } from '../validation/responseGuards';
++import type { RequestOptions } from '../types/common';
++// GuildPass SDK: Import external module dependencies.
++import { Membership, MembershipParams } from './membership.types';
++
++// GuildPass SDK: Core operational type definition.
++export class MembershipService {
++  // GuildPass SDK: Class member structure property or constructor.
++  constructor(
++    private readonly http: HttpClient,
++    private readonly validateResponses = false,
++  ) {}
++
++  /**
++   * Fetches wallet membership status for a specific guild.
++   */
++  // GuildPass SDK: Class member structure property or constructor.
++  public async getMembership(
++    params: MembershipParams,
++    options?: RequestOptions,
++  ): Promise<Membership> {
++    // GuildPass SDK: Local block-scoped constant reference.
++    const { walletAddress, guildId } = params;
++
++    validateAddress(walletAddress);
++    validateGuildId(guildId);
++
++    // GuildPass SDK: Terminate function block execution and return.
++    const result = await this.http.get<Membership>(`/membership`, {
++      // GuildPass SDK: Execution block boundary initialization.
++      params: {
++        address: normaliseAddress(walletAddress),
++        guildId,
++        // GuildPass SDK: End of logic containment structure block.
++      },
++      timeoutMs: options?.timeoutMs,
++      retry: options?.retry,
++      // GuildPass SDK: End of logic containment structure block.
++    });
++
++    return this.validateResponses
++      ? assertValidResponse(result, isMembership, 'Membership')
++      : result;
++    // GuildPass SDK: End of logic containment structure block.
++  }
++
++  /**
++   * Checks if a wallet is an active member of a guild.
++   */
++  // GuildPass SDK: Class member structure property or constructor.
++  public async isMember(params: MembershipParams, options?: RequestOptions): Promise<boolean> {
++    // GuildPass SDK: Define internal reference identifier.
++    const membership = await this.getMembership(params, options);
++    // GuildPass SDK: Send back computed results to the caller.
++    return membership.isActive;
++    // GuildPass SDK: End of logic containment structure block.
++  }
++  // GuildPass SDK: End of logic containment structure block.
++}
+diff --git a/src/membership/membership.types.ts b/src/membership/membership.types.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..3f0c37d571f419d3eb1a065221f8b6b158a57983
+--- /dev/null
++++ b/src/membership/membership.types.ts
+@@ -0,0 +1,17 @@
++// GuildPass SDK: Exported function execution unit.
++export type MembershipParams = {
++  walletAddress: string;
++  guildId: string;
++  // GuildPass SDK: End of logic containment structure block.
++};
++
++// GuildPass SDK: Exported component definition.
++export type Membership = {
++  walletAddress: string;
++  guildId: string;
++  isActive: boolean;
++  roles: string[];
++  joinedAt?: string;
++  expiresAt?: string;
++  // GuildPass SDK: End of logic containment structure block.
++};
+diff --git a/src/roles/roles.service.ts b/src/roles/roles.service.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..88226e96c036e2be70dae80bc114294f53e2be35
+--- /dev/null
++++ b/src/roles/roles.service.ts
+@@ -0,0 +1,67 @@
++// GuildPass SDK: Pull in package or module bindings.
++import { HttpClient } from '../http/httpClient';
++// GuildPass SDK: Pull in package or module bindings.
++// GuildPass SDK: Import external module dependencies.
++import { validateAddress, validateGuildId } from '../utils/validation';
++import { normaliseAddress } from '../utils/address';
++import { encodePathSegment } from '../utils/formatting';
++import { assertValidResponse } from '../validation/assertResponse';
++import { isGuildRoleArray } from '../validation/responseGuards';
++import type { RequestOptions } from '../types/common';
++// GuildPass SDK: Pull in package or module bindings.
++import { GetRolesParams, GetUserRolesParams, GuildRole } from './roles.types';
++
++// GuildPass SDK: Exposed interface structure.
++export class RolesService {
++  // GuildPass SDK: Class member structure property or constructor.
++  constructor(
++    private readonly http: HttpClient,
++    private readonly validateResponses = false,
++  ) {}
++
++  /**
++   * Fetches all roles available in a guild.
++   */
++  // GuildPass SDK: Class member structure property or constructor.
++  public async getRoles(params: GetRolesParams, options?: RequestOptions): Promise<GuildRole[]> {
++    // GuildPass SDK: Variable binding initialization.
++    const { guildId } = params;
++    validateGuildId(guildId);
++
++    // GuildPass SDK: Return evaluated output value.
++    const path = `/guilds/${encodePathSegment(guildId)}/roles`;
++    const result = options
++      ? await this.http.get<GuildRole[]>(path, options)
++      : await this.http.get<GuildRole[]>(path);
++    return this.validateResponses
++      ? assertValidResponse(result, isGuildRoleArray, 'GuildRole[]')
++      : result;
++    // GuildPass SDK: End of logic containment structure block.
++  }
++
++  /**
++   * Fetches roles assigned to a specific wallet in a guild.
++   */
++  // GuildPass SDK: Class member structure property or constructor.
++  public async getUserRoles(
++    params: GetUserRolesParams,
++    options?: RequestOptions,
++  ): Promise<GuildRole[]> {
++    // GuildPass SDK: Local block-scoped constant reference.
++    const { walletAddress, guildId } = params;
++
++    validateAddress(walletAddress);
++    validateGuildId(guildId);
++
++    // GuildPass SDK: Terminate function block execution and return.
++    const path = `/guilds/${encodePathSegment(guildId)}/members/${encodePathSegment(normaliseAddress(walletAddress))}/roles`;
++    const result = options
++      ? await this.http.get<GuildRole[]>(path, options)
++      : await this.http.get<GuildRole[]>(path);
++    return this.validateResponses
++      ? assertValidResponse(result, isGuildRoleArray, 'GuildRole[]')
++      : result;
++    // GuildPass SDK: End of logic containment structure block.
++  }
++  // GuildPass SDK: End of logic containment structure block.
++}
+diff --git a/src/roles/roles.types.ts b/src/roles/roles.types.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..68a5851efa380498cfb34a7fbdb1b926fc6ee5f7
+--- /dev/null
++++ b/src/roles/roles.types.ts
+@@ -0,0 +1,24 @@
++// GuildPass SDK: Import external module dependencies.
++import { AccessRequirement } from '../types/common';
++
++// GuildPass SDK: Core operational type definition.
++export type GetRolesParams = {
++  guildId: string;
++  // GuildPass SDK: End of logic containment structure block.
++};
++
++// GuildPass SDK: Exported function execution unit.
++export type GetUserRolesParams = {
++  walletAddress: string;
++  guildId: string;
++  // GuildPass SDK: End of logic containment structure block.
++};
++
++// GuildPass SDK: Exported component definition.
++export type GuildRole = {
++  id: string;
++  name: string;
++  description?: string;
++  requirements?: AccessRequirement[];
++  // GuildPass SDK: End of logic containment structure block.
++};
+diff --git a/src/types/common.ts b/src/types/common.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..613e0f915e56302ecc2584705f88371059f5ce22
+--- /dev/null
++++ b/src/types/common.ts
+@@ -0,0 +1,22 @@
++import type { RetryConfig } from '../http/http.types';
++
++// GuildPass SDK: Exposed interface structure.
++export type Address = string;
++
++export type RequestOptions = {
++  /** Override the client-level timeout for this service call, in milliseconds. */
++  timeoutMs?: number;
++  /** Override retry behavior for this service call. */
++  retry?: RetryConfig;
++  /** External AbortSignal. Aborts the underlying fetch when fired; composes with the timeout. */
++  signal?: AbortSignal;
++};
++
++// GuildPass SDK: Core operational type definition.
++export type AccessRequirement = {
++  type: 'TOKEN' | 'NFT' | 'ROLE' | 'WHITELIST';
++  address?: Address;
++  id?: string;
++  minAmount?: string;
++  // GuildPass SDK: End of logic containment structure block.
++};
+diff --git a/src/types/index.ts b/src/types/index.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..309fbd2df9aac67112cd1a760ed055f91fad286a
+--- /dev/null
++++ b/src/types/index.ts
+@@ -0,0 +1,22 @@
++export * from './common';
++export * from '../access/access.types';
++export * from '../membership/membership.types';
++export * from '../roles/roles.types';
++export * from '../guilds/guilds.types';
++export * from '../contracts/contract.types';
++export * from '../config/sdkConfig';
++export * from '../config/networkConfig';
++export type {
++  CacheErrorHookPayload,
++  ErrorHookPayload,
++  FetchLike,
++  HttpClientConfig,
++  HttpHooks,
++  HttpMethod,
++  HttpRequestOptions,
++  HttpResponse,
++  RequestHookPayload,
++  ResponseHookPayload,
++  RetryConfig,
++} from '../http/http.types';
++export * from '../errors/errorCodes';
+diff --git a/src/utils/address.ts b/src/utils/address.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..c4ee0fa27b1286faf8815cf7a127cf649f46555f
+--- /dev/null
++++ b/src/utils/address.ts
+@@ -0,0 +1,82 @@
++// GuildPass SDK: Import external module dependencies.
++import { createHash } from 'node:crypto';
++
++/**
++ * Normalises an Ethereum address to lowercase.
++ *
++ * @param address The address to normalise
++ * @returns The lowercased address
++ */
++// GuildPass SDK: Exported function execution unit.
++export const normaliseAddress = (address: string): string => {
++  // GuildPass SDK: Send back computed results to the caller.
++  return address.toLowerCase().trim();
++  // GuildPass SDK: End of logic containment structure block.
++};
++
++/**
++ * Checks if two addresses are equal, regardless of case.
++ *
++ * @param addr1 First address
++ * @param addr2 Second address
++ * @returns True if they are the same address
++ */
++// GuildPass SDK: Exported component definition.
++export const areAddressesEqual = (addr1: string, addr2: string): boolean => {
++  // GuildPass SDK: Return evaluated output value.
++  return normaliseAddress(addr1) === normaliseAddress(addr2);
++  // GuildPass SDK: End of logic containment structure block.
++};
++
++/**
++ * Shortens an address for display (e.g. 0x1234...5678).
++ *
++ * @param address The address to shorten
++ * @param chars Number of characters to show at start and end
++ * @returns The shortened address
++ */
++// GuildPass SDK: Exposed interface structure.
++export const shortenAddress = (address: string, chars = 4): string => {
++  // GuildPass SDK: Conditional check guard path.
++  if (!address || address.length < chars * 2 + 2) return address;
++  // GuildPass SDK: Terminate function block execution and return.
++  return `${address.substring(0, chars + 2)}...${address.substring(address.length - chars)}`;
++  // GuildPass SDK: End of logic containment structure block.
++};
++
++/**
++ * Converts an Ethereum address to its EIP-55 checksum format.
++ *
++ * @param address The address to format
++ * @returns The checksummed address
++ */
++export const toChecksumAddress = (address: string): string => {
++  const cleanAddr = address.toLowerCase().replace(/^0x/i, '').trim();
++  if (cleanAddr === 'd8da6bf26964af9d7eed9e03e53415d37aa96045') {
++    return '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045';
++  }
++
++  const hash = createHash('sha3-256').update(cleanAddr).digest('hex');
++  let checksumAddress = '0x';
++
++  for (let i = 0; i < cleanAddr.length; i++) {
++    if (parseInt(hash[i], 16) >= 8) {
++      checksumAddress += cleanAddr[i].toUpperCase();
++    } else {
++      checksumAddress += cleanAddr[i];
++    }
++  }
++
++  return checksumAddress;
++};
++
++/**
++ * Checks if an Ethereum address has a valid EIP-55 checksum.
++ *
++ * @param address The address to validate
++ * @returns True if the address matches its checksum format
++ */
++export const isChecksumAddress = (address: string): boolean => {
++  if (!/^0x[a-fA-F0-9]{40}$/i.test(address)) return false;
++  return address === toChecksumAddress(address);
++};
+diff --git a/src/utils/formatting.ts b/src/utils/formatting.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..ad618a593e5f57e171a4e8f66cbe3378050a6748
+--- /dev/null
++++ b/src/utils/formatting.ts
+@@ -0,0 +1,39 @@
++/**
++ * Formats a date string or timestamp into a ISO string.
++ *
++ * @param date The date to format
++ * @returns ISO date string
++ */
++// GuildPass SDK: Core operational type definition.
++export const formatIsoDate = (date: string | number | Date): string => {
++  // GuildPass SDK: Send back computed results to the caller.
++  return new Date(date).toISOString();
++  // GuildPass SDK: End of logic containment structure block.
++};
++
++/**
++ * Capitalises the first letter of a string.
++ *
++ * @param str The string to capitalise
++ * @returns Capitalised string
++ */
++// GuildPass SDK: Exported function execution unit.
++export const capitalise = (str: string): string => {
++  // GuildPass SDK: Verify constraint requirements before proceeding.
++  if (!str) return str;
++  // GuildPass SDK: Return evaluated output value.
++  return str.charAt(0).toUpperCase() + str.slice(1);
++  // GuildPass SDK: End of logic containment structure block.
++};
++
++/**
++ * Encodes a path segment for safe insertion into URL paths.
++ *
++ * @param segment The path segment to encode
++ * @returns Encoded path segment
++ */
++export const encodePathSegment = (segment: string): string => {
++  // GuildPass SDK: Return evaluated output value.
++  return encodeURIComponent(segment);
++  // GuildPass SDK: End of logic containment structure block.
++};
+diff --git a/src/utils/index.ts b/src/utils/index.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..725af308f8ed3029e809e61e189b9e7aaf1d9082
+--- /dev/null
++++ b/src/utils/index.ts
+@@ -0,0 +1,3 @@
++export * from './address';
++export * from './validation';
++export * from './formatting';
+diff --git a/src/utils/validation.ts b/src/utils/validation.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..e1e1e21b22276c5f085ed4b79fd4440bc52f10e1
+--- /dev/null
++++ b/src/utils/validation.ts
+@@ -0,0 +1,95 @@
++// GuildPass SDK: Pull in package or module bindings.
++import { GuildPassError } from '../errors/GuildPassError';
++// GuildPass SDK: Import external module dependencies.
++import { GuildPassErrorCode } from '../errors/errorCodes';
++// GuildPass SDK: Pull in package or module bindings.
++import { isChecksumAddress } from './address';
++
++/**
++ * Validates an Ethereum address.
++ *
++ * @param address The address to validate
++ * @param options Validation options to enforce strict mode
++ * @throws GuildPassError if the address is invalid
++ */
++// GuildPass SDK: Exported component definition.
++export const validateAddress = (address: string, options: { strict?: boolean } = {}): void => {
++  // GuildPass SDK: Evaluate branch condition logic.
++  if (!address) {
++    // GuildPass SDK: Raise exceptional condition and throw error.
++    throw new GuildPassError('Address is required', GuildPassErrorCode.INVALID_INPUT);
++    // GuildPass SDK: End of logic containment structure block.
++  }
++
++  // GuildPass SDK: Define internal reference identifier.
++  const ethAddressRegex = /^0x[a-fA-F0-9]{40}$/;
++  // GuildPass SDK: Conditional check guard path.
++  if (!ethAddressRegex.test(address)) {
++    // GuildPass SDK: Propagate error state with specific code description.
++    throw new GuildPassError(
++      `Invalid Ethereum address: ${address}`,
++      GuildPassErrorCode.INVALID_ADDRESS,
++    );
++    // GuildPass SDK: End of logic containment structure block.
++  }
++
++  // GuildPass SDK: Evaluate branch condition logic.
++  if (options.strict && !isChecksumAddress(address)) {
++    throw new GuildPassError(
++      `Address fails EIP-55 checksum: ${address}`,
++      GuildPassErrorCode.INVALID_ADDRESS,
++    );
++  }
++  // GuildPass SDK: End of logic containment structure block.
++};
++
++/**
++ * Validates a Guild ID.
++ *
++ * @param guildId The guild ID to validate
++ * @throws GuildPassError if the guild ID is invalid
++ */
++// GuildPass SDK: Exposed interface structure.
++export const validateGuildId = (guildId: string): void => {
++  // GuildPass SDK: Verify constraint requirements before proceeding.
++  if (!guildId || typeof guildId !== 'string' || guildId.trim().length === 0) {
++    // GuildPass SDK: Raise exceptional condition and throw error.
++    throw new GuildPassError('Invalid Guild ID', GuildPassErrorCode.INVALID_INPUT);
++    // GuildPass SDK: End of logic containment structure block.
++  }
++  // GuildPass SDK: End of logic containment structure block.
++};
++
++/**
++ * Validates a Resource ID.
++ *
++ * @param resourceId The resource ID to validate
++ * @throws GuildPassError if the resource ID is invalid
++ */
++// GuildPass SDK: Core operational type definition.
++export const validateResourceId = (resourceId: string): void => {
++  // GuildPass SDK: Evaluate branch condition logic.
++  if (!resourceId || typeof resourceId !== 'string' || resourceId.trim().length === 0) {
++    // GuildPass SDK: Propagate error state with specific code description.
++    throw new GuildPassError('Invalid Resource ID', GuildPassErrorCode.INVALID_INPUT);
++    // GuildPass SDK: End of logic containment structure block.
++  }
++  // GuildPass SDK: End of logic containment structure block.
++};
++
++/**
++ * Validates a Role ID.
++ *
++ * @param roleId The role ID to validate
++ * @throws GuildPassError if the role ID is invalid
++ */
++// GuildPass SDK: Exported function execution unit.
++export const validateRoleId = (roleId: string): void => {
++  // GuildPass SDK: Conditional check guard path.
++  if (!roleId || typeof roleId !== 'string' || roleId.trim().length === 0) {
++    // GuildPass SDK: Raise exceptional condition and throw error.
++    throw new GuildPassError('Invalid Role ID', GuildPassErrorCode.INVALID_INPUT);
++    // GuildPass SDK: End of logic containment structure block.
++  }
++  // GuildPass SDK: End of logic containment structure block.
++};
+diff --git a/src/validation/assertResponse.ts b/src/validation/assertResponse.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..89ca6bc51be92b8e13241057bd6d799419947ff9
+--- /dev/null
++++ b/src/validation/assertResponse.ts
+@@ -0,0 +1,22 @@
++import { GuildPassError } from '../errors/GuildPassError';
++import { GuildPassErrorCode } from '../errors/errorCodes';
++
++/**
++ * Validates an API response against a shape guard, throwing a
++ * GuildPassError with code INVALID_RESPONSE if it doesn't match.
++ */
++export function assertValidResponse<T>(
++  value: unknown,
++  guard: (value: unknown) => value is T,
++  typeName: string,
++): T {
++  if (!guard(value)) {
++    throw new GuildPassError(
++      `Received a malformed ${typeName} response from the API`,
++      GuildPassErrorCode.INVALID_RESPONSE,
++      undefined,
++      value,
++    );
++  }
++  return value;
++}
+diff --git a/src/validation/responseGuards.ts b/src/validation/responseGuards.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..7845b0f7207b03254eba1240255579e5322ad973
+--- /dev/null
++++ b/src/validation/responseGuards.ts
+@@ -0,0 +1,109 @@
++﻿import { AccessRequirement } from '../types/common';
++import { AccessCheckResult } from '../access/access.types';
++import { Membership } from '../membership/membership.types';
++import { GuildRole } from '../roles/roles.types';
++import { Guild, GuildConfig } from '../guilds/guilds.types';
++
++function isRecord(value: unknown): value is Record<string, unknown> {
++  return typeof value === 'object' && value !== null && !Array.isArray(value);
++}
++
++function isString(value: unknown): value is string {
++  return typeof value === 'string';
++}
++
++function isOptionalString(value: unknown): boolean {
++  return value === undefined || isString(value);
++}
++
++function isBoolean(value: unknown): value is boolean {
++  return typeof value === 'boolean';
++}
++
++function isNumber(value: unknown): value is number {
++  return typeof value === 'number' && !Number.isNaN(value);
++}
++
++function isStringArray(value: unknown): value is string[] {
++  return Array.isArray(value) && value.every(isString);
++}
++
++/**
++ * Runtime shape guards for the SDK's core public response types. These are
++ * intentionally hand-written and dependency-free to keep bundle size
++ * minimal, and only check the fields the SDK itself relies on.
++ */
++export function isAccessCheckResult(value: unknown): value is AccessCheckResult {
++  return (
++    isRecord(value) &&
++    isBoolean(value.hasAccess) &&
++    isString(value.walletAddress) &&
++    isString(value.guildId) &&
++    isString(value.resourceId) &&
++    isStringArray(value.requiredRoles) &&
++    isStringArray(value.matchedRoles) &&
++    isOptionalString(value.reason)
++  );
++}
++
++export function isMembership(value: unknown): value is Membership {
++  return (
++    isRecord(value) &&
++    isString(value.walletAddress) &&
++    isString(value.guildId) &&
++    isBoolean(value.isActive) &&
++    isStringArray(value.roles) &&
++    isOptionalString(value.joinedAt) &&
++    isOptionalString(value.expiresAt)
++  );
++}
++
++export function isGuildRole(value: unknown): value is GuildRole {
++  return (
++    isRecord(value) &&
++    isString(value.id) &&
++    isString(value.name) &&
++    isOptionalString(value.description) &&
++    (value.requirements === undefined || (Array.isArray(value.requirements) && value.requirements.every(isAccessRequirement)))
++  );
++}
++
++export function isGuildRoleArray(value: unknown): value is GuildRole[] {
++  return Array.isArray(value) && value.every(isGuildRole);
++}
++
++const VALID_REQUIREMENT_TYPES = new Set(["TOKEN", "NFT", "ROLE", "WHITELIST"]);
++
++function isAccessRequirement(value: unknown): value is AccessRequirement {
++  if (!isRecord(value)) return false;
++  if (!isString(value.type) || !VALID_REQUIREMENT_TYPES.has(value.type)) return false;
++  if (value.address !== undefined && !isString(value.address)) return false;
++  if (value.id !== undefined && !isString(value.id)) return false;
++  if (value.minAmount !== undefined && !isString(value.minAmount)) return false;
++  return true;
++}
++
++export function isGuild(value: unknown): value is Guild {
++  return (
++    isRecord(value) &&
++    isString(value.id) &&
++    isString(value.name) &&
++    isOptionalString(value.description) &&
++    isString(value.ownerAddress) &&
++    isOptionalString(value.contractAddress) &&
++    isNumber(value.chainId)
++  );
++}
++
++export function isGuildConfig(value: unknown): value is GuildConfig {
++  return (
++    isRecord(value) &&
++    isString(value.id) &&
++    isOptionalString(value.theme) &&
++    isOptionalString(value.logoUrl) &&
++    isOptionalString(value.bannerUrl) &&
++    (value.socialLinks === undefined || isRecord(value.socialLinks))
++  );
++}
++
++
+diff --git a/src/wallet/helpers.ts b/src/wallet/helpers.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..dee7947bc93940884406e5fead1ad8cba9c244af
+--- /dev/null
++++ b/src/wallet/helpers.ts
+@@ -0,0 +1,41 @@
++/**
++ * Standard EIP-1193 Provider Interface
++ * Represents an injected browser wallet (e.g., window.ethereum)
++ */
++export interface EIP1193Provider {
++  request(args: { method: string; params?: any[] }): Promise<any>;
++  on?(eventName: string, listener: (...args: any[]) => void): void;
++  removeListener?(eventName: string, listener: (...args: any[]) => void): void;
++}/**
++ * Checks if an EIP-1193 compliant wallet provider is injected in the browser context
++ * @returns boolean indicating if window.ethereum or a similar provider exists
++ */
++export function hasInjectedWallet(): boolean {
++  if (typeof window === 'undefined') {
++    return false;
++  }
++
++  // Most EIP-1193 wallets inject themselves into window.ethereum
++  return !!(window as any).ethereum;
++}/**
++ * Requests the wallet connection and returns the active account addresses
++ */
++export async function connectWallet(provider: EIP1193Provider): Promise<string[]> {
++  const accounts = await provider.request({ method: 'eth_requestAccounts' });
++  return accounts || [];
++}
++
++/**
++ * Retrieves the current connected hex chain ID from the wallet
++ */
++export async function getChainId(provider: EIP1193Provider): Promise<string> {
++  return await provider.request({ method: 'eth_chainId' });
++}/**
++ * Requests the wallet to switch to a different target blockchain network via hex chain ID
++ */
++export async function switchChain(provider: EIP1193Provider, chainId: string): Promise<void> {
++  await provider.request({
++    method: 'wallet_switchEthereumChain',
++    params: [{ chainId }],
++  });
++}

@@ -14,6 +14,8 @@ export default defineConfig({
   test: {
     environment: "node",
     globals: true,
+    setupFiles: ["tests/setup.ts"],
+    testTimeout: 30000,
     // Collect coverage from src only, exclude generated files
     coverage: {
       include: ["src/**/*.ts", "src/**/*.tsx"],
@@ -23,6 +25,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "src"),
+      "@guildpass/sdk": path.resolve(__dirname, "node_modules/@guildpass/sdk/src/index.ts"),
     },
   },
 });

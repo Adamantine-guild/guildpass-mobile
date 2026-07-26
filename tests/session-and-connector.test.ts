@@ -2,7 +2,11 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { useSessionStore } from "../src/features/session/session.store";
 import { SessionAdapter } from "../src/features/session/session.types";
 import { noopSessionAdapter } from "../src/features/session/session.adapter";
-import { createManualConnector, createWalletConnectConnector, isConnectorTypeSupported } from "../src/features/wallet/walletConnector.service";
+import {
+  createManualConnector,
+  createWalletConnectConnector,
+  isConnectorTypeSupported,
+} from "../src/features/wallet/walletConnector.service";
 
 const ADDR = "0x1234567890123456789012345678901234567890";
 
@@ -33,8 +37,12 @@ describe("Session store", () => {
 
   it("startSession transitions to failed when adapter throws", async () => {
     const failingAdapter: SessionAdapter = {
-      async signIn() { throw new Error("network error"); },
-      async refresh(t) { return { token: t, expiresAt: 0 }; },
+      async signIn() {
+        throw new Error("network error");
+      },
+      async refresh(t) {
+        return { token: t, expiresAt: 0 };
+      },
       async signOut() {},
     };
     useSessionStore.getState().setAdapter(failingAdapter);
@@ -53,8 +61,12 @@ describe("Session store", () => {
 
   it("refreshSession updates token", async () => {
     const refreshAdapter: SessionAdapter = {
-      async signIn() { return { token: "initial", expiresAt: Date.now() + 1000 }; },
-      async refresh() { return { token: "refreshed", expiresAt: Date.now() + 2000 }; },
+      async signIn() {
+        return { token: "initial", expiresAt: Date.now() + 1000 };
+      },
+      async refresh() {
+        return { token: "refreshed", expiresAt: Date.now() + 2000 };
+      },
       async signOut() {},
     };
     useSessionStore.getState().setAdapter(refreshAdapter);
@@ -66,8 +78,12 @@ describe("Session store", () => {
 
   it("refreshSession transitions to expired when adapter throws", async () => {
     const badRefreshAdapter: SessionAdapter = {
-      async signIn() { return { token: "tok", expiresAt: Date.now() + 1000 }; },
-      async refresh() { throw new Error("expired"); },
+      async signIn() {
+        return { token: "tok", expiresAt: Date.now() + 1000 };
+      },
+      async refresh() {
+        throw new Error("expired");
+      },
       async signOut() {},
     };
     useSessionStore.getState().setAdapter(badRefreshAdapter);
@@ -131,14 +147,19 @@ describe("WalletConnector — manual", () => {
   });
 });
 
-describe("WalletConnector — walletconnect stub", () => {
-  it("throws with helpful message when connect is called", () => {
-    const connector = createWalletConnectConnector();
-    expect(() => connector.connect()).toThrow("WalletConnect SDK not yet configured");
+describe("WalletConnector — walletconnect", () => {
+  const mockProvider = {
+    request: async () => ["0x1234567890123456789012345678901234567890"],
+    disconnect: async () => {},
+  };
+
+  it("connect returns accounts from provider", async () => {
+    const connector = createWalletConnectConnector(mockProvider);
+    const accounts = await connector.connect();
+    expect(accounts).toEqual(["0x1234567890123456789012345678901234567890"]);
   });
 
-  it("isConnectorTypeSupported returns true for walletconnect (stub registered)", () => {
-    // The stub factory is registered; it throws only when connect() is called without the SDK.
+  it("isConnectorTypeSupported returns true for walletconnect", () => {
     expect(isConnectorTypeSupported("walletconnect")).toBe(true);
   });
 

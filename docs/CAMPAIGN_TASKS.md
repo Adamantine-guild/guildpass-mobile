@@ -89,4 +89,4 @@ This document lists tasks suitable for open contributions.
 
 ---
 
-*To work on a task, comment on the linked GitHub issue.*
+_To work on a task, comment on the linked GitHub issue._

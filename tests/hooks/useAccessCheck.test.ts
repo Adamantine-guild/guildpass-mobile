@@ -4,20 +4,16 @@
  * What we verify
  * --------------
  * 1. SDK method + argument shape  – all three params forwarded exactly.
- * 2. Query key shape              – entire params object is the key (on-demand semantics).
+ * 2. Mutation key shape           – access checks run from an explicit action.
  * 3. Access granted response      – hasAccess, matchedRoles, requiredRoles present and correct.
  * 4. Access denied response       – hasAccess: false, empty matchedRoles, reason provided.
- * 5. enabled guard                – query suppressed when any param is empty string.
+ * 5. validation guard             – network action suppressed when any param is empty string.
  * 6. Error propagation            – SDK errors surface as rejected promises.
  * 7. Response field contract      – every field AccessStatusCard reads must exist on the response.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  createSdkMock,
-  resetSdkMock,
-  mockSdkModule,
-} from "../fixtures/sdk.mock";
+import { createSdkMock, resetSdkMock } from "../fixtures/sdk.mock";
 import {
   ACCESS_GRANTED_FIXTURE,
   ACCESS_GRANTED_MULTI_ROLE_FIXTURE,
@@ -31,8 +27,14 @@ import {
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock("@guildpass/sdk", mockSdkModule);
-vi.mock("expo-constants", () => ({ default: { expoConfig: { extra: {} } } }));
+vi.mock("@guildpass/sdk", async () => {
+  // @ts-expect-error Vitest runs this async mock factory through Vite.
+  const { mockSdkModule } = await import("../fixtures/sdk.mock");
+  return mockSdkModule();
+});
+vi.mock("expo-constants", () => ({
+  default: { expoConfig: { extra: { apiUrl: "https://api.guildpass.test", chainId: 1 } } },
+}));
 
 import { guildPassClient } from "../../src/lib/guildpassClient";
 
@@ -89,17 +91,13 @@ describe("useAccessCheck – access granted", () => {
     expect(result.matchedRoles.length).toBeGreaterThanOrEqual(1);
   });
 
-  it("documents the expected query key: ['access-check', params]", () => {
-    // The entire params object is the key so that changing any input field
-    // triggers a fresh fetch rather than serving a stale cached result.
-    const expectedKey = ["access-check", ACCESS_CHECK_PARAMS];
+  it("documents the expected mutation key: ['access-check']", () => {
+    // Access checks are user-triggered mutations. The checked params are passed
+    // into mutate(), so input changes never auto-fetch stale results.
+    const expectedKey = ["access-check"];
 
     expect(expectedKey[0]).toBe("access-check");
-    expect(expectedKey[1]).toStrictEqual({
-      walletAddress: ACCESS_CHECK_PARAMS.walletAddress,
-      guildId: ACCESS_CHECK_PARAMS.guildId,
-      resourceId: ACCESS_CHECK_PARAMS.resourceId,
-    });
+    expect(expectedKey).toStrictEqual(["access-check"]);
   });
 });
 
@@ -142,9 +140,9 @@ describe("useAccessCheck – access denied", () => {
     sdk.access.checkAccess.mockResolvedValueOnce(ACCESS_DENIED_FIXTURE);
 
     // The screen differentiates granted/denied via hasAccess, not try/catch
-    await expect(
-      guildPassClient.access.checkAccess(ACCESS_CHECK_PARAMS),
-    ).resolves.toMatchObject({ hasAccess: false });
+    await expect(guildPassClient.access.checkAccess(ACCESS_CHECK_PARAMS)).resolves.toMatchObject({
+      hasAccess: false,
+    });
   });
 
   it("handles the no-requirements edge case: hasAccess false, empty requiredRoles", async () => {
@@ -233,9 +231,9 @@ describe("useAccessCheck – error propagation", () => {
   it("surfaces a network error as a rejected promise (screen shows error card)", async () => {
     sdk.access.checkAccess.mockRejectedValueOnce(new Error("Network request failed"));
 
-    await expect(
-      guildPassClient.access.checkAccess(ACCESS_CHECK_PARAMS),
-    ).rejects.toThrow("Network request failed");
+    await expect(guildPassClient.access.checkAccess(ACCESS_CHECK_PARAMS)).rejects.toThrow(
+      "Network request failed",
+    );
   });
 
   it("surfaces a 404/resource-not-found error correctly", async () => {
@@ -253,8 +251,8 @@ describe("useAccessCheck – error propagation", () => {
   it("surfaces a 401/unauthorised error so the screen can prompt re-connection", async () => {
     sdk.access.checkAccess.mockRejectedValueOnce(new Error("Unauthorized"));
 
-    await expect(
-      guildPassClient.access.checkAccess(ACCESS_CHECK_PARAMS),
-    ).rejects.toThrow("Unauthorized");
+    await expect(guildPassClient.access.checkAccess(ACCESS_CHECK_PARAMS)).rejects.toThrow(
+      "Unauthorized",
+    );
   });
 });

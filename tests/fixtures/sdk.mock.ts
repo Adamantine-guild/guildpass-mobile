@@ -103,8 +103,8 @@ export function resetSdkMock(): void {
     _instance.membership.getMembership.mockReset().mockResolvedValue(MEMBERSHIP_ACTIVE_FIXTURE);
     _instance.access.checkAccess.mockReset().mockResolvedValue(ACCESS_GRANTED_FIXTURE);
   }
-  // Also destroy the instance so the next createSdkMock() call rebuilds cleanly
-  _instance = null;
+  // Keep the singleton stable because guildPassClient is instantiated once at
+  // module load and continues to hold this SDK instance across tests.
 }
 
 /**

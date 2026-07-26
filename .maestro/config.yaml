@@ -8,6 +8,13 @@ flows:
   - 04-access-check-success.yaml
   - 05-access-check-failure.yaml
   - 06-reset-app-state.yaml
+  - 07-walletconnect-flow.yaml
+  - 09-access-scanner-rescan.yaml
+  - 10-access-qr-expired.yaml
+  - 11-access-qr-unsupported-version.yaml
+  - 12-access-qr-malformed-json.yaml
+  - 13-deep-link-access-check-missing-resource-id.yaml
+  - 14-deep-link-guild-detail-invalid-guild-id.yaml
 
 env:
   # Default test environment variables
