@@ -1,6 +1,7 @@
 import { View, Text, TouchableOpacity, SafeAreaView } from "react-native";
 import React from "react";
-import { useRouter, usePathname } from "expo-router";
+import { useRouter } from "expo-router";
+import { useMutationQueue } from "../features/offline/mutationQueue";
 
 type AppHeaderProps = {
   title: string;
@@ -9,6 +10,7 @@ type AppHeaderProps = {
 
 export const AppHeader = ({ title, showBack = false }: AppHeaderProps) => {
   const router = useRouter();
+  const queuedMutations = useMutationQueue();
 
   return (
     <SafeAreaView className="bg-white border-b border-border">
@@ -24,6 +26,20 @@ export const AppHeader = ({ title, showBack = false }: AppHeaderProps) => {
           </TouchableOpacity>
         )}
         <Text className="text-xl font-bold text-text flex-1">{title}</Text>
+        
+        {queuedMutations.length > 0 && (
+          <TouchableOpacity
+            onPress={() => router.push("/pending-changes")}
+            className="p-2 relative"
+            accessibilityRole="button"
+            accessibilityLabel="Pending changes"
+          >
+            <Text className="text-2xl">☁️</Text>
+            <View className="absolute top-1 right-1 bg-red-500 rounded-full w-4 h-4 items-center justify-center">
+              <Text className="text-white text-xs font-bold">{queuedMutations.length}</Text>
+            </View>
+          </TouchableOpacity>
+        )}
       </View>
     </SafeAreaView>
   );

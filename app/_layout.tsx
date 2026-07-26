@@ -1,6 +1,6 @@
 import { Stack } from "expo-router";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
-import { View } from "react-native";
+import { View, useColorScheme } from "react-native";
 import { queryClient } from "../src/lib/queryClient";
 import { asyncStoragePersister } from "../src/lib/queryPersister";
 import { isPersistableQuery, QUERY_GC_TIME_MS } from "../src/lib/offlineCache";
@@ -36,11 +36,57 @@ function SecurityInit() {
 }
 
 export default function RootLayout() {
+  const colorScheme = useColorScheme();
+
   return (
     <ErrorBoundary>
       <SensitiveStorageMigrationGate>
         <SecurityInit />
         <EmbeddedWalletProvider>
+        <PersistQueryClientProvider
+          client={queryClient}
+          persistOptions={{
+            persister: asyncStoragePersister,
+            maxAge: QUERY_GC_TIME_MS,
+            dehydrateOptions: {
+              shouldDehydrateQuery: (query) =>
+                query.state.status === "success" && isPersistableQuery(query.queryKey),
+              shouldDehydrateMutation: (mutation) =>
+                mutation.meta?.isQueueable === true,
+            },
+          }}
+          onSuccess={() => {
+            // The persisted cache is only fully restored now; reconcile it so a
+            // device that reopens online (after being offline) still corrects
+            // stale grants instead of waiting for the next reconnect event.
+            void triggerSync();
+          }}
+        >
+          <View className="flex-1 bg-background">
+            <WalletConnectProvider>
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                  contentStyle: { backgroundColor: "#f8fafc" },
+                }}
+              >
+                <Stack.Screen name="index" />
+                <Stack.Screen name="onboarding" />
+                <Stack.Screen name="profile" />
+                <Stack.Screen name="guilds" />
+                <Stack.Screen name="guilds/[guildId]" />
+                <Stack.Screen name="access-check" />
+                <Stack.Screen name="access-scanner" />
+                <Stack.Screen name="settings" />
+                <Stack.Screen name="pending-changes" options={{ presentation: 'modal' }} />
+                <Stack.Screen name="deep-link-error" />
+              </Stack>
+              <SyncCorrectionOverlay />
+              <SyncStatusBanner />
+              <IntegrityWarningBanner />
+            </WalletConnectProvider>
+          </View>
+        </PersistQueryClientProvider>
           <PersistQueryClientProvider
             client={queryClient}
             persistOptions={{
@@ -58,12 +104,12 @@ export default function RootLayout() {
               void triggerSync();
             }}
           >
-            <View className="flex-1 bg-background">
+            <View className="flex-1 bg-background dark:bg-slate-900">
               <WalletConnectProvider>
                 <Stack
                   screenOptions={{
                     headerShown: false,
-                    contentStyle: { backgroundColor: "#f8fafc" },
+                    contentStyle: { backgroundColor: colorScheme === 'dark' ? '#0f172a' : '#f8fafc' },
                   }}
                 >
                   <Stack.Screen name="index" />
