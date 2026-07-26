@@ -314,6 +314,7 @@ export default function AccessCheck() {
             variant="outline"
             className="mt-4"
             testID="scan-qr-button"
+            disabled={isOffline}
           />
 
           <View className="mt-4">
@@ -356,9 +357,15 @@ export default function AccessCheck() {
               !!addressError ||
               !!guildIdError ||
               !!resourceIdError ||
-              countdown.isExpired
+              countdown.isExpired ||
+              isOffline
             }
           />
+          {isOffline ? (
+            <Text className="text-amber-700 dark:text-amber-400 mt-3 text-center text-sm font-bold">
+              QR Access Check Requires Internet
+            </Text>
+          ) : null}
         </Card>
 
         {scanError && (
