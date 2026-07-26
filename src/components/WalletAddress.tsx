@@ -1,6 +1,7 @@
 import { View, Text, TouchableOpacity } from "react-native";
 import React, { useEffect, useRef, useState } from "react";
 import * as Clipboard from "expo-clipboard";
+import * as Haptics from "expo-haptics";
 
 const COPIED_FEEDBACK_DURATION_MS = 2000;
 
@@ -11,13 +12,13 @@ export const truncateAddress = (address: string): string => {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
 };
 
-type AddressChipProps = {
+type WalletAddressProps = {
   address: string;
   className?: string;
   testID?: string;
 };
 
-export const AddressChip = ({ address, className = "", testID }: AddressChipProps) => {
+export const WalletAddress = ({ address, className = "", testID }: WalletAddressProps) => {
   const [copied, setCopied] = useState(false);
   const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -31,6 +32,7 @@ export const AddressChip = ({ address, className = "", testID }: AddressChipProp
 
   const handleCopy = async () => {
     await Clipboard.setStringAsync(address);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setCopied(true);
     if (resetTimer.current) {
       clearTimeout(resetTimer.current);
@@ -45,13 +47,13 @@ export const AddressChip = ({ address, className = "", testID }: AddressChipProp
       accessibilityRole="button"
       accessibilityLabel={copied ? "Address copied to clipboard" : `Copy wallet address ${address}`}
       testID={testID}
-      className={`flex-row items-center bg-primary/10 px-3 py-1.5 rounded-lg ${className}`}
+      className={`flex-row items-center bg-primary/10 dark:bg-primary/20 px-3 py-1.5 rounded-lg ${className}`}
     >
-      <Text className="text-text font-medium text-sm mr-2" numberOfLines={1}>
+      <Text className="text-text dark:text-slate-100 font-medium text-sm mr-2" numberOfLines={1}>
         {truncateAddress(address)}
       </Text>
       <View testID={testID ? `${testID}-feedback` : undefined}>
-        <Text className="text-primary text-xs font-medium">{copied ? "Copied!" : "Copy"}</Text>
+        <Text className="text-primary dark:text-indigo-400 text-xs font-medium">{copied ? "Copied!" : "Copy"}</Text>
       </View>
     </TouchableOpacity>
   );
