@@ -47,6 +47,8 @@ export default function RootLayout() {
             dehydrateOptions: {
               shouldDehydrateQuery: (query) =>
                 query.state.status === "success" && isPersistableQuery(query.queryKey),
+              shouldDehydrateMutation: (mutation) =>
+                mutation.meta?.isQueueable === true,
             },
           }}
           onSuccess={() => {
@@ -72,6 +74,7 @@ export default function RootLayout() {
                 <Stack.Screen name="access-check" />
                 <Stack.Screen name="access-scanner" />
                 <Stack.Screen name="settings" />
+                <Stack.Screen name="pending-changes" options={{ presentation: 'modal' }} />
                 <Stack.Screen name="deep-link-error" />
               </Stack>
               <SyncCorrectionOverlay />
