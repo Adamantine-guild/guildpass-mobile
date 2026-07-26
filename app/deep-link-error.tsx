@@ -9,13 +9,13 @@ export default function DeepLinkError() {
   const router = useRouter();
 
   return (
-    <View className="flex-1 bg-background">
+    <View className="flex-1 bg-background dark:bg-slate-900">
       <AppHeader title="Link Error" showBack={false} />
       <View className="flex-1 px-4 py-6 justify-center">
         <Card className="items-center py-8">
           <Text className="text-4xl mb-4">🔗</Text>
-          <Text className="text-2xl font-bold text-text mb-3 text-center">Invalid Link</Text>
-          <Text className="text-text-muted text-center mb-6 px-4">
+          <Text className="text-2xl font-bold text-text dark:text-slate-100 mb-3 text-center">Invalid Link</Text>
+          <Text className="text-text-muted dark:text-slate-400 text-center mb-6 px-4">
             The link you followed is not supported or is malformed. Please check the URL and try
             again.
           </Text>
