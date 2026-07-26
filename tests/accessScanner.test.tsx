@@ -145,6 +145,11 @@ describe("AccessScanner", () => {
     vi.clearAllMocks();
     useAccessHistoryStore.setState({ entries: [] });
     cameraViewMock.mockImplementation(() => null);
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("shows loading state while checking permission", () => {
@@ -164,7 +169,7 @@ describe("AccessScanner", () => {
 
     const output = screenText(renderer);
     expect(output).toContain("Allow Camera Access");
-    expect(output).toContain("Camera access needed");
+    expect(output).toContain("Camera permission denied");
     expect(output).toContain("accessibilityRole");
   });
 
@@ -174,7 +179,7 @@ describe("AccessScanner", () => {
     const renderer = TestRenderer.create(<AccessScanner />);
 
     expect(screenText(renderer)).toContain(
-      "Enable camera access in your device settings to scan QR codes.",
+      "Camera permission was permanently denied. Open Settings to enable camera access for GuildPass to scan QR codes.",
     );
   });
 
@@ -194,13 +199,13 @@ describe("AccessScanner", () => {
   it("announces processing and success during a valid scan", async () => {
     mockCameraPermission(createPermissionResponse(true, true));
     verifyAndParseAccessQrPayloadMock.mockResolvedValue({
-      success: true,
       payload: {
         guildId: "guild-alpha",
         resourceId: "vip-door",
         walletAddress: "0xabc",
         expiresAt: "2099-01-01T00:00:00.000Z",
-      }
+      },
+      isVerified: true
     });
 
     TestRenderer.create(<AccessScanner />);
@@ -225,7 +230,7 @@ describe("AccessScanner", () => {
 
   it("marks scan errors as assertive live-region alerts", async () => {
     mockCameraPermission(createPermissionResponse(true, true));
-    verifyAndParseAccessQrPayloadMock.mockResolvedValue({ success: false, reason: "UNKNOWN_ERROR", message: "forged" });
+    verifyAndParseAccessQrPayloadMock.mockRejectedValue(new Error("forged"));
 
     const renderer = TestRenderer.create(<AccessScanner />);
 
@@ -258,13 +263,13 @@ describe("AccessScanner", () => {
   it("verifies a valid scan and navigates to the access-check screen", async () => {
     mockCameraPermission(createPermissionResponse(true, true));
     verifyAndParseAccessQrPayloadMock.mockResolvedValue({
-      success: true,
       payload: {
         guildId: "guild-alpha",
         resourceId: "vip-door",
         walletAddress: "0xabc",
         expiresAt: "2099-01-01T00:00:00.000Z",
-      }
+      },
+      isVerified: true
     });
 
     TestRenderer.create(<AccessScanner />);
@@ -277,6 +282,10 @@ describe("AccessScanner", () => {
       }
 
       await cameraProps.onBarcodeScanned?.({ data: "payload" });
+    });
+
+    act(() => {
+      vi.runAllTimers();
     });
 
     expect(verifyAndParseAccessQrPayloadMock).toHaveBeenCalledWith("payload");
@@ -321,6 +330,10 @@ describe("AccessScanner", () => {
       await firstScanPromise;
     });
 
+    act(() => {
+      vi.runAllTimers();
+    });
+
     expect(routerMocks.replace).toHaveBeenCalledTimes(1);
     expect(routerMocks.replace).toHaveBeenCalledWith({
       pathname: "/access-check",
@@ -343,7 +356,7 @@ describe("AccessScanner", () => {
     ],
   ])("shows a specific signature error message for %s", async (code, expectedMessage) => {
     mockCameraPermission(createPermissionResponse(true, true));
-    verifyAndParseAccessQrPayloadMock.mockResolvedValueOnce({ success: false, reason: code });
+    verifyAndParseAccessQrPayloadMock.mockRejectedValueOnce(new QrSignatureErrorMock(code));
 
     const renderer = TestRenderer.create(<AccessScanner />);
 
@@ -367,11 +380,7 @@ describe("AccessScanner", () => {
 
   it("shows a safe rejection message for invalid or forged QR payloads", async () => {
     mockCameraPermission(createPermissionResponse(true, true));
-    verifyAndParseAccessQrPayloadMock.mockResolvedValue({
-      success: false,
-      reason: "UNKNOWN_ERROR",
-      message: "Authorization: Bearer secret-token"
-    });
+    verifyAndParseAccessQrPayloadMock.mockRejectedValue(new Error("Authorization: Bearer secret-token"));
 
     const renderer = TestRenderer.create(<AccessScanner />);
 
@@ -396,15 +405,15 @@ describe("AccessScanner", () => {
   it("restores scanning after an error", async () => {
     mockCameraPermission(createPermissionResponse(true, true));
     verifyAndParseAccessQrPayloadMock
-      .mockResolvedValueOnce({ success: false, reason: "UNKNOWN_ERROR", message: "forged" })
+      .mockRejectedValueOnce(new Error("forged"))
       .mockResolvedValueOnce({
-        success: true,
         payload: {
           guildId: "guild-alpha",
           resourceId: "vip-door",
           walletAddress: "0xabc",
           expiresAt: "2099-01-01T00:00:00.000Z",
-        }
+        },
+        isVerified: true
       });
 
     const renderer = TestRenderer.create(<AccessScanner />);
@@ -433,6 +442,10 @@ describe("AccessScanner", () => {
       await cameraProps.onBarcodeScanned?.({ data: "good" });
     });
 
+    act(() => {
+      vi.runAllTimers();
+    });
+
     expect(routerMocks.replace).toHaveBeenCalledWith({
       pathname: "/access-check",
       params: { qrPayload: "good" },
@@ -442,15 +455,15 @@ describe("AccessScanner", () => {
   it("automatically re-arms the scanner guard after a scan error", async () => {
     mockCameraPermission(createPermissionResponse(true, true));
     verifyAndParseAccessQrPayloadMock
-      .mockResolvedValueOnce({ success: false, reason: "UNKNOWN_ERROR", message: "first error" })
+      .mockRejectedValueOnce(new Error("first error"))
       .mockResolvedValueOnce({
-        success: true,
         payload: {
           guildId: "guild-alpha",
           resourceId: "vip-door",
           walletAddress: "0xabc",
           expiresAt: "2099-01-01T00:00:00.000Z",
-        }
+        },
+        isVerified: true
       });
 
     TestRenderer.create(<AccessScanner />);
@@ -469,6 +482,10 @@ describe("AccessScanner", () => {
     // Guard should be reset after error — invoke handler directly on same ref
     await act(async () => {
       await getCameraProps().onBarcodeScanned?.({ data: "good" });
+    });
+
+    act(() => {
+      vi.runAllTimers();
     });
 
     expect(routerMocks.replace).toHaveBeenCalledWith({

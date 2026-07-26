@@ -3,7 +3,8 @@ appId: xyz.guildpass.mobile
 # E2E Test: Onboarding to Profile Navigation
 # Validates: User can complete onboarding and navigate to profile screen
 
-- launchApp
+- launchApp:
+    clearState: true
 - assertVisible:
     id: "onboarding-screen"
 - assertVisible:
