@@ -163,7 +163,12 @@ export default function AccessScanner() {
             </Text>
 
             {permission.canAskAgain ? (
-              <Button title="Allow Camera Access" onPress={requestPermission} />
+              <Button
+                title="Allow Camera Access"
+                accessibilityRole="button"
+                accessibilityLabel="Allow Camera Access"
+                onPress={requestPermission}
+              />
             ) : (
               <Button
                 title="Open Settings"
@@ -259,7 +264,13 @@ export default function AccessScanner() {
             >
               {scanError.message}
             </Text>
-            <Button title="Scan Again" onPress={handleScanAgain} variant="outline" />
+            <Button
+              title="Scan Again"
+              accessibilityRole="button"
+              accessibilityLabel="Scan Again"
+              onPress={handleScanAgain}
+              variant="outline"
+            />
           </Card>
         </View>
       </View>
