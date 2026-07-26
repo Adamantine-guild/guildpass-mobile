@@ -4,32 +4,59 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import AccessScanner from "../app/access-scanner";
 
 // Mock react-native
-vi.mock("react-native", () => ({
-  View: "View",
-  Text: "Text",
-  ScrollView: "ScrollView",
-  TextInput: "TextInput",
-  TouchableOpacity: "TouchableOpacity",
-  ActivityIndicator: "ActivityIndicator",
-  SafeAreaView: "SafeAreaView",
-  StyleSheet: { create: (styles: Record<string, unknown>) => styles },
-  Platform: { OS: "ios", select: (objs: Record<string, unknown>) => objs.ios ?? objs.default },
-  DeviceEventEmitter: {
-    addListener: vi.fn(() => ({ remove: vi.fn() })),
-    removeListener: vi.fn(),
-    emit: vi.fn(),
-  },
-  NativeModules: {},
-  NativeEventEmitter: vi.fn(() => ({
-    addListener: vi.fn(() => ({ remove: vi.fn() })),
-    removeListener: vi.fn(),
-  })),
-  Linking: {
-    openURL: vi.fn(),
-    canOpenURL: vi.fn(),
-    addEventListener: vi.fn(() => ({ remove: vi.fn() })),
-  },
-}));
+vi.mock("react-native", () => {
+  // --------------- shared animation helpers ---------------
+  const createAnimatable = () => ({
+    start: (callback?: () => void) => {
+      queueMicrotask(() => callback?.());
+    },
+  });
+
+  class AnimatedValue {
+    _value: number;
+    constructor(value: number) {
+      this._value = value;
+    }
+    setValue(_value: number) {}
+  }
+
+  return {
+    View: "View",
+    Text: "Text",
+    ScrollView: "ScrollView",
+    TextInput: "TextInput",
+    TouchableOpacity: "TouchableOpacity",
+    ActivityIndicator: "ActivityIndicator",
+    SafeAreaView: "SafeAreaView",
+    StyleSheet: { create: (styles: Record<string, unknown>) => styles },
+    Platform: { OS: "ios", select: (objs: Record<string, unknown>) => objs.ios ?? objs.default },
+    DeviceEventEmitter: {
+      addListener: vi.fn(() => ({ remove: vi.fn() })),
+      removeListener: vi.fn(),
+      emit: vi.fn(),
+    },
+    NativeModules: {},
+    NativeEventEmitter: vi.fn(() => ({
+      addListener: vi.fn(() => ({ remove: vi.fn() })),
+      removeListener: vi.fn(),
+    })),
+    Linking: {
+      openURL: vi.fn(),
+      canOpenURL: vi.fn(),
+      addEventListener: vi.fn(() => ({ remove: vi.fn() })),
+    },
+    Animated: {
+      parallel: createAnimatable,
+      sequence: createAnimatable,
+      spring: createAnimatable,
+      timing: createAnimatable,
+      loop: createAnimatable,
+      View: "Animated.View",
+      Text: "Animated.Text",
+      Value: AnimatedValue,
+    },
+  };
+});
 
 // Mock expo-camera
 vi.mock("expo-camera", () => ({

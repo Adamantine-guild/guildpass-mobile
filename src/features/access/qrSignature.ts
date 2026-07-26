@@ -57,21 +57,21 @@ export class QrSignatureError extends Error {
 
 const QR_SIGNATURE_ERROR_MESSAGES: Record<QrSignatureErrorCode, string> = {
   [QR_SIGNATURE_ERROR_CODES.MISSING_SIGNATURE]:
-    "This QR code is missing its security signature. Ask the guild admin to issue a new code.",
+    "This QR code is missing its security signature. Ask the guild admin to issue a properly signed code.",
   [QR_SIGNATURE_ERROR_CODES.INVALID_SIGNATURE_FORMAT]:
-    "The QR code signature is malformed. Re-scan the code or ask the guild admin for a fresh one.",
+    "The QR code signature is malformed. Try scanning again in better lighting, or ask the guild admin for a fresh code.",
   [QR_SIGNATURE_ERROR_CODES.VERIFICATION_FAILED]:
-    "The QR code signature could not be verified. Do not use this code; ask the guild admin for a fresh one.",
+    "The QR code signature could not be verified. This may indicate a tampered or forged code — do not use it. Ask the guild admin for a fresh one.",
   [QR_SIGNATURE_ERROR_CODES.PUBLIC_KEY_UNAVAILABLE]:
-    "The guild issuer key is unavailable. Try again later or contact the guild admin.",
+    "Unable to verify this guild's identity. Check your internet connection and try again, or contact the guild admin.",
   [QR_SIGNATURE_ERROR_CODES.REVOKED_KEY]:
-    "This QR code was signed with a revoked guild key. Contact the guild admin for a new code.",
+    "This QR code was signed with a revoked guild key. The guild has rotated their security keys. Ask the guild admin for a newly issued code.",
   [QR_SIGNATURE_ERROR_CODES.UNKNOWN_KEY]:
-    "This QR code was signed by an unknown guild key. Contact the guild admin before using it.",
+    "This QR code was signed by an unrecognized guild key. Do not use this code — contact the guild admin to verify it's genuine before proceeding.",
   [QR_SIGNATURE_ERROR_CODES.MISSING_KID]:
-    "This QR code is missing its key identifier. Ask the guild admin to reissue it.",
+    "This QR code is missing its key identifier. Ask the guild admin to reissue a properly formatted code.",
   [QR_SIGNATURE_ERROR_CODES.KEY_REGISTRY_EXPIRED]:
-    "The guild key registry is stale. Reconnect to the internet and scan again.",
+    "The guild key registry is out of date. Make sure you're connected to the internet and try scanning again.",
 };
 
 export const describeQrSignatureError = (code: QrSignatureErrorCode): string =>

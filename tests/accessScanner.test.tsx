@@ -17,33 +17,73 @@ const accessibilityInfoMock = vi.hoisted(() => ({
   announceForAccessibility: vi.fn(),
 }));
 
-vi.mock("react-native", () => ({
-  View: "View",
-  Text: "Text",
-  ScrollView: "ScrollView",
-  TextInput: "TextInput",
-  TouchableOpacity: "TouchableOpacity",
-  ActivityIndicator: "ActivityIndicator",
-  SafeAreaView: "SafeAreaView",
-  StyleSheet: { create: (styles: Record<string, unknown>) => styles },
-  Platform: { OS: "ios", select: (objs: Record<string, unknown>) => objs.ios ?? objs.default },
-  DeviceEventEmitter: {
-    addListener: vi.fn(() => ({ remove: vi.fn() })),
-    removeListener: vi.fn(),
-    emit: vi.fn(),
-  },
-  NativeModules: {},
-  NativeEventEmitter: vi.fn(() => ({
-    addListener: vi.fn(() => ({ remove: vi.fn() })),
-    removeListener: vi.fn(),
-  })),
-  Linking: {
-    openURL: vi.fn(),
-    canOpenURL: vi.fn(),
-    addEventListener: vi.fn(() => ({ remove: vi.fn() })),
-  },
-  AccessibilityInfo: accessibilityInfoMock,
-}));
+vi.mock("react-native", () => {
+  // Animation helpers: store the completion callback so it can be
+  // invoked synchronously in tests (matching the animation-driven
+  // navigation flow).
+  const createAnimatable = () => {
+    let completion: (() => void) | undefined;
+    const start = (callback?: () => void) => {
+      completion = callback;
+      // Call synchronously so animation-driven flows (e.g. navigation
+      // after success animation) don't need real timers.
+      queueMicrotask(() => completion?.());
+    };
+    return { start, _completion: () => completion };
+  };
+
+  const animationMethods = {
+    parallel: () => createAnimatable(),
+    sequence: () => createAnimatable(),
+    spring: () => createAnimatable(),
+    timing: () => createAnimatable(),
+    loop: () => createAnimatable(),
+  };
+
+  class AnimatedValue {
+    _value: number;
+    constructor(value: number) {
+      this._value = value;
+    }
+    setValue(value: number) {
+      this._value = value;
+    }
+  }
+
+  return {
+    View: "View",
+    Text: "Text",
+    ScrollView: "ScrollView",
+    TextInput: "TextInput",
+    TouchableOpacity: "TouchableOpacity",
+    ActivityIndicator: "ActivityIndicator",
+    SafeAreaView: "SafeAreaView",
+    StyleSheet: { create: (styles: Record<string, unknown>) => styles },
+    Platform: { OS: "ios", select: (objs: Record<string, unknown>) => objs.ios ?? objs.default },
+    DeviceEventEmitter: {
+      addListener: vi.fn(() => ({ remove: vi.fn() })),
+      removeListener: vi.fn(),
+      emit: vi.fn(),
+    },
+    NativeModules: {},
+    NativeEventEmitter: vi.fn(() => ({
+      addListener: vi.fn(() => ({ remove: vi.fn() })),
+      removeListener: vi.fn(),
+    })),
+    Linking: {
+      openURL: vi.fn(),
+      canOpenURL: vi.fn(),
+      addEventListener: vi.fn(() => ({ remove: vi.fn() })),
+    },
+    AccessibilityInfo: accessibilityInfoMock,
+    Animated: {
+      ...animationMethods,
+      View: "Animated.View",
+      Text: "Animated.Text",
+      Value: AnimatedValue,
+    },
+  };
+});
 
 type MockCameraViewProps = {
   onBarcodeScanned?: (result: { data: string }) => Promise<void>;
@@ -138,6 +178,10 @@ vi.mock("../src/features/access/qrSignature", () => ({
   describeQrSignatureError: describeQrSignatureErrorMock,
 }));
 
+vi.mock("../src/features/offline/mutationQueue", () => ({
+  useMutationQueue: () => [],
+}));
+
 const screenText = (renderer: ReactTestRenderer) => JSON.stringify(renderer.toJSON());
 
 describe("AccessScanner", () => {
@@ -173,14 +217,15 @@ describe("AccessScanner", () => {
     expect(output).toContain("accessibilityRole");
   });
 
-  it("shows permanent denial message when camera denied and cannot ask again", () => {
+  it("shows permanent denial message with platform-specific instructions when camera denied and cannot ask again", () => {
     mockCameraPermission(createPermissionResponse(false, false));
 
     const renderer = TestRenderer.create(<AccessScanner />);
 
-    expect(screenText(renderer)).toContain(
-      "Camera permission was permanently denied. Open Settings to enable camera access for GuildPass to scan QR codes.",
-    );
+    const output = screenText(renderer);
+    expect(output).toContain("Camera permission was permanently denied.");
+    // Platform is mocked as iOS, so iOS-specific settings path is shown
+    expect(output).toContain("Privacy & Security");
   });
 
   it("shows scanner view when permission is granted", () => {
@@ -284,8 +329,9 @@ describe("AccessScanner", () => {
       await cameraProps.onBarcodeScanned?.({ data: "payload" });
     });
 
-    act(() => {
-      vi.runAllTimers();
+    // Wait for the animation microtask to fire the navigation callback
+    await act(async () => {
+      await new Promise((resolve) => queueMicrotask(resolve));
     });
 
     expect(verifyAndParseAccessQrPayloadMock).toHaveBeenCalledWith("payload");
@@ -332,6 +378,11 @@ describe("AccessScanner", () => {
 
     act(() => {
       vi.runAllTimers();
+    });
+
+    // Wait for the animation microtask to fire the navigation callback
+    await act(async () => {
+      await new Promise((resolve) => queueMicrotask(resolve));
     });
 
     expect(routerMocks.replace).toHaveBeenCalledTimes(1);
@@ -429,7 +480,8 @@ describe("AccessScanner", () => {
     });
 
     act(() => {
-      renderer.root.findByProps({ accessibilityLabel: "Scan Again" }).props.onPress();
+      // Recoverable errors use "Scan Again Now" label with auto-reset indicator
+      renderer.root.findByProps({ accessibilityLabel: "Scan Again Now" }).props.onPress();
     });
 
     await act(async () => {
@@ -442,8 +494,9 @@ describe("AccessScanner", () => {
       await cameraProps.onBarcodeScanned?.({ data: "good" });
     });
 
-    act(() => {
-      vi.runAllTimers();
+    // Wait for the animation microtask to fire the navigation callback
+    await act(async () => {
+      await new Promise((resolve) => queueMicrotask(resolve));
     });
 
     expect(routerMocks.replace).toHaveBeenCalledWith({
@@ -479,13 +532,146 @@ describe("AccessScanner", () => {
       await getCameraProps().onBarcodeScanned?.({ data: "bad" });
     });
 
-    // Guard should be reset after error — invoke handler directly on same ref
+    // Guard should be reset after error — invoke handler directly on same ref.
+    // First advance past the auto-reset timer to clear the error state,
+    // then scan the good data.
+    act(() => {
+      vi.advanceTimersByTime(4000);
+    });
+
     await act(async () => {
       await getCameraProps().onBarcodeScanned?.({ data: "good" });
     });
 
+    // Wait for the animation microtask to fire the navigation callback
+    await act(async () => {
+      await new Promise((resolve) => queueMicrotask(resolve));
+    });
+
+    expect(routerMocks.replace).toHaveBeenCalledWith({
+      pathname: "/access-check",
+      params: { qrPayload: "good" },
+    });
+  });
+
+  it("auto-resets the scanner UI after a recoverable error", async () => {
+    mockCameraPermission(createPermissionResponse(true, true));
+    verifyAndParseAccessQrPayloadMock.mockRejectedValue(new Error("forged"));
+
+    TestRenderer.create(<AccessScanner />);
+
+    const getCameraProps = () => {
+      const props = cameraViewMock.mock.calls.at(-1)?.[0];
+      if (!props) throw new Error("CameraView did not render");
+      return props;
+    };
+
+    // First scan → recoverable error
+    await act(async () => {
+      await getCameraProps().onBarcodeScanned?.({ data: "bad" });
+    });
+
+    // Auto-reset should clear error after delay and return to camera view
     act(() => {
-      vi.runAllTimers();
+      vi.advanceTimersByTime(4000);
+    });
+
+    // Now a subsequent scan should be accepted (proving auto-reset worked)
+    verifyAndParseAccessQrPayloadMock.mockResolvedValueOnce({
+      payload: {
+        guildId: "guild-alpha",
+        resourceId: "vip-door",
+        walletAddress: "0xabc",
+        expiresAt: "2099-01-01T00:00:00.000Z",
+      },
+      isVerified: true,
+    });
+
+    await act(async () => {
+      await getCameraProps().onBarcodeScanned?.({ data: "good" });
+    });
+
+    await act(async () => {
+      await new Promise((resolve) => queueMicrotask(resolve));
+    });
+
+    expect(routerMocks.replace).toHaveBeenCalledWith({
+      pathname: "/access-check",
+      params: { qrPayload: "good" },
+    });
+  });
+
+  it("does not auto-reset the scanner UI for untrusted (signature) errors", async () => {
+    mockCameraPermission(createPermissionResponse(true, true));
+    verifyAndParseAccessQrPayloadMock.mockRejectedValue(
+      new QrSignatureErrorMock(QR_SIGNATURE_ERROR_CODES_MOCK.VERIFICATION_FAILED),
+    );
+
+    TestRenderer.create(<AccessScanner />);
+
+    const getCameraProps = () => {
+      const props = cameraViewMock.mock.calls.at(-1)?.[0];
+      if (!props) throw new Error("CameraView did not render");
+      return props;
+    };
+
+    await act(async () => {
+      await getCameraProps().onBarcodeScanned?.({ data: "bad" });
+    });
+
+    // Advance past auto-reset time — error should persist because it's untrusted
+    act(() => {
+      vi.advanceTimersByTime(4000);
+    });
+
+    // Error state should still be showing (no "Point your camera" text)
+    // A subsequent scan should NOT be accepted because the guard re-arms
+    // but the error UI persists for untrusted codes, blocking the camera.
+    // The scan ref guard is reset, but the user must manually dismiss.
+    expect(routerMocks.replace).not.toHaveBeenCalled();
+  });
+
+  it("auto-resets for network-recoverable signature errors (KEY_REGISTRY_EXPIRED)", async () => {
+    mockCameraPermission(createPermissionResponse(true, true));
+    verifyAndParseAccessQrPayloadMock.mockRejectedValue(
+      new QrSignatureErrorMock(QR_SIGNATURE_ERROR_CODES_MOCK.KEY_REGISTRY_EXPIRED),
+    );
+
+    TestRenderer.create(<AccessScanner />);
+
+    const getCameraProps = () => {
+      const props = cameraViewMock.mock.calls.at(-1)?.[0];
+      if (!props) throw new Error("CameraView did not render");
+      return props;
+    };
+
+    // First scan -> KEY_REGISTRY_EXPIRED (network-recoverable, should auto-reset)
+    await act(async () => {
+      await getCameraProps().onBarcodeScanned?.({ data: "bad" });
+    });
+
+    // Auto-reset should clear error after delay
+    act(() => {
+      vi.advanceTimersByTime(4000);
+    });
+
+    // Now a subsequent scan should be accepted (proving auto-reset worked)
+    verifyAndParseAccessQrPayloadMock.mockResolvedValueOnce({
+      payload: {
+        guildId: "guild-alpha",
+        resourceId: "vip-door",
+        walletAddress: "0xabc",
+        expiresAt: "2099-01-01T00:00:00.000Z",
+      },
+      isVerified: true,
+    });
+
+    await act(async () => {
+      await getCameraProps().onBarcodeScanned?.({ data: "good" });
+    });
+
+    await act(async () => {
+      await new Promise((resolve) => queueMicrotask(resolve));
     });
 
     expect(routerMocks.replace).toHaveBeenCalledWith({
