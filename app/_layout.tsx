@@ -82,6 +82,7 @@ export default function RootLayout() {
                   <Stack.Screen name="access-check" />
                   <Stack.Screen name="access-scanner" />
                   <Stack.Screen name="settings" />
+                  <Stack.Screen name="push-notification-setup" />
                   <Stack.Screen name="pending-changes" options={{ presentation: "modal" }} />
                   <Stack.Screen name="deep-link-error" />
                 </Stack>

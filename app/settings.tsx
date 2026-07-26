@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, TouchableOpacity } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, Alert } from "react-native";
 import { useWallet } from "../src/features/wallet/useWallet";
 import { AppHeader } from "../src/components/AppHeader";
 import { Card } from "../src/components/Card";
@@ -7,13 +7,45 @@ import { WalletRequired } from "../src/components/WalletRequired";
 import { appConfig } from "../src/config/appConfig";
 import { resetAppState } from "../src/lib/resetAppState";
 import { useBiometricStore } from "../src/features/security/biometric.store";
+import { usePushNotifications } from "../src/features/notifications";
+import { useRouter } from "expo-router";
 import React, { useState } from "react";
 
 export default function Settings() {
+  const router = useRouter();
   const { isConnected } = useWallet();
   const [isResetting, setIsResetting] = useState(false);
   const biometricRequired = useBiometricStore((s) => s.biometricRequired);
   const setBiometricRequired = useBiometricStore((s) => s.setBiometricRequired);
+
+  const {
+    enabled: pushEnabled,
+    isSupported: isPushSupported,
+    disablePushNotifications,
+  } = usePushNotifications();
+
+  const handlePushNotificationToggle = async () => {
+    if (pushEnabled) {
+      // Disable push notifications
+      Alert.alert(
+        "Disable Notifications",
+        "You will no longer receive push notifications about role updates and access grants. You can re-enable them anytime.",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Disable",
+            style: "destructive",
+            onPress: async () => {
+              await disablePushNotifications();
+            },
+          },
+        ],
+      );
+    } else {
+      // Navigate to rationale screen
+      router.push("/push-notification-setup" as never);
+    }
+  };
 
   const handleReset = async () => {
     setIsResetting(true);
@@ -82,6 +114,43 @@ export default function Settings() {
                 />
               </View>
             </TouchableOpacity>
+          </Card>
+
+          <Text className="text-lg font-bold text-text dark:text-slate-100 mb-3">Notifications</Text>
+          <Card className="mb-6">
+            {isPushSupported ? (
+              <TouchableOpacity
+                className="flex-row justify-between items-center py-2"
+                onPress={handlePushNotificationToggle}
+                testID="settings-push-notifications-toggle"
+                accessibilityRole="switch"
+                accessibilityState={{ checked: pushEnabled }}
+              >
+                <View className="flex-1">
+                  <Text className="text-text dark:text-slate-100 font-medium">Push Notifications</Text>
+                  <Text className="text-text-muted dark:text-slate-400 text-sm mt-1">
+                    Receive real-time alerts for role updates and access grants.
+                  </Text>
+                </View>
+                <View
+                  className={`w-12 h-7 rounded-full ml-3 justify-center ${
+                    pushEnabled ? "bg-success dark:bg-green-600" : "bg-border dark:bg-slate-700"
+                  }`}
+                >
+                  <View
+                    className={`w-5 h-5 rounded-full bg-white mx-0.5 ${
+                      pushEnabled ? "self-end" : "self-start"
+                    }`}
+                  />
+                </View>
+              </TouchableOpacity>
+            ) : (
+              <View className="py-2">
+                <Text className="text-text-muted dark:text-slate-400 text-sm">
+                  Push notifications are not available on this device or simulator.
+                </Text>
+              </View>
+            )}
           </Card>
 
           <Text className="text-lg font-bold text-text dark:text-slate-100 mb-3">Account</Text>
