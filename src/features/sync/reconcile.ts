@@ -6,6 +6,7 @@
  */
 
 import { isWalletScopedQueryRoot } from "../../lib/queryKeys";
+import { PERSISTABLE_QUERY_KEY_ROOTS } from "../../lib/offlineCache";
 import type {
   SyncCorrection,
   SyncCorrectionSeverity,

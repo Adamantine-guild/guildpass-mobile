@@ -104,6 +104,8 @@ export function createSyncEngine(deps: SyncEngineDeps): SyncEngine {
   const { queryClient, fetchers, syncStore, isOnline } = deps;
   const now = deps.now ?? Date.now;
   const retryConfig = deps.retryConfig ?? DEFAULT_RETRY_CONFIG;
+  const sleep = deps.sleep;
+  const random = deps.random;
 
   let inFlight: Promise<SyncRunSummary> | null = null;
 
@@ -132,7 +134,12 @@ export function createSyncEngine(deps: SyncEngineDeps): SyncEngine {
       // No fetcher registered for this entity kind — skip silently.
       return null;
     }
-    const fresh = await fetcher(descriptor);
+    const fresh = await runWithRetry(() => fetcher(descriptor), {
+      config: retryConfig,
+      sleep,
+      random,
+      isOnline,
+    });
     if (fresh === undefined) {
       throw new Error(`Server returned no data for ${descriptor.kind}`);
     }

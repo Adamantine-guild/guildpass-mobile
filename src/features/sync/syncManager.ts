@@ -12,7 +12,13 @@ import { useNetworkStore } from "../network/connectivityService";
 import { queryClient as appQueryClient } from "../../lib/queryClient";
 import { createSyncEngine } from "./syncEngine";
 import type { SyncEngine } from "./syncEngine";
+import { createSyncCoordinator, type SyncCoordinator } from "./syncCoordinator";
 import { defaultSyncFetchers } from "./syncFetchers";
+import {
+  registerForegroundTrigger,
+  registerReconnectTrigger,
+  type TriggerHandle,
+} from "./syncTriggers";
 import { useSyncStore } from "./sync.store";
 
 export { SYNC_RECONNECT_DEBOUNCE_MS } from "./syncTriggers";
