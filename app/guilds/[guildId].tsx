@@ -11,7 +11,11 @@ import { GuildNotFoundState } from "../../src/components/GuildNotFoundState";
 import { Card } from "../../src/components/Card";
 import { RoleBadge } from "../../src/components/RoleBadge";
 import { AddressChip } from "../../src/components/AddressChip";
-import { RequirementCard, getChainDisplayName, isKnownChainId } from "../../src/components/RequirementCard";
+import {
+  RequirementCard,
+  getChainDisplayName,
+  isKnownChainId,
+} from "../../src/components/RequirementCard";
 import { StaleDataBanner } from "../../src/components/StaleDataBanner";
 import { WalletRequired } from "../../src/components/WalletRequired";
 import { useCombinedStaleState } from "../../src/features/offline/useStaleQuery";
@@ -42,22 +46,28 @@ export default function GuildDetail() {
 
   const staleState = useCombinedStaleState([guildQuery, membershipQuery, rolesQuery]);
   const groupedRequirements = groupRoleRequirementsByChain(
-    (roles as Array<{ id: string; name: string; chainId?: number }> | undefined) && guildConfig?.requirements
-      ? (roles as Array<{ id: string; name: string; chainId?: number }> | undefined)?.map((role) => {
-          const requirement = guildConfig.requirements?.find(
-            (item: { id: string; name?: string; chainId: number }) => item.id === role.id || item.name === role.name,
-          );
-          return {
+    (roles as Array<{ id: string; name: string; chainId?: number }> | undefined) &&
+      guildConfig?.requirements
+      ? (roles as Array<{ id: string; name: string; chainId?: number }> | undefined)?.map(
+          (role) => {
+            const requirement = guildConfig.requirements?.find(
+              (item: { id: string; name?: string; chainId: number }) =>
+                item.id === role.id || item.name === role.name,
+            );
+            return {
+              id: role.id,
+              name: role.name,
+              chainId: role.chainId ?? requirement?.chainId ?? guild?.chainId ?? 1,
+            };
+          },
+        )
+      : ((roles as Array<{ id: string; name: string; chainId?: number }> | undefined) ?? []).map(
+          (role) => ({
             id: role.id,
             name: role.name,
-            chainId: role.chainId ?? requirement?.chainId ?? guild?.chainId ?? 1,
-          };
-        })
-      : ((roles as Array<{ id: string; name: string; chainId?: number }> | undefined) ?? []).map((role) => ({
-          id: role.id,
-          name: role.name,
-          chainId: role.chainId ?? guild?.chainId ?? 1,
-        })),
+            chainId: role.chainId ?? guild?.chainId ?? 1,
+          }),
+        ),
     guild?.chainId ?? 1,
   );
   const guildChainLabel =
@@ -70,9 +80,7 @@ export default function GuildDetail() {
         : `Multiple networks (${groupedRequirements.map((group) => group.label).join(", ")})`;
 
   const showSkeleton =
-    (guildLoading && !guild) ||
-    (memLoading && !membership) ||
-    (rolesLoading && !roles);
+    (guildLoading && !guild) || (memLoading && !membership) || (rolesLoading && !roles);
 
   return (
     <WalletRequired>
@@ -91,9 +99,15 @@ export default function GuildDetail() {
                 : "Failed to load guild details"
             }
             onRetry={() => {
-              void Promise.all([guildQuery.refetch(), membershipQuery.refetch(), rolesQuery.refetch()]);
+              void Promise.all([
+                guildQuery.refetch(),
+                membershipQuery.refetch(),
+                rolesQuery.refetch(),
+              ]);
             }}
-            isRetrying={guildQuery.isFetching || membershipQuery.isFetching || rolesQuery.isFetching}
+            isRetrying={
+              guildQuery.isFetching || membershipQuery.isFetching || rolesQuery.isFetching
+            }
           />
         ) : !guild ? (
           <ErrorState
@@ -103,9 +117,15 @@ export default function GuildDetail() {
                 : "Failed to load guild details"
             }
             onRetry={() => {
-              void Promise.all([guildQuery.refetch(), membershipQuery.refetch(), rolesQuery.refetch()]);
+              void Promise.all([
+                guildQuery.refetch(),
+                membershipQuery.refetch(),
+                rolesQuery.refetch(),
+              ]);
             }}
-            isRetrying={guildQuery.isFetching || membershipQuery.isFetching || rolesQuery.isFetching}
+            isRetrying={
+              guildQuery.isFetching || membershipQuery.isFetching || rolesQuery.isFetching
+            }
           />
         ) : (
           <>
@@ -114,7 +134,10 @@ export default function GuildDetail() {
               {staleState.isOffline ? (
                 <StaleDataBanner reason="offline" lastSyncedAt={staleState.lastSyncedAt} />
               ) : staleState.isStale && staleState.reason ? (
-                <StaleDataBanner reason={staleState.reason} lastSyncedAt={staleState.lastSyncedAt} />
+                <StaleDataBanner
+                  reason={staleState.reason}
+                  lastSyncedAt={staleState.lastSyncedAt}
+                />
               ) : null}
 
               <Card className="mb-6">
@@ -166,8 +189,13 @@ export default function GuildDetail() {
                 {groupedRequirements.length > 0 ? (
                   groupedRequirements.map((group) => (
                     <View key={`${group.chainId}`} className="mb-4">
-                      <Text className="text-sm font-semibold text-text-muted mb-2">{group.label}</Text>
-                      <View className="flex-row flex-wrap" testID={`guild-roles-list-${group.chainId}`}>
+                      <Text className="text-sm font-semibold text-text-muted mb-2">
+                        {group.label}
+                      </Text>
+                      <View
+                        className="flex-row flex-wrap"
+                        testID={`guild-roles-list-${group.chainId}`}
+                      >
                         {group.requirements.map((role) => (
                           <RequirementCard
                             key={role.id}

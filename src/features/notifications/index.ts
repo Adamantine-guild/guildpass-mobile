@@ -27,7 +27,17 @@
  */
 
 export { useReconciliation } from "./useReconciliation";
-export { useReconciliationStore, entityCompositeKey, parseEntityCompositeKey } from "./reconciliation.store";
+export {
+  useBackgroundSync,
+  registerBackgroundSyncTask,
+  unregisterBackgroundSyncTask,
+  BACKGROUND_SYNC_TASK_NAME,
+} from "./useBackgroundSync";
+export {
+  useReconciliationStore,
+  entityCompositeKey,
+  parseEntityCompositeKey,
+} from "./reconciliation.store";
 export type {
   EntityKey,
   RoleChangeSnapshot,

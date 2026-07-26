@@ -33,6 +33,6 @@ export const useBiometricStore = create<BiometricStore>()(
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true);
       },
-    }
-  )
+    },
+  ),
 );

@@ -82,14 +82,14 @@ The application is built on a robust, feature-driven foundation designed for lon
 
 ### Project structure
 
-| Path                   | Purpose                                      |
-| ---------------------- | -------------------------------------------- |
-| `app/`                 | Expo Router file-based pages and layouts     |
-| `app/access-scanner.tsx` | QR code scanner screen using expo-camera   |
-| `src/features/access/` | Access check hooks and QR payload validation |
-| `src/`                 | Feature modules, hooks, stores, and services |
-| `docs/`                | Architecture and integration guides          |
-| `tests/`               | Vitest unit tests                            |
+| Path                     | Purpose                                      |
+| ------------------------ | -------------------------------------------- |
+| `app/`                   | Expo Router file-based pages and layouts     |
+| `app/access-scanner.tsx` | QR code scanner screen using expo-camera     |
+| `src/features/access/`   | Access check hooks and QR payload validation |
+| `src/`                   | Feature modules, hooks, stores, and services |
+| `docs/`                  | Architecture and integration guides          |
+| `tests/`                 | Vitest unit tests                            |
 
 ## 🧪 Testing
 
@@ -117,6 +117,7 @@ pnpm format
 GuildPass Mobile uses [Maestro](https://maestro.mobile.dev/) for E2E testing. Maestro provides deterministic, device-level testing for Expo apps.
 
 **Install Maestro:**
+
 ```bash
 # macOS/Linux
 curl -Ls "https://get.maestro.mobile.dev" | bash
@@ -127,6 +128,7 @@ curl -Ls "https://get.maestro.mobile.dev" | bash
 ```
 
 **Run E2E Tests:**
+
 ```bash
 # 1. Build the app for your platform
 npx expo run:ios    # or npx expo run:android
@@ -145,6 +147,7 @@ maestro studio
 ```
 
 **E2E Test Coverage:**
+
 - ✅ Onboarding to profile navigation
 - ✅ Manual wallet entry
 - ✅ Guild list and guild detail navigation
@@ -157,11 +160,11 @@ See [`.maestro/README.md`](.maestro/README.md) for detailed E2E testing document
 
 GuildPass Mobile uses **EAS Build** with three distinct profiles:
 
-| Profile       | Distribution  | Channel        | Use Case                     |
-|---------------|---------------|----------------|------------------------------|
-| `development` | Internal      | `development`  | Local dev & debug builds     |
-| `preview`     | Internal      | `preview`      | QA / TestFlight / Beta       |
-| `production`  | Store         | `production`   | App Store & Play Store       |
+| Profile       | Distribution | Channel       | Use Case                 |
+| ------------- | ------------ | ------------- | ------------------------ |
+| `development` | Internal     | `development` | Local dev & debug builds |
+| `preview`     | Internal     | `preview`     | QA / TestFlight / Beta   |
+| `production`  | Store        | `production`  | App Store & Play Store   |
 
 ```bash
 # Development build (APK / debug)
@@ -186,6 +189,7 @@ Copy `.env.example` to `.env` and fill in your values. Environment variables pre
 
 **Configuration Validation:**
 The application uses a typed configuration layer to validate environment variables on startup.
+
 - `EXPO_PUBLIC_API_URL` and `EXPO_PUBLIC_CHAIN_ID` are required and strictly validated.
 - If they are missing or invalid, the app will throw a clear developer-facing error in development, preventing silent, unsafe fallbacks to production defaults.
 
@@ -223,22 +227,26 @@ GuildPass Mobile supports deep linking, allowing external links to open specific
 ### Supported Link Formats
 
 #### Guild Detail
+
 - **Custom Scheme**: `guildpass://guild/{guildId}`
 - **Universal Link**: `https://guildpass.xyz/guild/{guildId}`
 - **Example**: `guildpass://guild/alpha-guild`
 
 #### Access Check
+
 - **Custom Scheme**: `guildpass://access-check?guildId={id}&resourceId={id}&walletAddress={address}`
 - **Universal Link**: `https://guildpass.xyz/access-check?guildId={id}&resourceId={id}&walletAddress={address}`
 - **Example**: `guildpass://access-check?guildId=alpha-guild&resourceId=secret-channel&walletAddress=0x1234...`
 
 ### Parameter Validation
+
 - Guild detail links require a valid `guildId`
 - Access check links require both `guildId` and `resourceId` parameters
 - `walletAddress` is optional for access check; if not provided, the app uses the connected wallet
 - Invalid or malformed links redirect to a user-friendly error screen
 
 ### Cold Start Support
+
 Deep links work when the app is cold-started (not already running). The app will launch and navigate to the appropriate screen.
 
 ## 🗺️ Roadmap

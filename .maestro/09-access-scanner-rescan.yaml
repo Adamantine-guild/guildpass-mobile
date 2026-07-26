@@ -1,0 +1,49 @@
+appId: xyz.guildpass.mobile
+env:
+  MOCK_API_SUCCESS: true
+---
+# E2E Test: Access Scanner Rescan Path
+# Validates: User sees specific rejection message and can tap "Scan Again" to resume scanning
+
+- launchApp
+- tapOn:
+    id: "onboarding-get-started-button"
+- tapOn:
+    id: "wallet-address-input"
+- inputText: "0x1234567890123456789012345678901234567890"
+- tapOn:
+    id: "wallet-connect-button"
+
+# Wait for navigation to complete
+- assertVisible:
+    text: "Guilds"
+
+# Navigate to scanner
+- tapOn:
+    text: "Scan Access QR"
+
+# Assert scanner is visible
+- assertVisible:
+    text: "Point your camera at a GuildPass access QR code."
+
+# Tap the dev-only button to simulate a failed scan
+- tapOn:
+    id: "test-fail-scan"
+
+# Assert rejection UI and specific reason
+- assertVisible:
+    text: "QR code rejected"
+- assertVisible:
+    text: "This QR code has expired."
+- assertVisible:
+    text: "Scan Again"
+
+# Tap "Scan Again" to resume scanning
+- tapOn:
+    text: "Scan Again"
+
+# Assert scanner is visible and error is cleared
+- assertVisible:
+    text: "Point your camera at a GuildPass access QR code."
+- assertNotVisible:
+    text: "QR code rejected"

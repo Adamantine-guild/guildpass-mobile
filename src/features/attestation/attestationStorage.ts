@@ -3,9 +3,10 @@
  * Manages persistent storage of attestations for offline verification
  */
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { type CachedAttestation, type RoleAttestation, ATTESTATION_STORAGE_KEYS } from './types';
-import { migratingSecureStorage } from '../../lib/storage';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import type { CachedAttestation, RoleAttestation } from "./types";
+import { ATTESTATION_STORAGE_KEYS } from "./types";
+import { migratingSecureStorage } from "../../lib/storage";
 
 type AttestationIndexEntry = { guildId: string; roleId: string };
 
@@ -31,7 +32,7 @@ async function registerAttestationWallet(walletAddress: string): Promise<void> {
   if (!wallets.includes(normalized)) {
     await migratingSecureStorage.setItem(
       ATTESTATION_WALLET_INDEX_KEY,
-      JSON.stringify([...wallets, normalized])
+      JSON.stringify([...wallets, normalized]),
     );
   }
 }
@@ -50,11 +51,7 @@ async function unregisterAttestationWallet(walletAddress: string): Promise<void>
 /**
  * Create a unique storage key for an attestation
  */
-function getAttestationStorageKey(
-  walletAddress: string,
-  guildId: string,
-  roleId: string
-): string {
+function getAttestationStorageKey(walletAddress: string, guildId: string, roleId: string): string {
   return `${ATTESTATION_STORAGE_KEYS.ATTESTATIONS}${walletAddress}:${guildId}:${roleId}`;
 }
 
@@ -66,7 +63,7 @@ function getAttestationStorageKey(
  */
 export async function cacheAttestation(
   walletAddress: string,
-  attestation: RoleAttestation
+  attestation: RoleAttestation,
 ): Promise<void> {
   try {
     const key = getAttestationStorageKey(walletAddress, attestation.guildId, attestation.roleId);
@@ -82,7 +79,7 @@ export async function cacheAttestation(
     const entries = await getAttestationIndex(walletAddress);
 
     const exists = entries.some(
-      (e) => e.guildId === attestation.guildId && e.roleId === attestation.roleId
+      (e) => e.guildId === attestation.guildId && e.roleId === attestation.roleId,
     );
 
     if (!exists) {
@@ -96,7 +93,7 @@ export async function cacheAttestation(
   } catch (error) {
     console.error(
       `Failed to cache attestation for ${walletAddress} in guild ${attestation.guildId}:`,
-      error
+      error,
     );
     throw error;
   }
@@ -113,7 +110,7 @@ export async function cacheAttestation(
 export async function getCachedAttestation(
   walletAddress: string,
   guildId: string,
-  roleId: string
+  roleId: string,
 ): Promise<CachedAttestation | null> {
   try {
     const key = getAttestationStorageKey(walletAddress, guildId, roleId);
@@ -128,7 +125,7 @@ export async function getCachedAttestation(
   } catch (error) {
     console.warn(
       `Failed to retrieve cached attestation for ${walletAddress} in guild ${guildId}:`,
-      error
+      error,
     );
     return null;
   }
@@ -141,7 +138,7 @@ export async function getCachedAttestation(
  * @returns Array of all cached attestations for this wallet
  */
 export async function getAllAttestationsForWallet(
-  walletAddress: string
+  walletAddress: string,
 ): Promise<CachedAttestation[]> {
   try {
     const entries = await getAttestationIndex(walletAddress);
@@ -153,11 +150,7 @@ export async function getAllAttestationsForWallet(
     const attestations: CachedAttestation[] = [];
 
     for (const entry of entries) {
-      const attestation = await getCachedAttestation(
-        walletAddress,
-        entry.guildId,
-        entry.roleId
-      );
+      const attestation = await getCachedAttestation(walletAddress, entry.guildId, entry.roleId);
       if (attestation) {
         attestations.push(attestation);
       }
@@ -179,7 +172,7 @@ export async function getAllAttestationsForWallet(
  */
 export async function getAttestationsForGuild(
   walletAddress: string,
-  guildId: string
+  guildId: string,
 ): Promise<CachedAttestation[]> {
   const allAttestations = await getAllAttestationsForWallet(walletAddress);
   return allAttestations.filter((a) => a.guildId === guildId);
@@ -195,7 +188,7 @@ export async function getAttestationsForGuild(
 export async function removeCachedAttestation(
   walletAddress: string,
   guildId: string,
-  roleId: string
+  roleId: string,
 ): Promise<void> {
   try {
     const key = getAttestationStorageKey(walletAddress, guildId, roleId);
@@ -205,9 +198,7 @@ export async function removeCachedAttestation(
     const indexKey = getAttestationIndexKey(walletAddress);
     const entries = await getAttestationIndex(walletAddress);
 
-    const filtered = entries.filter(
-      (e) => !(e.guildId === guildId && e.roleId === roleId)
-    );
+    const filtered = entries.filter((e) => !(e.guildId === guildId && e.roleId === roleId));
 
     if (filtered.length > 0) {
       await migratingSecureStorage.setItem(indexKey, JSON.stringify(filtered));
@@ -218,7 +209,7 @@ export async function removeCachedAttestation(
   } catch (error) {
     console.warn(
       `Failed to remove cached attestation for ${walletAddress} in guild ${guildId}:`,
-      error
+      error,
     );
   }
 }
@@ -232,7 +223,7 @@ export async function clearAttestationsForWallet(walletAddress: string): Promise
   try {
     const entries = await getAttestationIndex(walletAddress);
     const keys = entries.map((entry) =>
-      getAttestationStorageKey(walletAddress, entry.guildId, entry.roleId)
+      getAttestationStorageKey(walletAddress, entry.guildId, entry.roleId),
     );
     keys.push(getAttestationIndexKey(walletAddress));
 
@@ -258,13 +249,13 @@ export async function clearAllAttestations(): Promise<void> {
     const attestationKeys = legacyKeys.filter(
       (k) =>
         k.startsWith(ATTESTATION_STORAGE_KEYS.ATTESTATIONS) ||
-        k.startsWith(ATTESTATION_STORAGE_KEYS.ATTESTATION_INDEX)
+        k.startsWith(ATTESTATION_STORAGE_KEYS.ATTESTATION_INDEX),
     );
 
     await Promise.all(attestationKeys.map((key) => migratingSecureStorage.removeItem(key)));
     await migratingSecureStorage.removeItem(ATTESTATION_WALLET_INDEX_KEY);
   } catch (error) {
-    console.error('Failed to clear all attestations:', error);
+    console.error("Failed to clear all attestations:", error);
     throw error;
   }
 }

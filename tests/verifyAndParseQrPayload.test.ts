@@ -103,8 +103,9 @@ describe("verifyAndParseAccessQrPayload", () => {
     const signed = JSON.parse(buildSignedQrPayloadString(validFields)) as Record<string, unknown>;
     signed.resourceId = "evil-door";
     const tampered = JSON.stringify(signed);
-    await expect(verifyAndParseAccessQrPayload(tampered, now)).rejects.toMatchObject({
-      code: "QR_SIGNATURE_VERIFICATION_FAILED",
+    await expect(verifyAndParseAccessQrPayload(tampered, now)).resolves.toMatchObject({
+      success: false,
+      reason: "QR_SIGNATURE_VERIFICATION_FAILED",
     });
   });
 

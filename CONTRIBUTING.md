@@ -133,7 +133,7 @@ pnpm test:run    # All tests must pass
 - Mobile PRs with UI changes may require a screen recording.
 - Address requested changes promptly.
 
-----
+---
 
 ## SDK Development
 

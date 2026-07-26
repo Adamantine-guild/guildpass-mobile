@@ -1,7 +1,4 @@
-import {
-  PERSISTABLE_QUERY_ROOTS,
-  isPersistableQuery as _isPersistableQuery,
-} from "./queryKeys";
+import { PERSISTABLE_QUERY_ROOTS, isPersistableQuery as _isPersistableQuery } from "./queryKeys";
 
 export const PERSISTED_QUERY_CACHE_KEY = "GUILDPASS_QUERY_CACHE";
 
@@ -23,4 +20,3 @@ export function formatLastSyncedAt(timestamp: number | undefined): string | null
 
   return new Date(timestamp).toLocaleString();
 }
-

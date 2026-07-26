@@ -280,9 +280,7 @@ describe("useReconciliation — fetch failure", () => {
     await simulateReconcile(hint);
 
     // Store should be untouched
-    expect(
-      store.getVersion({ guildId: "guild_abc", walletAddress: "0x123" }),
-    ).toBe(5);
+    expect(store.getVersion({ guildId: "guild_abc", walletAddress: "0x123" })).toBe(5);
   });
 });
 
@@ -310,9 +308,7 @@ describe("useReconciliation — extended offline catch-up", () => {
         isActive: true,
         roleChangeSeq: entity.seq,
       });
-      sdk.roles.getUserRoles.mockResolvedValueOnce([
-        { id: "r1", name: "Member" },
-      ]);
+      sdk.roles.getUserRoles.mockResolvedValueOnce([{ id: "r1", name: "Member" }]);
     }
 
     // Reconcile all

@@ -51,9 +51,7 @@
           }
         }
       },
-      "associatedDomains": [
-        "applinks:guildpass.xyz"
-      ]
+      "associatedDomains": ["applinks:guildpass.xyz"]
     },
     "android": {
       "adaptiveIcon": {

@@ -1,6 +1,6 @@
 import React from "react";
 import { Text } from "react-native";
-import TestRenderer, { act } from "react-test-renderer";
+import TestRenderer, { type ReactTestRenderer, act } from "react-test-renderer";
 import { describe, expect, it, vi } from "vitest";
 import { SensitiveStorageMigrationGate } from "../src/features/security/SensitiveStorageMigrationGate";
 
@@ -20,7 +20,7 @@ const successfulReport = {
 describe("SensitiveStorageMigrationGate", () => {
   it("renders children only after a clean migration report", async () => {
     const migrate = vi.fn().mockResolvedValue(successfulReport);
-    let renderer!: TestRenderer.ReactTestRenderer;
+    let renderer!: ReactTestRenderer;
 
     await act(async () => {
       renderer = TestRenderer.create(
@@ -43,7 +43,7 @@ describe("SensitiveStorageMigrationGate", () => {
       })
       .mockResolvedValueOnce(successfulReport);
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    let renderer!: TestRenderer.ReactTestRenderer;
+    let renderer!: ReactTestRenderer;
 
     try {
       await act(async () => {

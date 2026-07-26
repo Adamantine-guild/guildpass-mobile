@@ -81,7 +81,9 @@ describe("Reconciliation Store — monotonic version tracking", () => {
     store.processSnapshot(makeSnapshot("guild_abc", "0x123", 5));
 
     // Second: seq 7 (genuine update)
-    const result = store.processSnapshot(makeSnapshot("guild_abc", "0x123", 7, ["Member", "Admin"]));
+    const result = store.processSnapshot(
+      makeSnapshot("guild_abc", "0x123", 7, ["Member", "Admin"]),
+    );
 
     expect(result.isUpdate).toBe(true);
     expect(result.isDuplicate).toBe(false);

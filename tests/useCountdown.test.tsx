@@ -1,5 +1,6 @@
 import React from "react";
-import TestRenderer, { act, type ReactTestRenderer } from "react-test-renderer";
+import TestRenderer, { act } from "react-test-renderer";
+import type { ReactTestRenderer } from "react-test-renderer";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useCountdown } from "../src/features/access/useCountdown";
 

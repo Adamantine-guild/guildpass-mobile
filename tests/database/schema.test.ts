@@ -3,7 +3,8 @@
 // ---------------------------------------------------------------------------
 
 import { describe, it, expect, beforeAll } from "vitest";
-import { createMockDb, type MockDb } from "./mock-db";
+import { createMockDb } from "./mock-db";
+import type { MockDb } from "./mock-db";
 import { MIGRATIONS, SCHEMA_VERSION_1 } from "../../src/database/schema";
 import { applyMigrations } from "../../src/database/migrations";
 
@@ -17,8 +18,14 @@ beforeAll(async () => {
 
 describe("Schema — tables", () => {
   const tables = [
-    "schema_migrations", "guilds", "guild_configs", "wallets",
-    "roles", "memberships", "user_roles", "access_checks",
+    "schema_migrations",
+    "guilds",
+    "guild_configs",
+    "wallets",
+    "roles",
+    "memberships",
+    "user_roles",
+    "access_checks",
   ];
   for (const t of tables) {
     it(`creates ${t}`, () => expect(mock.tables.has(t)).toBe(true));
@@ -27,10 +34,14 @@ describe("Schema — tables", () => {
 
 describe("Schema — indexes", () => {
   const indexes = [
-    "idx_guilds_updated_at", "idx_roles_guild_id",
-    "idx_memberships_wallet", "idx_memberships_guild",
-    "idx_user_roles_wallet", "idx_user_roles_guild",
-    "idx_access_checks_wallet", "idx_access_checks_guild",
+    "idx_guilds_updated_at",
+    "idx_roles_guild_id",
+    "idx_memberships_wallet",
+    "idx_memberships_guild",
+    "idx_user_roles_wallet",
+    "idx_user_roles_guild",
+    "idx_access_checks_wallet",
+    "idx_access_checks_guild",
     "idx_access_checks_checked",
   ];
   for (const idx of indexes) {
@@ -48,16 +59,30 @@ describe("MIGRATIONS registry", () => {
   });
 
   it("SCHEMA_VERSION_1 contains all 7 entity CREATE TABLEs", () => {
-    for (const t of ["guilds", "guild_configs", "wallets", "roles", "memberships", "user_roles", "access_checks"]) {
+    for (const t of [
+      "guilds",
+      "guild_configs",
+      "wallets",
+      "roles",
+      "memberships",
+      "user_roles",
+      "access_checks",
+    ]) {
       expect(SCHEMA_VERSION_1).toContain(`CREATE TABLE IF NOT EXISTS ${t}`);
     }
   });
 
   it("SCHEMA_VERSION_1 contains all 9 CREATE INDEXes", () => {
     for (const idx of [
-      "idx_guilds_updated_at", "idx_roles_guild_id", "idx_memberships_wallet",
-      "idx_memberships_guild", "idx_user_roles_wallet", "idx_user_roles_guild",
-      "idx_access_checks_wallet", "idx_access_checks_guild", "idx_access_checks_checked",
+      "idx_guilds_updated_at",
+      "idx_roles_guild_id",
+      "idx_memberships_wallet",
+      "idx_memberships_guild",
+      "idx_user_roles_wallet",
+      "idx_user_roles_guild",
+      "idx_access_checks_wallet",
+      "idx_access_checks_guild",
+      "idx_access_checks_checked",
     ]) {
       expect(SCHEMA_VERSION_1).toContain(`CREATE INDEX IF NOT EXISTS ${idx}`);
     }

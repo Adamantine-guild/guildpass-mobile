@@ -19,10 +19,7 @@ import { EncryptionService } from "../src/lib/encryptionService";
 import { KeyManager } from "../src/lib/keyManager";
 import { PERSISTED_QUERY_CACHE_KEY } from "../src/lib/offlineCache";
 import { enforcePinConfigurationAtStartup } from "../src/features/security/certificatePinning";
-import {
-  TEST_WALLET_ADDRESS,
-  MEMBERSHIP_ACTIVE_FIXTURE,
-} from "./fixtures/membership.fixtures";
+import { TEST_WALLET_ADDRESS, MEMBERSHIP_ACTIVE_FIXTURE } from "./fixtures/membership.fixtures";
 import { GUILD_DETAIL_FIXTURE } from "./fixtures/guild.fixtures";
 
 const FIXED_KEY_HEX = "fedcba9876543210".repeat(4);
@@ -54,10 +51,7 @@ describe("Security verification – on-disk opacity (Req 1.3 / 6.5)", () => {
       keyManager: fakeKeyManager(),
     });
     const source = new QueryClient();
-    source.setQueryData(
-      ["guild", "guild_abc"],
-      GUILD_DETAIL_FIXTURE,
-    );
+    source.setQueryData(["guild", "guild_abc"], GUILD_DETAIL_FIXTURE);
     source.setQueryData(
       ["membership", TEST_WALLET_ADDRESS, "guild_abc"],
       MEMBERSHIP_ACTIVE_FIXTURE,
@@ -143,9 +137,7 @@ describe("Security verification – tamper resistance (Req 1.6 / 6.2)", () => {
 
     const onDisk = (await storage.getItem(PERSISTED_QUERY_CACHE_KEY)) as string;
     const envelope = JSON.parse(onDisk);
-    const cipherBytes = Uint8Array.from(atob(envelope.c), (c) =>
-      c.charCodeAt(0),
-    );
+    const cipherBytes = Uint8Array.from(atob(envelope.c), (c) => c.charCodeAt(0));
     cipherBytes[0] ^= 0xff;
     envelope.c = btoa(String.fromCharCode(...cipherBytes));
     await storage.setItem(PERSISTED_QUERY_CACHE_KEY, JSON.stringify(envelope));
@@ -172,15 +164,15 @@ describe("Security verification – certificate pin startup gate (issue #164)", 
   };
 
   it("blocks production builds when pin configuration is invalid", () => {
-    expect(() =>
-      enforcePinConfigurationAtStartup("production", placeholderValidation),
-    ).toThrow(/Certificate pinning is misconfigured for a production build/);
+    expect(() => enforcePinConfigurationAtStartup("production", placeholderValidation)).toThrow(
+      /Certificate pinning is misconfigured for a production build/,
+    );
   });
 
   it("blocks preview builds when pin configuration is invalid", () => {
-    expect(() =>
-      enforcePinConfigurationAtStartup("preview", placeholderValidation),
-    ).toThrow(/Certificate pinning is misconfigured for a preview build/);
+    expect(() => enforcePinConfigurationAtStartup("preview", placeholderValidation)).toThrow(
+      /Certificate pinning is misconfigured for a preview build/,
+    );
   });
 
   it("does not block development builds when pins are placeholders", () => {
@@ -194,9 +186,7 @@ describe("Security verification – certificate pin startup gate (issue #164)", 
 
   it("is a no-op when pin configuration is valid in any environment", () => {
     for (const env of ["development", "preview", "production"] as const) {
-      expect(() =>
-        enforcePinConfigurationAtStartup(env, healthyValidation),
-      ).not.toThrow();
+      expect(() => enforcePinConfigurationAtStartup(env, healthyValidation)).not.toThrow();
     }
   });
 });

@@ -10,10 +10,10 @@ This document scopes the security hardening implemented in GuildPass Mobile v1.0
 
 The hardening layer consists of two controls:
 
-| Control | Mechanism | Scope |
-|---------|-----------|-------|
-| **Device Integrity** (Root/Jailbreak Detection) | JS heuristic checks + native config plugin | Detect compromised device environments |
-| **Certificate Pinning** | Native TLS pinning (Android NSC / iOS ATS) + JS domain validation | Prevent MITM attacks on API traffic |
+| Control                                         | Mechanism                                                         | Scope                                  |
+| ----------------------------------------------- | ----------------------------------------------------------------- | -------------------------------------- |
+| **Device Integrity** (Root/Jailbreak Detection) | JS heuristic checks + native config plugin                        | Detect compromised device environments |
+| **Certificate Pinning**                         | Native TLS pinning (Android NSC / iOS ATS) + JS domain validation | Prevent MITM attacks on API traffic    |
 
 ---
 
@@ -42,25 +42,25 @@ The hardening layer consists of two controls:
 
 ### Assets Under Protection
 
-| Asset | Sensitivity | Storage |
-|-------|-------------|---------|
-| Wallet address / identifier | Medium | AsyncStorage (public data) |
-| Access-control decisions (QR payloads) | High | In-memory only |
-| Signed attestations / proofs | High | Transient; not persisted |
-| Future: embedded private keys | **Critical** | Planned: `expo-secure-store` / Secure Enclave |
-| Session / auth tokens | High | `expo-secure-store` |
+| Asset                                  | Sensitivity  | Storage                                       |
+| -------------------------------------- | ------------ | --------------------------------------------- |
+| Wallet address / identifier            | Medium       | AsyncStorage (public data)                    |
+| Access-control decisions (QR payloads) | High         | In-memory only                                |
+| Signed attestations / proofs           | High         | Transient; not persisted                      |
+| Future: embedded private keys          | **Critical** | Planned: `expo-secure-store` / Secure Enclave |
+| Session / auth tokens                  | High         | `expo-secure-store`                           |
 
 ---
 
 ## 3. Threat Actors
 
-| Actor | Capability | Motivation |
-|-------|-----------|------------|
-| **Casual attacker** | Installs public rooting tools, MITM proxy apps | Curiosity, casual fraud |
-| **Sophisticated attacker** | Custom ROMs, kernel modules, hardware debuggers | Targeted theft of assets/access |
-| **Network adversary** | Controls local network (Wi-Fi, VPN), ARP spoofing | Intercept API traffic, steal tokens |
-| **Malicious insider** | Access to build pipeline, signing keys | Supply-chain compromise |
-| **Nation-state actor** | Zerodium-grade exploits, physical device access | Out of scope for this document |
+| Actor                      | Capability                                        | Motivation                          |
+| -------------------------- | ------------------------------------------------- | ----------------------------------- |
+| **Casual attacker**        | Installs public rooting tools, MITM proxy apps    | Curiosity, casual fraud             |
+| **Sophisticated attacker** | Custom ROMs, kernel modules, hardware debuggers   | Targeted theft of assets/access     |
+| **Network adversary**      | Controls local network (Wi-Fi, VPN), ARP spoofing | Intercept API traffic, steal tokens |
+| **Malicious insider**      | Access to build pipeline, signing keys            | Supply-chain compromise             |
+| **Nation-state actor**     | Zerodium-grade exploits, physical device access   | Out of scope for this document      |
 
 ---
 
@@ -68,22 +68,22 @@ The hardening layer consists of two controls:
 
 ### 4.1 What It Protects Against
 
-| Threat | Mitigation |
-|--------|-----------|
+| Threat                                               | Mitigation                                                 |
+| ---------------------------------------------------- | ---------------------------------------------------------- |
 | Modified app binary intercepting signed attestations | Detection raises barrier; requires bypass of native checks |
-| Hooking frameworks (Frida, Xposed, Substrate) | Native module detects framework artifacts |
-| Casual rooting via Magisk/SuperSU (Android) | File-path and property checks |
-| Casual jailbreaking via checkra1n/unc0ver (iOS) | File-path and sandbox checks |
+| Hooking frameworks (Frida, Xposed, Substrate)        | Native module detects framework artifacts                  |
+| Casual rooting via Magisk/SuperSU (Android)          | File-path and property checks                              |
+| Casual jailbreaking via checkra1n/unc0ver (iOS)      | File-path and sandbox checks                               |
 
 ### 4.2 What It Does NOT Protect Against
 
-| Threat | Rationale |
-|--------|-----------|
-| Kernel-level rootkits that hide files/properties | Detection relies on OS APIs the kernel can lie about |
-| Hardware debuggers (JTAG/SWD) | Outside JS/native app boundary |
-| Custom AOSP builds that mask root indicators | Attacker controls the OS; all checks are bypassable |
-| Running in a compromised emulator with root hidden | Emulator detection is separate and also bypassable |
-| Zero-day jailbreak/root exploits | By definition, detection signatures lag behind |
+| Threat                                             | Rationale                                            |
+| -------------------------------------------------- | ---------------------------------------------------- |
+| Kernel-level rootkits that hide files/properties   | Detection relies on OS APIs the kernel can lie about |
+| Hardware debuggers (JTAG/SWD)                      | Outside JS/native app boundary                       |
+| Custom AOSP builds that mask root indicators       | Attacker controls the OS; all checks are bypassable  |
+| Running in a compromised emulator with root hidden | Emulator detection is separate and also bypassable   |
+| Zero-day jailbreak/root exploits                   | By definition, detection signatures lag behind       |
 
 ### 4.3 Implementation Details
 
@@ -104,23 +104,23 @@ The hardening layer consists of two controls:
 
 ### 5.1 What It Protects Against
 
-| Threat | Mitigation |
-|--------|-----------|
-| MITM proxy (Charles, Burp, mitmproxy) with user-installed CA | App rejects non-pinned certificate |
-| Compromised CA issuing fraudulent certs for `guildpass.xyz` | Only the pinned SPKI hashes are trusted |
-| DNS poisoning + attacker-controlled server with valid cert | Pinning by SPKI, not by CA chain |
-| Rogue Wi-Fi access point intercepting TLS | Pinning enforced at native TLS layer |
+| Threat                                                       | Mitigation                              |
+| ------------------------------------------------------------ | --------------------------------------- |
+| MITM proxy (Charles, Burp, mitmproxy) with user-installed CA | App rejects non-pinned certificate      |
+| Compromised CA issuing fraudulent certs for `guildpass.xyz`  | Only the pinned SPKI hashes are trusted |
+| DNS poisoning + attacker-controlled server with valid cert   | Pinning by SPKI, not by CA chain        |
+| Rogue Wi-Fi access point intercepting TLS                    | Pinning enforced at native TLS layer    |
 
 ### 5.2 What It Does NOT Protect Against
 
-| Threat | Rationale |
-|--------|-----------|
-| Compromise of the GuildPass API server private key | Pinning trusts that specific key; if stolen, attacker can impersonate |
-| Traffic to non-pinned domains (CDNs, analytics, third-party) | Pinning only covers `api.guildpass.xyz` and `staging.guildpass.xyz` |
-| IP-level redirection that bypasses TLS entirely | Pinning operates at the TLS handshake, not the network layer |
-| BGP hijacking with a server that has the pinned private key | Requires physical server key compromise |
-| App binary modification to remove pinning | Requires root + binary patching (raised bar via Control 1) |
-| Certificate transparency log poisoning | Out of scope; CT is a server-side concern |
+| Threat                                                       | Rationale                                                             |
+| ------------------------------------------------------------ | --------------------------------------------------------------------- |
+| Compromise of the GuildPass API server private key           | Pinning trusts that specific key; if stolen, attacker can impersonate |
+| Traffic to non-pinned domains (CDNs, analytics, third-party) | Pinning only covers `api.guildpass.xyz` and `staging.guildpass.xyz`   |
+| IP-level redirection that bypasses TLS entirely              | Pinning operates at the TLS handshake, not the network layer          |
+| BGP hijacking with a server that has the pinned private key  | Requires physical server key compromise                               |
+| App binary modification to remove pinning                    | Requires root + binary patching (raised bar via Control 1)            |
+| Certificate transparency log poisoning                       | Out of scope; CT is a server-side concern                             |
 
 ### 5.3 Implementation Details
 
@@ -179,25 +179,25 @@ Goal: Intercept or modify wallet attestations
 
 The following risks remain after hardening and should be tracked:
 
-| Risk | Severity | Mitigation Strategy |
-|------|----------|---------------------|
-| Sophisticated attacker bypasses root detection | Medium | Accept; layer with server-side attestation validation (roadmap) |
-| Pin rotation mishap bricks connectivity | High | Pin rotation runbook + backup pin policy + phased rollout |
-| Native config plugin not included in build | High | CI check that validates plugin presence |
-| Traffic to non-pinned third-party domains | Low-Medium | Audit third-party dependencies; add pins for critical domains |
-| Expo Go bypass in development | Low | Detect Expo Go and warn (not block) during development |
+| Risk                                           | Severity   | Mitigation Strategy                                             |
+| ---------------------------------------------- | ---------- | --------------------------------------------------------------- |
+| Sophisticated attacker bypasses root detection | Medium     | Accept; layer with server-side attestation validation (roadmap) |
+| Pin rotation mishap bricks connectivity        | High       | Pin rotation runbook + backup pin policy + phased rollout       |
+| Native config plugin not included in build     | High       | CI check that validates plugin presence                         |
+| Traffic to non-pinned third-party domains      | Low-Medium | Audit third-party dependencies; add pins for critical domains   |
+| Expo Go bypass in development                  | Low        | Detect Expo Go and warn (not block) during development          |
 
 ---
 
 ## 8. Future Improvements
 
-| Improvement | Priority | Notes |
-|-------------|----------|-------|
-| Play Integrity / App Attest integration | High | Server-side verification of device + app integrity |
-| Runtime integrity (checksum of JS bundle) | Medium | Detect tampered JS bundles |
-| Certificate Transparency enforcement | Medium | Require CT for pinned domains |
-| Obfuscation / anti-tamper (ProGuard/DexGuard) | Low | Raise reverse-engineering cost |
-| Hardware-backed key attestation for wallets | High | Use Secure Enclave / StrongBox for key generation |
+| Improvement                                   | Priority | Notes                                              |
+| --------------------------------------------- | -------- | -------------------------------------------------- |
+| Play Integrity / App Attest integration       | High     | Server-side verification of device + app integrity |
+| Runtime integrity (checksum of JS bundle)     | Medium   | Detect tampered JS bundles                         |
+| Certificate Transparency enforcement          | Medium   | Require CT for pinned domains                      |
+| Obfuscation / anti-tamper (ProGuard/DexGuard) | Low      | Raise reverse-engineering cost                     |
+| Hardware-backed key attestation for wallets   | High     | Use Secure Enclave / StrongBox for key generation  |
 
 ---
 

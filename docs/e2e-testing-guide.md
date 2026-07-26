@@ -35,6 +35,7 @@ curl -Ls "https://get.maestro.mobile.dev" | bash
 ### Windows
 
 Use WSL (Windows Subsystem for Linux):
+
 ```bash
 wsl
 curl -Ls "https://get.maestro.mobile.dev" | bash
@@ -63,6 +64,7 @@ This creates a development build with bundle ID `xyz.guildpass.mobile` that Maes
 ### 2. Start Development Server
 
 In a separate terminal:
+
 ```bash
 pnpm start
 ```
@@ -101,47 +103,51 @@ appId: xyz.guildpass.mobile
 ### Available Commands
 
 #### Navigation
+
 ```yaml
-- launchApp                          # Launch the app
-- back                               # Press back button
-- scroll                             # Scroll the screen
+- launchApp # Launch the app
+- back # Press back button
+- scroll # Scroll the screen
 - swipe:
     direction: UP|DOWN|LEFT|RIGHT
 ```
 
 #### Assertions
+
 ```yaml
 - assertVisible:
-    id: "testID"                     # Check element is visible
-    timeout: 10000                   # Optional timeout in ms
+    id: "testID" # Check element is visible
+    timeout: 10000 # Optional timeout in ms
 
 - assertVisible:
-    text: "Welcome"                  # Check by text content
+    text: "Welcome" # Check by text content
 
 - assertNotVisible:
-    id: "testID"                     # Check element not visible
+    id: "testID" # Check element not visible
 ```
 
 #### Interactions
+
 ```yaml
 - tapOn:
-    id: "testID"                     # Tap on element
+    id: "testID" # Tap on element
 
 - tapOn:
-    text: "Submit"                   # Tap by text
+    text: "Submit" # Tap by text
 
-- inputText: "Hello World"           # Enter text (requires prior focus)
+- inputText: "Hello World" # Enter text (requires prior focus)
 
-- eraseText                          # Clear text field
+- eraseText # Clear text field
 ```
 
 #### Waiting
+
 ```yaml
 - waitForAnimationToEnd:
     timeout: 5000
 
 - runFlow:
-    file: other-flow.yaml            # Run another test flow
+    file: other-flow.yaml # Run another test flow
 ```
 
 ### Example: Complete Flow
@@ -187,38 +193,39 @@ Follow these patterns for consistency:
 
 ```typescript
 // Screens
-testID="onboarding-screen"
-testID="profile-screen"
-testID="guilds-screen"
+testID = "onboarding-screen";
+testID = "profile-screen";
+testID = "guilds-screen";
 
 // Buttons (actions)
-testID="submit-button"
-testID="cancel-button"
-testID="wallet-connect-button"
+testID = "submit-button";
+testID = "cancel-button";
+testID = "wallet-connect-button";
 
 // Navigation buttons
-testID="navigate-guilds-button"
-testID="navigate-settings-button"
+testID = "navigate-guilds-button";
+testID = "navigate-settings-button";
 
 // Input fields
-testID="email-input"
-testID="password-input"
-testID="wallet-address-input"
+testID = "email-input";
+testID = "password-input";
+testID = "wallet-address-input";
 
 // Status indicators
-testID="loading-indicator"
-testID="error-message"
-testID="success-banner"
+testID = "loading-indicator";
+testID = "error-message";
+testID = "success-banner";
 
 // Data display
-testID="user-profile-data"
-testID="guild-list"
-testID="membership-status-card"
+testID = "user-profile-data";
+testID = "guild-list";
+testID = "membership-status-card";
 ```
 
 ### Adding Test IDs to Components
 
 #### Button Component
+
 ```typescript
 interface ButtonProps {
   title: string;
@@ -233,14 +240,15 @@ export const Button = ({ title, onPress, testID }: ButtonProps) => (
 );
 
 // Usage
-<Button 
-  title="Connect" 
+<Button
+  title="Connect"
   onPress={handleConnect}
   testID="wallet-connect-button"
 />
 ```
 
 #### Screen Container
+
 ```typescript
 export default function ProfileScreen() {
   return (
@@ -267,37 +275,40 @@ E2E tests that depend on network requests need mocking to avoid flakiness.
 ### Option 1: Mock Service Worker (MSW)
 
 Install MSW:
+
 ```bash
 npm install --save-dev msw
 ```
 
 Setup handlers:
+
 ```typescript
 // tests/mocks/handlers.ts
-import { http, HttpResponse } from 'msw';
+import { http, HttpResponse } from "msw";
 
 export const handlers = [
-  http.get('/api/guilds', () => {
+  http.get("/api/guilds", () => {
     return HttpResponse.json([
-      { id: 'guild_abc', name: 'Alpha Guild' },
-      { id: 'guild_xyz', name: 'Beta Community' }
+      { id: "guild_abc", name: "Alpha Guild" },
+      { id: "guild_xyz", name: "Beta Community" },
     ]);
   }),
-  
-  http.post('/api/access-check', () => {
+
+  http.post("/api/access-check", () => {
     return HttpResponse.json({
       hasAccess: true,
-      reason: 'User has required role'
+      reason: "User has required role",
     });
-  })
+  }),
 ];
 ```
 
 Start server:
+
 ```typescript
 // tests/mocks/server.ts
-import { setupServer } from 'msw/node';
-import { handlers } from './handlers';
+import { setupServer } from "msw/node";
+import { handlers } from "./handlers";
 
 export const server = setupServer(...handlers);
 ```
@@ -317,6 +328,7 @@ env:
 ```
 
 Start local mock server:
+
 ```bash
 # Using json-server
 npx json-server --watch db.json --port 3000
@@ -326,12 +338,14 @@ npx json-server --watch db.json --port 3000
 
 ```typescript
 // src/lib/guildpassClient.ts
-const apiUrl = __DEV__ && process.env.EXPO_PUBLIC_USE_MOCK === 'true'
-  ? 'http://localhost:3000'
-  : process.env.EXPO_PUBLIC_API_URL;
+const apiUrl =
+  __DEV__ && process.env.EXPO_PUBLIC_USE_MOCK === "true"
+    ? "http://localhost:3000"
+    : process.env.EXPO_PUBLIC_API_URL;
 ```
 
 Run tests with mock:
+
 ```bash
 EXPO_PUBLIC_USE_MOCK=true maestro test .maestro/
 ```
@@ -355,6 +369,7 @@ EXPO_TOKEN: Your Expo access token
 ```
 
 Get your token:
+
 ```bash
 npx expo login
 npx expo whoami --token
@@ -365,11 +380,13 @@ Add to GitHub: **Settings** → **Secrets and variables** → **Actions** → **
 #### Triggering Tests
 
 Tests run automatically on:
+
 - Push to `main` or `develop` branches
 - Pull requests to `main` or `develop`
 - Manual workflow dispatch
 
 View results:
+
 1. Go to **Actions** tab in your repository
 2. Select **E2E Tests** workflow
 3. Click on a run to see results
@@ -387,7 +404,7 @@ brew install act
 # Run iOS workflow
 act -j e2e-ios
 
-# Run Android workflow  
+# Run Android workflow
 act -j e2e-android
 ```
 
@@ -396,11 +413,13 @@ act -j e2e-android
 ### App Not Found Error
 
 **Problem**: Maestro can't find the app
+
 ```
 Error: App xyz.guildpass.mobile not found
 ```
 
 **Solution**:
+
 ```bash
 # Check installed apps
 xcrun simctl listapps booted | grep guildpass
@@ -412,11 +431,13 @@ npx expo run:ios --device
 ### Element Not Found
 
 **Problem**: Test fails with element not visible
+
 ```
 Error: Element with id "button-id" not found
 ```
 
 **Solutions**:
+
 1. Verify testID is added to component
 2. Check element isn't behind a modal or overlay
 3. Add scroll if element is off-screen
@@ -430,6 +451,7 @@ Error: Element with id "button-id" not found
 ### Simulator/Emulator Issues
 
 **iOS Simulator**:
+
 ```bash
 # List simulators
 xcrun simctl list devices
@@ -442,6 +464,7 @@ xcrun simctl boot "iPhone 15"
 ```
 
 **Android Emulator**:
+
 ```bash
 # List emulators
 emulator -list-avds
@@ -459,7 +482,9 @@ adb start-server
 **Problem**: Tests pass sometimes, fail other times
 
 **Solutions**:
+
 1. **Add waits**: Wait for animations and network requests
+
    ```yaml
    - waitForAnimationToEnd:
        timeout: 3000
@@ -468,6 +493,7 @@ adb start-server
 2. **Mock network**: Remove dependency on external APIs
 
 3. **Reset state**: Clear app data between tests
+
    ```yaml
    - clearState
    - launchApp
@@ -478,6 +504,7 @@ adb start-server
 ### Build Errors
 
 **Expo prebuild fails**:
+
 ```bash
 # Clean and retry
 rm -rf ios android
@@ -485,6 +512,7 @@ npx expo prebuild --clean
 ```
 
 **Xcode build fails**:
+
 ```bash
 # Clean build folder
 cd ios
@@ -494,6 +522,7 @@ cd ..
 ```
 
 **Android Gradle errors**:
+
 ```bash
 cd android
 ./gradlew clean
@@ -505,6 +534,7 @@ cd ..
 ### 1. Test Independence
 
 Each test should run independently:
+
 ```yaml
 # Good: Resets state
 - launchApp
@@ -513,7 +543,7 @@ Each test should run independently:
 
 # Bad: Depends on previous test state
 - tapOn:
-    id: "next-button"  # What if we're not on the right screen?
+    id: "next-button" # What if we're not on the right screen?
 ```
 
 ### 2. Descriptive Comments
@@ -533,6 +563,7 @@ Each test should run independently:
 ### 3. Use Helpers
 
 Create reusable flows:
+
 ```yaml
 # .maestro/helpers/login.yaml
 appId: xyz.guildpass.mobile
@@ -545,6 +576,7 @@ appId: xyz.guildpass.mobile
 ```
 
 Use in tests:
+
 ```yaml
 - runFlow:
     file: helpers/login.yaml
@@ -559,7 +591,7 @@ Use in tests:
 - assertVisible:
     text: "Connection successful"
 
-# Bad: Generic assertions  
+# Bad: Generic assertions
 - assertVisible:
     text: "Success"
 ```
@@ -567,6 +599,7 @@ Use in tests:
 ### 5. Cleanup
 
 Reset state after tests:
+
 ```yaml
 - tapOn:
     id: "settings-button"

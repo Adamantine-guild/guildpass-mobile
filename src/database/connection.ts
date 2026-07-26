@@ -62,17 +62,14 @@ export async function checkDatabaseHealth(): Promise<DbHealthCheck> {
 
   try {
     const result = await runSqlReadonly(db, "PRAGMA integrity_check");
-    const rows = result.rows as { integrity_check: string }[];
+    const rows = result.rows as unknown as { integrity_check: string }[];
     const ok = rows.length === 1 && rows[0].integrity_check === "ok";
 
     if (ok) {
       return { ok: true, resetPerformed: false };
     }
 
-    console.warn(
-      "[db] integrity_check failed:",
-      rows[0]?.integrity_check ?? "unknown error",
-    );
+    console.warn("[db] integrity_check failed:", rows[0]?.integrity_check ?? "unknown error");
     await resetDatabase();
     return { ok: true, resetPerformed: true };
   } catch (err) {
@@ -103,10 +100,7 @@ export async function initDatabase(
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-function runSqlReadonly(
-  db: SQLite.WebSQLDatabase,
-  sql: string,
-): Promise<SQLite.SQLResultSet> {
+function runSqlReadonly(db: SQLite.WebSQLDatabase, sql: string): Promise<SQLite.SQLResultSet> {
   return new Promise((resolve, reject) => {
     db.readTransaction((tx) => {
       tx.executeSql(
@@ -125,24 +119,25 @@ function runSqlReadonly(
 /**
  * Execute an array of SQL statements in a single write transaction.
  */
-export function execInTransaction(
-  db: SQLite.WebSQLDatabase,
-  statements: string[],
-): Promise<void> {
+export function execInTransaction(db: SQLite.WebSQLDatabase, statements: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
-    db.transaction((tx) => {
-      for (const sql of statements) {
-        const trimmed = sql.trim();
-        if (!trimmed) continue;
+    db.transaction(
+      (tx) => {
+        for (const sql of statements) {
+          const trimmed = sql.trim();
+          if (!trimmed) continue;
 
-        // Split multi-statement strings by `;` for older expo-sqlite compat.
-        for (const stmt of trimmed.split(";")) {
-          const s = stmt.trim();
-          if (!s) continue;
-          tx.executeSql(s);
+          // Split multi-statement strings by `;` for older expo-sqlite compat.
+          for (const stmt of trimmed.split(";")) {
+            const s = stmt.trim();
+            if (!s) continue;
+            tx.executeSql(s);
+          }
         }
-      }
-    }, reject, resolve);
+      },
+      reject,
+      resolve,
+    );
   });
 }
 

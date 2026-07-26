@@ -111,9 +111,7 @@ async function fetchRoleSnapshot(key: EntityKey): Promise<RoleChangeSnapshot> {
 // Implementation
 // ---------------------------------------------------------------------------
 
-export function useReconciliation(
-  options: UseReconciliationOptions = {},
-): UseReconciliationReturn {
+export function useReconciliation(options: UseReconciliationOptions = {}): UseReconciliationReturn {
   const store = useReconciliationStore;
   const { onRoleChangeApplied } = options;
 

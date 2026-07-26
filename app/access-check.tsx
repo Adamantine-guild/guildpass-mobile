@@ -115,6 +115,8 @@ export default function AccessCheck() {
 
   const guilds = useGuilds();
   const guildQuery = guilds.useGuild(guildId);
+  guilds.useGuildConfig(guildId);
+  guilds.useRoles(guildId);
   const accessCheck = useAccessCheck();
   const {
     data: result,
@@ -354,7 +356,6 @@ export default function AccessCheck() {
               !!addressError ||
               !!guildIdError ||
               !!resourceIdError ||
-              isOffline ||
               countdown.isExpired
             }
           />
@@ -476,6 +477,12 @@ export default function AccessCheck() {
                   reason={result.reason}
                   matchedRoles={result.matchedRoles}
                   requiredRoles={result.requiredRoles}
+                  confidence={result.confidence}
+                  syncStatus={result.syncStatus}
+                  lastSyncedAt={result.lastSyncedAt}
+                  credentialExpiresAt={result.credentialExpiresAt}
+                  revocationSyncedAt={result.revocationSyncedAt}
+                  discrepancy={result.discrepancy}
                 />
                 <PerChainEligibilityList
                   perChainRoleEligibility={perChainRoleEligibility}
@@ -491,7 +498,7 @@ export default function AccessCheck() {
                   message={
                     isOffline
                       ? "We couldn't complete the access check. Please check your connection and try again."
-                      : "Please verify your inputs and try again."
+                      : "Error checking access. Please verify your inputs and try again."
                   }
                   onRetry={handleRetryAccessCheck}
                   isRetrying={isPending}

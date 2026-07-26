@@ -118,7 +118,8 @@ describe("Offline Caching Layer – Requirements & Acceptance Criteria", () => {
       if (restored?.clientState) {
         const memQuery = restored.clientState.queries.find((q) => q.queryKey[0] === "membership");
         const profQuery = restored.clientState.queries.find((q) => q.queryKey[0] === "profile");
-        if (memQuery) targetClient.setQueryData(["membership", "0x123", "guild_1"], memQuery.state.data);
+        if (memQuery)
+          targetClient.setQueryData(["membership", "0x123", "guild_1"], memQuery.state.data);
         if (profQuery) targetClient.setQueryData(["profile", "0x123"], profQuery.state.data);
       }
 
@@ -159,7 +160,11 @@ describe("Offline Caching Layer – Requirements & Acceptance Criteria", () => {
 
       const pruned = evictUnboundedData(client as any, maxAge, MAX_CACHE_SIZE_BYTES);
       expect(pruned.clientState.queries).toHaveLength(1);
-      expect(pruned.clientState.queries[0].queryKey).toEqual(["membership", "0x123", "guild_fresh"]);
+      expect(pruned.clientState.queries[0].queryKey).toEqual([
+        "membership",
+        "0x123",
+        "guild_fresh",
+      ]);
     });
 
     it("evicts whole cache during deserialization if client timestamp exceeds max age", async () => {

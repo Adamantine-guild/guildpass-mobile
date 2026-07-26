@@ -40,7 +40,7 @@ describe("WalletRequired", () => {
       tree = TestRenderer.create(
         <WalletRequired>
           <Text>Protected content</Text>
-        </WalletRequired>
+        </WalletRequired>,
       );
     });
     expect(JSON.stringify(tree.toJSON())).toContain("Protected content");
@@ -54,7 +54,7 @@ describe("WalletRequired", () => {
       tree = TestRenderer.create(
         <WalletRequired>
           <Text>Protected content</Text>
-        </WalletRequired>
+        </WalletRequired>,
       );
     });
     expect(tree.toJSON()).toBeNull();
@@ -67,7 +67,7 @@ describe("WalletRequired", () => {
       TestRenderer.create(
         <WalletRequired redirect={true}>
           <Text>Protected content</Text>
-        </WalletRequired>
+        </WalletRequired>,
       );
     });
     expect(mockReplace).toHaveBeenCalledWith("/profile");
@@ -81,7 +81,7 @@ describe("WalletRequired", () => {
       renderer = TestRenderer.create(
         <WalletRequired redirect={false}>
           <Text>Protected content</Text>
-        </WalletRequired>
+        </WalletRequired>,
       );
     });
     expect(renderer.root.findByProps({ testID: "wallet-required-prompt" })).toBeDefined();

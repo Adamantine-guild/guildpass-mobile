@@ -44,9 +44,7 @@ const HistoryRow = ({ entry }: { entry: AccessHistoryEntry }) => {
         </Text>
       </View>
       <Text className="text-text-muted text-sm mt-1">{guildName}</Text>
-      {entry.reason ? (
-        <Text className="text-text-muted text-sm mt-1">{entry.reason}</Text>
-      ) : null}
+      {entry.reason ? <Text className="text-text-muted text-sm mt-1">{entry.reason}</Text> : null}
       <Text className="text-text-muted text-xs mt-1">
         {new Date(entry.checkedAt).toLocaleString()}
       </Text>

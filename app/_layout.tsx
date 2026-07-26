@@ -6,6 +6,7 @@ import { asyncStoragePersister } from "../src/lib/queryPersister";
 import { isPersistableQuery, QUERY_GC_TIME_MS } from "../src/lib/offlineCache";
 import { initConnectivityService } from "../src/features/network/connectivityService";
 import { initSyncManager, triggerSync } from "../src/features/sync/syncManager";
+import { mutationReplayer } from "../src/lib/mutationReplayer";
 import { ErrorBoundary } from "../src/components/ErrorBoundary";
 import { SyncCorrectionOverlay } from "../src/components/SyncCorrectionOverlay";
 import { SyncStatusBanner } from "../src/components/SyncStatusBanner";
@@ -23,6 +24,7 @@ import { SensitiveStorageMigrationGate } from "../src/features/security/Sensitiv
 
 initConnectivityService();
 initSyncManager();
+mutationReplayer.start();
 initFocusManager(queryClient);
 // Discovery only — verification paths hold direct references to their own
 // registries and work whether or not this has run.
@@ -83,6 +85,46 @@ export default function RootLayout() {
             </WalletConnectProvider>
           </View>
         </PersistQueryClientProvider>
+          <PersistQueryClientProvider
+            client={queryClient}
+            persistOptions={{
+              persister: asyncStoragePersister,
+              maxAge: QUERY_GC_TIME_MS,
+              dehydrateOptions: {
+                shouldDehydrateQuery: (query) =>
+                  query.state.status === "success" && isPersistableQuery(query.queryKey),
+              },
+            }}
+            onSuccess={() => {
+              // The persisted cache is only fully restored now; reconcile it so a
+              // device that reopens online (after being offline) still corrects
+              // stale grants instead of waiting for the next reconnect event.
+              void triggerSync();
+            }}
+          >
+            <View className="flex-1 bg-background">
+              <WalletConnectProvider>
+                <Stack
+                  screenOptions={{
+                    headerShown: false,
+                    contentStyle: { backgroundColor: "#f8fafc" },
+                  }}
+                >
+                  <Stack.Screen name="index" />
+                  <Stack.Screen name="onboarding" />
+                  <Stack.Screen name="profile" />
+                  <Stack.Screen name="guilds" />
+                  <Stack.Screen name="guilds/[guildId]" />
+                  <Stack.Screen name="access-check" />
+                  <Stack.Screen name="access-scanner" />
+                  <Stack.Screen name="settings" />
+                  <Stack.Screen name="deep-link-error" />
+                </Stack>
+                <SyncCorrectionOverlay />
+                <IntegrityWarningBanner />
+              </WalletConnectProvider>
+            </View>
+          </PersistQueryClientProvider>
         </EmbeddedWalletProvider>
       </SensitiveStorageMigrationGate>
     </ErrorBoundary>

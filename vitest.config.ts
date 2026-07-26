@@ -25,6 +25,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "src"),
+      "@guildpass/sdk": path.resolve(__dirname, "node_modules/@guildpass/sdk/src/index.ts"),
     },
   },
 });

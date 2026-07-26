@@ -40,17 +40,16 @@ function descriptor(overrides: Partial<SyncEntityDescriptor> = {}): SyncEntityDe
 
 describe("describeSyncableQuery", () => {
   it("parses wallet-scoped membership and user-roles keys", () => {
-    expect(
-      describeSyncableQuery(["membership", TEST_WALLET_ADDRESS, "guild_abc"]),
-    ).toStrictEqual({
+    expect(describeSyncableQuery(["membership", TEST_WALLET_ADDRESS, "guild_abc"])).toStrictEqual({
       kind: "membership",
       queryKey: ["membership", TEST_WALLET_ADDRESS, "guild_abc"],
       guildId: "guild_abc",
       walletAddress: TEST_WALLET_ADDRESS,
     });
-    expect(
-      describeSyncableQuery(["user-roles", TEST_WALLET_ADDRESS, "guild_abc"]),
-    ).toMatchObject({ kind: "user-roles", walletAddress: TEST_WALLET_ADDRESS });
+    expect(describeSyncableQuery(["user-roles", TEST_WALLET_ADDRESS, "guild_abc"])).toMatchObject({
+      kind: "user-roles",
+      walletAddress: TEST_WALLET_ADDRESS,
+    });
   });
 
   it("parses guild-scoped keys without a wallet address", () => {
@@ -68,7 +67,9 @@ describe("describeSyncableQuery", () => {
   });
 
   it("rejects non-reconciled namespaces and malformed keys", () => {
-    expect(describeSyncableQuery(["access-check", { walletAddress: TEST_WALLET_ADDRESS }])).toBeNull();
+    expect(
+      describeSyncableQuery(["access-check", { walletAddress: TEST_WALLET_ADDRESS }]),
+    ).toBeNull();
     expect(describeSyncableQuery(["wallet-secret"])).toBeNull();
     expect(describeSyncableQuery(["membership", null, "guild_abc"])).toBeNull();
     expect(describeSyncableQuery(["guild", 42])).toBeNull();
@@ -84,9 +85,7 @@ describe("computeEntityVersion", () => {
   });
 
   it("changes when content changes", () => {
-    expect(entityVersionsDiffer(MEMBERSHIP_ACTIVE_FIXTURE, MEMBERSHIP_ACTIVE_FIXTURE)).toBe(
-      false,
-    );
+    expect(entityVersionsDiffer(MEMBERSHIP_ACTIVE_FIXTURE, MEMBERSHIP_ACTIVE_FIXTURE)).toBe(false);
     expect(
       entityVersionsDiffer(MEMBERSHIP_ACTIVE_FIXTURE, {
         ...MEMBERSHIP_ACTIVE_FIXTURE,
@@ -146,9 +145,7 @@ describe("diffEntity – membership", () => {
   });
 
   it("returns no corrections for malformed data (overwrite still applies upstream)", () => {
-    expect(diffEntity(descriptor(), "corrupted", MEMBERSHIP_ACTIVE_FIXTURE, NOW)).toStrictEqual(
-      [],
-    );
+    expect(diffEntity(descriptor(), "corrupted", MEMBERSHIP_ACTIVE_FIXTURE, NOW)).toStrictEqual([]);
     expect(
       diffEntity(descriptor(), { isActive: "yes" }, MEMBERSHIP_ACTIVE_FIXTURE, NOW),
     ).toStrictEqual([]);
@@ -188,14 +185,18 @@ describe("diffEntity – user roles", () => {
     const corrections = diffEntity(
       rolesDescriptor,
       USER_ROLES_FIXTURE,
-      [{ id: "role_9", name: "Observer", guildId: "guild_abc", walletAddress: TEST_WALLET_ADDRESS }],
+      [
+        {
+          id: "role_9",
+          name: "Observer",
+          guildId: "guild_abc",
+          walletAddress: TEST_WALLET_ADDRESS,
+        },
+      ],
       NOW,
     );
 
-    expect(corrections.map((c) => c.type).sort()).toStrictEqual([
-      "roles_added",
-      "roles_removed",
-    ]);
+    expect(corrections.map((c) => c.type).sort()).toStrictEqual(["roles_added", "roles_removed"]);
   });
 
   it("treats a null server role payload as all roles removed", () => {

@@ -14,7 +14,7 @@ feature flag used for gradual rollout, and how to operate it.
 Previously, an access QR was plain JSON validated only by schema + expiry
 checks (and a server-side lookup). A well-formed, non-expired payload with a
 real `guildId` / `resourceId` could in principle be forged on-device, because
-nothing proved *who* issued it. Signature verification closes that gap: the app
+nothing proved _who_ issued it. Signature verification closes that gap: the app
 now checks the payload against the guild's published **issuer public key**
 before treating it as trustworthy.
 
@@ -26,7 +26,7 @@ The issuer (guild access backend) signs every QR payload with its secp256k1
 issuer keypair.
 
 **Signed message** — a deterministic, newline-delimited canonicalization of the
-payload fields (the `signature` field itself is *not* included):
+payload fields (the `signature` field itself is _not_ included):
 
 ```
 type\nversion\nguildId\nresourceId\nwalletAddress\nexpiresAt
@@ -71,13 +71,13 @@ payload's `signature` field (lower-case hex, optional `0x` prefix).
 
 ## Client verification path
 
-| Module | Responsibility |
-| --- | --- |
-| `src/features/access/qrConstants.ts` | Canonical `ACCESS_QR_TYPE` / `ACCESS_QR_VERSION`. |
-| `src/features/access/qrSignature.ts` | Pure `verifyQrSignature()` + `buildSigningMessage()` using `elliptic` (secp256k1) and `js-sha3` (keccak256). Throws `QrSignatureError` with a specific code. |
-| `src/features/access/guildIssuerKey.ts` | Fetches and in-memory-caches the guild issuer public key via `guildPassClient.guilds.getGuildConfig({ guildId })` → `issuerPublicKey`. |
-| `src/features/access/verifyQrPayload.ts` | `verifyAndParseAccessQrPayload()` — structural parse + (flag-gated) signature verification. |
-| `src/features/access/qrPayload.ts` | `parseAccessQrPayload()` — pure structural / expiry validation. SDK-free, trivially testable. |
+| Module                                   | Responsibility                                                                                                                                               |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `src/features/access/qrConstants.ts`     | Canonical `ACCESS_QR_TYPE` / `ACCESS_QR_VERSION`.                                                                                                            |
+| `src/features/access/qrSignature.ts`     | Pure `verifyQrSignature()` + `buildSigningMessage()` using `elliptic` (secp256k1) and `js-sha3` (keccak256). Throws `QrSignatureError` with a specific code. |
+| `src/features/access/guildIssuerKey.ts`  | Fetches and in-memory-caches the guild issuer public key via `guildPassClient.guilds.getGuildConfig({ guildId })` → `issuerPublicKey`.                       |
+| `src/features/access/verifyQrPayload.ts` | `verifyAndParseAccessQrPayload()` — structural parse + (flag-gated) signature verification.                                                                  |
+| `src/features/access/qrPayload.ts`       | `parseAccessQrPayload()` — pure structural / expiry validation. SDK-free, trivially testable.                                                                |
 
 `verifyQrSignature` rejects with one of these specific error codes (see
 `QR_SIGNATURE_ERROR_CODES`):
@@ -88,8 +88,8 @@ payload's `signature` field (lower-case hex, optional `0x` prefix).
 - `QR_SIGNATURE_VERIFICATION_FAILED` — signature does not match the payload.
 
 The scanner (`app/access-scanner.tsx`) calls `verifyAndParseAccessQrPayload`
-on scan. A `QrSignatureError` surfaces as *"QR code signature is invalid or
-missing."* to the user.
+on scan. A `QrSignatureError` surfaces as _"QR code signature is invalid or
+missing."_ to the user.
 
 ---
 
@@ -100,16 +100,16 @@ existing unsigned QR codes keep working during the migration window.
 
 - **Flag OFF (default)** — `verifyAndParseAccessQrPayload` performs only
   structural + expiry checks. Unsigned payloads scan normally.
-- **Flag ON** — payloads *must* carry a valid signature; missing / malformed /
+- **Flag ON** — payloads _must_ carry a valid signature; missing / malformed /
   failed signatures are rejected with a `QrSignatureError`.
 
 The flag is opt-in via environment, so rollout is staged per environment with
 no app-store resubmission:
 
-| Source (precedence) | Example |
-| --- | --- |
-| `app.json` → `extra.qrSignatureVerification` | `"qrSignatureVerification": true` |
-| `EXPO_PUBLIC_QR_SIGNATURE_VERIFICATION` | `EXPO_PUBLIC_QR_SIGNATURE_VERIFICATION=true` |
+| Source (precedence)                          | Example                                      |
+| -------------------------------------------- | -------------------------------------------- |
+| `app.json` → `extra.qrSignatureVerification` | `"qrSignatureVerification": true`            |
+| `EXPO_PUBLIC_QR_SIGNATURE_VERIFICATION`      | `EXPO_PUBLIC_QR_SIGNATURE_VERIFICATION=true` |
 
 Accepted values: `true` / `false` / `1` / `0` / `yes` / `no` (anything truthy
 enables it). It defaults to **OFF**.
