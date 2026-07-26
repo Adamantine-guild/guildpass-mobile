@@ -1,17 +1,25 @@
 import { View, Text, ActivityIndicator, AccessibilityInfo } from "react-native";
 import React, { useRef, useState } from "react";
 import { useRouter } from "expo-router";
-import { CameraView, useCameraPermissions } from "expo-camera/next";
-import type { BarcodeScanningResult } from "expo-camera/next";
+import { CameraView, useCameraPermissions } from "expo-camera";
+import type { BarcodeScanningResult } from "expo-camera";
 import * as Linking from "expo-linking";
 import { AppHeader } from "../src/components/AppHeader";
 import { Button } from "../src/components/Button";
 import { Card } from "../src/components/Card";
-import { verifyAndParseAccessQrPayload } from "../src/features/access/verifyQrPayload";
-import { QrSignatureError, describeQrSignatureError } from "../src/features/access/qrSignature";
-import { QrPayloadError, QR_PAYLOAD_ERROR_CODES } from "../src/features/access/qrPayload";
+import { verifyAndParseAccessQrPayload, QrValidationResult } from "../src/features/access/verifyQrPayload";
+import { describeQrSignatureError, QR_SIGNATURE_ERROR_CODES, QrSignatureErrorCode } from "../src/features/access/qrSignature";
+import { describeQrPayloadError, QR_PAYLOAD_ERROR_CODES, QrPayloadErrorCode } from "../src/features/access/qrPayload";
 import { AccessHistoryList } from "../src/components/AccessHistoryList";
 import { useAccessHistoryStore } from "../src/features/access/accessHistory.store";
+
+type AccessibleCameraViewProps = React.ComponentProps<typeof CameraView> & {
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
+  accessibilityLiveRegion?: "none" | "polite" | "assertive";
+};
+
+const AccessibleCameraView = CameraView as React.ComponentType<AccessibleCameraViewProps>;
 
 export default function AccessScanner() {
   const router = useRouter();
@@ -31,6 +39,9 @@ export default function AccessScanner() {
     scanInProgressRef.current = true;
     setIsProcessingScan(true);
     setScanError(null);
+    AccessibilityInfo.announceForAccessibility("Processing access QR code.");
+
+    const result = await verifyAndParseAccessQrPayload(data);
 
     try {
       AccessibilityInfo.announceForAccessibility("Processing access QR code.");
@@ -69,10 +80,9 @@ export default function AccessScanner() {
 
       setScanError({ message: errorMessage, isUntrusted });
       AccessibilityInfo.announceForAccessibility(`QR code rejected. ${errorMessage}`);
+      setIsProcessingScan(false);
+      scanInProgressRef.current = false;
     }
-
-    setIsProcessingScan(false);
-    scanInProgressRef.current = false;
   };
 
   const handleScanAgain = () => {
@@ -177,7 +187,7 @@ export default function AccessScanner() {
     <View className="flex-1 bg-background">
       <AppHeader title="Scan Access QR" showBack />
       <View className="flex-1">
-        <CameraView
+        <AccessibleCameraView
           accessibilityLabel="Scanning for GuildPass access QR code"
           accessibilityHint="Point the camera at a GuildPass QR code to start access verification"
           accessibilityLiveRegion="polite"
@@ -194,6 +204,20 @@ export default function AccessScanner() {
           </Card>
           <AccessHistoryList entries={entries} onClear={clearHistory} />
         </View>
+        
+        {__DEV__ && (
+          <View className="absolute top-4 right-4">
+            <Button
+              title="Test: Fail Scan"
+              accessibilityLabel="test-fail-scan"
+              onPress={() => {
+                setScanError("This QR code has expired.");
+                setIsProcessingScan(false);
+                scanInProgressRef.current = true;
+              }}
+            />
+          </View>
+        )}
       </View>
     </View>
   );

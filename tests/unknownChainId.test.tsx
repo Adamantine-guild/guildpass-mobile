@@ -56,33 +56,27 @@ const KNOWN_CHAIN_ID = 1; // Ethereum mainnet
 describe("UnsupportedNetworkCard", () => {
   it("renders without throwing for any numeric chain ID", () => {
     expect(() =>
-      TestRenderer.create(<UnsupportedNetworkCard chainId={UNKNOWN_CHAIN_ID} />)
+      TestRenderer.create(<UnsupportedNetworkCard chainId={UNKNOWN_CHAIN_ID} />),
     ).not.toThrow();
   });
 
   it("renders the 'Unsupported network' label", () => {
-    const renderer = TestRenderer.create(
-      <UnsupportedNetworkCard chainId={UNKNOWN_CHAIN_ID} />
-    );
+    const renderer = TestRenderer.create(<UnsupportedNetworkCard chainId={UNKNOWN_CHAIN_ID} />);
     const json = JSON.stringify(renderer.toJSON());
     expect(json).toContain("Unsupported network");
   });
 
   it("displays the chain ID in the fallback card", () => {
-    const renderer = TestRenderer.create(
-      <UnsupportedNetworkCard chainId={UNKNOWN_CHAIN_ID} />
-    );
+    const renderer = TestRenderer.create(<UnsupportedNetworkCard chainId={UNKNOWN_CHAIN_ID} />);
     const json = JSON.stringify(renderer.toJSON());
     expect(json).toContain(String(UNKNOWN_CHAIN_ID));
   });
 
   it("applies the testID prop when provided", () => {
     const renderer = TestRenderer.create(
-      <UnsupportedNetworkCard chainId={UNKNOWN_CHAIN_ID} testID="my-unsupported-card" />
+      <UnsupportedNetworkCard chainId={UNKNOWN_CHAIN_ID} testID="my-unsupported-card" />,
     );
-    expect(
-      renderer.root.findByProps({ testID: "my-unsupported-card" })
-    ).toBeDefined();
+    expect(renderer.root.findByProps({ testID: "my-unsupported-card" })).toBeDefined();
   });
 });
 
@@ -96,8 +90,8 @@ describe("RequirementCard – unrecognised chain ID", () => {
       TestRenderer.create(
         <RequirementCard chainId={UNKNOWN_CHAIN_ID}>
           <Text>Should not appear</Text>
-        </RequirementCard>
-      )
+        </RequirementCard>,
+      ),
     ).not.toThrow();
   });
 
@@ -105,7 +99,7 @@ describe("RequirementCard – unrecognised chain ID", () => {
     const renderer = TestRenderer.create(
       <RequirementCard chainId={UNKNOWN_CHAIN_ID}>
         <Text testID="child-should-be-hidden">Sensitive content</Text>
-      </RequirementCard>
+      </RequirementCard>,
     );
     const json = JSON.stringify(renderer.toJSON());
     // The fallback replaces children entirely
@@ -116,16 +110,14 @@ describe("RequirementCard – unrecognised chain ID", () => {
     const renderer = TestRenderer.create(
       <RequirementCard chainId={UNKNOWN_CHAIN_ID}>
         <Text>Role badge</Text>
-      </RequirementCard>
+      </RequirementCard>,
     );
     const json = JSON.stringify(renderer.toJSON());
     expect(json).toContain("Unsupported network");
   });
 
   it("the fallback card is accessible (has an accessibilityLabel referencing the chain ID)", () => {
-    const renderer = TestRenderer.create(
-      <UnsupportedNetworkCard chainId={UNKNOWN_CHAIN_ID} />
-    );
+    const renderer = TestRenderer.create(<UnsupportedNetworkCard chainId={UNKNOWN_CHAIN_ID} />);
     // The outer card must have an accessibilityLabel that mentions the chain ID
     const card = renderer.root.findByProps({
       testID: "unsupported-network-card",
@@ -143,7 +135,7 @@ describe("RequirementCard – recognised chain ID", () => {
     const renderer = TestRenderer.create(
       <RequirementCard chainId={KNOWN_CHAIN_ID}>
         <Text testID="known-chain-child">Member badge</Text>
-      </RequirementCard>
+      </RequirementCard>,
     );
     const json = JSON.stringify(renderer.toJSON());
     expect(json).toContain("Member badge");
@@ -154,7 +146,7 @@ describe("RequirementCard – recognised chain ID", () => {
     const renderer = TestRenderer.create(
       <RequirementCard chainId={KNOWN_CHAIN_ID}>
         <Text>Member badge</Text>
-      </RequirementCard>
+      </RequirementCard>,
     );
     const json = JSON.stringify(renderer.toJSON());
     expect(json).not.toContain("Unsupported network");
@@ -180,8 +172,8 @@ describe("RequirementCard – mixed known/unknown chain IDs in roles list", () =
               <Text testID={`role-badge-${role.id}`}>{role.name}</Text>
             </RequirementCard>
           ))}
-        </View>
-      )
+        </View>,
+      ),
     ).not.toThrow();
   });
 
@@ -197,7 +189,7 @@ describe("RequirementCard – mixed known/unknown chain IDs in roles list", () =
             <Text testID={`role-badge-${role.id}`}>{role.name}</Text>
           </RequirementCard>
         ))}
-      </View>
+      </View>,
     );
     const json = JSON.stringify(renderer.toJSON());
     // The "Member" role with chainId: 1 (known) should render its badge text
@@ -216,7 +208,7 @@ describe("RequirementCard – mixed known/unknown chain IDs in roles list", () =
             <Text testID={`role-badge-${role.id}`}>{role.name}</Text>
           </RequirementCard>
         ))}
-      </View>
+      </View>,
     );
     const json = JSON.stringify(renderer.toJSON());
     // Unknown-chain role shows fallback
@@ -239,13 +231,13 @@ describe("RequirementCard – mixed known/unknown chain IDs in roles list", () =
             <Text testID={`role-badge-${role.id}`}>{role.name}</Text>
           </RequirementCard>
         ))}
-      </View>
+      </View>,
     );
     // "Member" (chainId 1) badge rendered
     expect(renderer.root.findByProps({ testID: "role-badge-role_known" })).toBeDefined();
     // "Future Role" (chainId 999999) replaced by unsupported-network card
     expect(
-      renderer.root.findByProps({ testID: "role-requirement-role_unknown-unsupported" })
+      renderer.root.findByProps({ testID: "role-requirement-role_unknown-unsupported" }),
     ).toBeDefined();
   });
 });
@@ -258,7 +250,7 @@ describe("groupRoleRequirementsByChain", () => {
   it("groups mixed-chain requirements by chain while preserving fallback labels", () => {
     const grouped = groupRoleRequirementsByChain(
       GUILD_MIXED_CHAIN_CONFIG_FIXTURE.requirements ?? [],
-      1
+      1,
     );
 
     expect(grouped).toHaveLength(3);
@@ -276,9 +268,7 @@ describe("GUILD_UNKNOWN_CHAIN_FIXTURE – chain registry integration", () => {
   });
 
   it("getChainDisplayName returns 'Unsupported network' for the fixture chain ID", () => {
-    expect(getChainDisplayName(GUILD_UNKNOWN_CHAIN_FIXTURE.chainId)).toBe(
-      "Unsupported network"
-    );
+    expect(getChainDisplayName(GUILD_UNKNOWN_CHAIN_FIXTURE.chainId)).toBe("Unsupported network");
   });
 
   it("the guild detail screen would display 'Unsupported network' for the fixture chain ID", () => {

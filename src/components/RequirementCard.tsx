@@ -118,7 +118,12 @@ interface RequirementCardProps {
  * unsupported-network fallback.
  */
 export const RequirementCard = ({ chainId, children, testID }: RequirementCardProps) => {
-  const fallback = <UnsupportedNetworkCard chainId={chainId} testID={testID ? `${testID}-unsupported` : undefined} />;
+  const fallback = (
+    <UnsupportedNetworkCard
+      chainId={chainId}
+      testID={testID ? `${testID}-unsupported` : undefined}
+    />
+  );
 
   if (!isKnownChainId(chainId)) {
     return fallback;

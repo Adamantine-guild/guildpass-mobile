@@ -9,7 +9,8 @@
 // ---------------------------------------------------------------------------
 
 import { describe, it, expect, beforeEach } from "vitest";
-import { createTestDbWithRaw, getRawDb, rawQueryOne, rawQueryAll, type MockDb } from "./test-helpers";
+import { createTestDbWithRaw, rawQueryOne } from "./test-helpers";
+import type { MockDb } from "./test-helpers";
 import { applyMigrations, getAppliedMigrations } from "../../src/database/migrations";
 import type { MockDatabase } from "./mock-db";
 
@@ -28,7 +29,7 @@ describe("Migration runner", () => {
 
     const row = rawQueryOne<{ name: string }>(
       raw,
-      "SELECT name FROM sqlite_master WHERE type='table' AND name='schema_migrations'"
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='schema_migrations'",
     );
     expect(row).toBeDefined();
   });
@@ -74,7 +75,7 @@ describe("Migration runner", () => {
     }
   });
 
-  it("should apply migrations that create all 7 entity tables", async () => {
+  it("should apply migrations that create all 8 entity tables", async () => {
     await applyMigrations(wrapper as never);
 
     // Check tables directly in the mock
@@ -87,13 +88,14 @@ describe("Migration runner", () => {
       "guild_configs",
       "guilds",
       "memberships",
+      "qr_replay_nonces",
       "roles",
       "user_roles",
       "wallets",
     ]);
   });
 
-  it("should apply migrations that create all 9 indexes", async () => {
+  it("should apply migrations that create all 10 indexes", async () => {
     await applyMigrations(wrapper as never);
 
     // Check indexes directly in the mock
@@ -106,6 +108,7 @@ describe("Migration runner", () => {
       "idx_guilds_updated_at",
       "idx_memberships_guild",
       "idx_memberships_wallet",
+      "idx_qr_nonces_expires",
       "idx_roles_guild_id",
       "idx_user_roles_guild",
       "idx_user_roles_wallet",

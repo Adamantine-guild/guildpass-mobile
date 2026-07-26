@@ -64,9 +64,7 @@ export default function Settings() {
               accessibilityState={{ checked: biometricRequired }}
             >
               <View className="flex-1">
-                <Text className="text-text font-medium">
-                  Require Biometrics for Access Checks
-                </Text>
+                <Text className="text-text font-medium">Require Biometrics for Access Checks</Text>
                 <Text className="text-text-muted text-sm mt-1">
                   Use Face ID, Touch ID, or device passcode before scanning access QR codes or
                   viewing check results.

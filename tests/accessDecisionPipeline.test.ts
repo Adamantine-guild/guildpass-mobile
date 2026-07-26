@@ -439,6 +439,29 @@ describe("Access Decision Pipeline – partial availability (no backend)", () =>
     expect(result.sources.attestation?.success).toBe(true);
   });
 
+  it("preserves matched roles and sync metadata from attestation-only verification", async () => {
+    const result = await resolveAccessDecision({
+      ...BASE_PARAMS,
+      attestationVerifier: async () => ({
+        valid: true,
+        matchedRoles: ["member"],
+        requiredRoles: ["member"],
+        lastSyncedAt: "2026-07-25T10:00:00.000Z",
+        credentialExpiresAt: "2026-07-27T12:00:00.000Z",
+      }),
+    });
+
+    expect(result.confidence).toBe("partial_attestation_only");
+    expect(result.matchedRoles).toEqual(["member"]);
+    expect(result.requiredRoles).toEqual(["member"]);
+    expect(result.sources.attestation?.success).toBe(true);
+    if (result.sources.attestation?.success !== true) {
+      throw new Error("Expected attestation source to succeed");
+    }
+    expect(result.sources.attestation.lastSyncedAt).toBe("2026-07-25T10:00:00.000Z");
+    expect(result.sources.attestation.credentialExpiresAt).toBe("2026-07-27T12:00:00.000Z");
+  });
+
   it("returns all_sources_failed when only RPC provided and fails", async () => {
     const result = await resolveAccessDecision({
       ...BASE_PARAMS,
@@ -528,7 +551,11 @@ describe("Access Decision Pipeline – error handling", () => {
       },
     });
 
-    expect(result.sources.backend?.error).toBe("Backend unavailable");
+    expect(result.sources.backend?.success).toBe(false);
+    if (result.sources.backend?.success !== false) {
+      throw new Error("Expected backend source to fail");
+    }
+    expect(result.sources.backend.error).toBe("Backend unavailable");
     expect(result.reason).toContain("Backend unavailable");
   });
 
@@ -543,7 +570,11 @@ describe("Access Decision Pipeline – error handling", () => {
       },
     });
 
-    expect(result.sources.rpc?.error).toBe("RPC endpoint timeout");
+    expect(result.sources.rpc?.success).toBe(false);
+    if (result.sources.rpc?.success !== false) {
+      throw new Error("Expected RPC source to fail");
+    }
+    expect(result.sources.rpc.error).toBe("RPC endpoint timeout");
   });
 
   it("captures attestation error message", async () => {
@@ -566,6 +597,10 @@ describe("Access Decision Pipeline – error handling", () => {
       },
     });
 
-    expect(result.sources.backend?.error).toBe("String error");
+    expect(result.sources.backend?.success).toBe(false);
+    if (result.sources.backend?.success !== false) {
+      throw new Error("Expected backend source to fail");
+    }
+    expect(result.sources.backend.error).toBe("String error");
   });
 });

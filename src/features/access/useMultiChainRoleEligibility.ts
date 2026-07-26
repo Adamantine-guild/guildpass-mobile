@@ -1,11 +1,12 @@
 import { useCallback, useMemo, useState } from "react";
 import { guildPassClient } from "../../lib/guildpassClient";
 import { getRpcsForChain, rpcConfig } from "../../config/rpcConfig";
-import {
-  resolveRoleEligibilityForChains,
-  type AccessRequirement,
-  type PerChainRoleEligibilityResolution,
-  type RoleRequirementOnChain,
+
+import { resolveRoleEligibilityForChains } from "./roleEligibilityResolver";
+import type {
+  AccessRequirement,
+  PerChainRoleEligibilityResolution,
+  RoleRequirementOnChain,
 } from "./roleEligibilityResolver";
 
 export type MultiChainRoleEligibilityStatusState = {
@@ -74,31 +75,35 @@ export const useMultiChainRoleEligibility = () => {
     setState({ isResolving: true, perChain: [] });
 
     try {
+      // Fetch roles including their on-chain requirements.
       const roles = (await guildPassClient.roles.getRoles({
         guildId,
       })) as GuildRoleWithRequirements[];
-      const { requirements, configurationErrors } = buildRoleEligibilityResolutionPlan(roles);
+      const plan = buildRoleEligibilityResolutionPlan(roles);
 
-      if (requirements.length === 0) {
-        setState({ isResolving: false, perChain: configurationErrors });
+      if (plan.requirements.length === 0) {
+        setState({
+          isResolving: false,
+          perChain: plan.configurationErrors,
+        });
         return;
       }
 
       const rpcsByChain: Record<number, string[]> = {};
-      for (const { chainId } of requirements) {
+      for (const { chainId } of plan.requirements) {
         rpcsByChain[chainId] = getRpcsForChain(chainId);
       }
 
-      const resolvedPerChain = await resolveRoleEligibilityForChains({
+      const perChain = await resolveRoleEligibilityForChains({
         walletAddress,
-        requirements,
+        requirements: plan.requirements,
         rpcsByChain,
         timeouts: rpcConfig.timeouts,
       });
 
       setState({
         isResolving: false,
-        perChain: [...configurationErrors, ...resolvedPerChain],
+        perChain: [...plan.configurationErrors, ...perChain],
       });
     } catch (e: any) {
       setState({
@@ -109,5 +114,8 @@ export const useMultiChainRoleEligibility = () => {
     }
   }, []);
 
-  return useMemo(() => ({ ...state, resolve }), [resolve, state]);
+  return useMemo(
+    () => ({ ...state, resolve }),
+    [resolve, state.isResolving, state.perChain, state.error],
+  );
 };

@@ -37,9 +37,7 @@ describe("offline cache – persistable query keys", () => {
     expect(isPersistableQuery(["guild", "guild_abc"])).toBe(true);
     expect(isPersistableQuery(["guild-config", "guild_abc"])).toBe(true);
     expect(isPersistableQuery(["guild-roles", "guild_abc"])).toBe(true);
-    expect(isPersistableQuery(["access-check", { walletAddress: TEST_WALLET_ADDRESS }])).toBe(
-      true,
-    );
+    expect(isPersistableQuery(["access-check", { walletAddress: TEST_WALLET_ADDRESS }])).toBe(true);
   });
 
   it("does not persist unknown or sensitive query namespaces", () => {

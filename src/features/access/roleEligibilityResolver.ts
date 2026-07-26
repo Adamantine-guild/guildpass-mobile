@@ -57,13 +57,18 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   });
 }
 
-function buildRoleRequirementCallData(requirement: AccessRequirement): { to: string; data: string } {
+function buildRoleRequirementCallData(requirement: AccessRequirement): {
+  to: string;
+  data: string;
+} {
   // NOTE: This is a simplified encoder that matches the SDK patch contractClient
   // behaviour for ROLE requirements only.
   // For TOKEN/NFT/WHITELIST we cannot reconstruct ABI safely without importing
   // SDK contract helpers; instead we throw so the UI reports per-chain partial failure.
   if (requirement.type !== "ROLE") {
-    throw new Error(`On-chain RPC role eligibility is only implemented for ROLE requirements; got ${requirement.type}`);
+    throw new Error(
+      `On-chain RPC role eligibility is only implemented for ROLE requirements; got ${requirement.type}`,
+    );
   }
 
   const to = requirement.address;
@@ -173,9 +178,7 @@ async function resolveChainRoleEligibility(params: {
         timeouts.roleResolverPerChainTimeoutMs,
       );
 
-      const resolvedRoles = results
-        .filter((r) => r.hasRole && r.id)
-        .map((r) => r.id);
+      const resolvedRoles = results.filter((r) => r.hasRole && r.id).map((r) => r.id);
 
       return { chainId, status: "resolved", resolvedRoles };
     } catch (e: any) {
@@ -208,12 +211,7 @@ async function resolveChainRoleEligibility(params: {
 export async function resolveRoleEligibilityForChains(
   input: ResolveRoleEligibilityInput,
 ): Promise<PerChainRoleEligibilityResolution[]> {
-  const {
-    walletAddress,
-    requirements,
-    rpcsByChain = {},
-    timeouts = rpcConfig.timeouts,
-  } = input;
+  const { walletAddress, requirements, rpcsByChain = {}, timeouts = rpcConfig.timeouts } = input;
 
   const byChain = new Map<number, AccessRequirement[]>();
   for (const { chainId, requirement } of requirements) {
@@ -257,4 +255,3 @@ export async function resolveRoleEligibilityForChains(
         },
   );
 }
-

@@ -1,7 +1,18 @@
 import { getGuildIssuerPublicKey } from "./guildIssuerKey";
-import { verifyQrSignature } from "./qrSignature";
-import { parseAccessQrPayload, type ParsedAccessQrPayload } from "./qrPayload";
+import { QrSignatureError, verifyQrSignature } from "./qrSignature";
+import type { QrSignatureErrorCode } from "./qrSignature";
+import { parseAccessQrPayload, QrPayloadError } from "./qrPayload";
+import type { ParsedAccessQrPayload } from "./qrPayload";
+import type { QrPayloadErrorCode } from "./qrPayload";
 import { checkAndRecordNonce } from "./qrReplayGuard";
+
+export type QrValidationResult =
+  | { success: true; payload: ParsedAccessQrPayload }
+  | {
+      success: false;
+      reason: QrSignatureErrorCode | QrPayloadErrorCode | "UNKNOWN_ERROR";
+      message?: string;
+    };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -55,7 +66,14 @@ export const verifyAndParseAccessQrPayload = async (
   );
 
   if (parsed.nonce !== undefined) {
-    checkAndRecordNonce(parsed.nonce, parsed.expiresAt, now);
+    try {
+      await checkAndRecordNonce(parsed.nonce, parsed.expiresAt, now);
+    } catch (error) {
+      if (error instanceof QrPayloadError) {
+        return { success: false, reason: error.code, message: error.message };
+      }
+      return { success: false, reason: "UNKNOWN_ERROR", message: String(error) };
+    }
   }
 
   return { payload: parsed, isVerified: true };

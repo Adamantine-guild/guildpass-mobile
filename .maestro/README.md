@@ -5,17 +5,20 @@ This directory contains end-to-end tests for GuildPass Mobile using [Maestro](ht
 ## Test Coverage
 
 ### 01. Onboarding to Profile Navigation
+
 - ✅ Validates onboarding screen display
 - ✅ Tests navigation to profile screen
 - **File**: `01-onboarding-to-profile.yaml`
 
 ### 02. Manual Wallet Entry
+
 - ✅ Tests manual wallet address input
 - ✅ Validates wallet connection flow
 - ✅ Confirms connected state display
 - **File**: `02-wallet-entry.yaml`
 
 ### 03. Guild List and Detail Navigation
+
 - ✅ Tests navigation to guilds list
 - ✅ Validates guild card display
 - ✅ Tests guild detail navigation
@@ -23,6 +26,7 @@ This directory contains end-to-end tests for GuildPass Mobile using [Maestro](ht
 - **File**: `03-guild-navigation.yaml`
 
 ### 04. Access Check Success Path
+
 - ✅ Tests successful access check flow
 - ✅ Validates form input and submission
 - ✅ Confirms success result display
@@ -30,6 +34,7 @@ This directory contains end-to-end tests for GuildPass Mobile using [Maestro](ht
 - **Note**: Requires mock API to return success response
 
 ### 05. Access Check Failure Path
+
 - ✅ Tests failed access check flow
 - ✅ Validates error handling
 - ✅ Confirms error message display
@@ -37,12 +42,14 @@ This directory contains end-to-end tests for GuildPass Mobile using [Maestro](ht
 - **Note**: Requires mock API to return error response
 
 ### 06. Reset App State
+
 - ✅ Tests settings navigation
 - ✅ Validates reset functionality
 - ✅ Confirms app returns to disconnected state
 - **File**: `06-reset-app-state.yaml`
 
 ### 08. Social/email embedded wallet entry
+
 - âœ… Verifies the configured social/email onboarding branch and its email input
 - **File**: `08-embedded-wallet-entry.yaml`
 - **Note**: Run this flow explicitly against a development build configured with
@@ -54,11 +61,13 @@ This directory contains end-to-end tests for GuildPass Mobile using [Maestro](ht
 ### Install Maestro
 
 **macOS/Linux:**
+
 ```bash
 curl -Ls "https://get.maestro.mobile.dev" | bash
 ```
 
 **Windows:**
+
 ```powershell
 # Using WSL (recommended)
 wsl
@@ -66,6 +75,7 @@ curl -Ls "https://get.maestro.mobile.dev" | bash
 ```
 
 Verify installation:
+
 ```bash
 maestro --version
 ```
@@ -73,6 +83,7 @@ maestro --version
 ### Setup Simulator/Emulator
 
 **iOS Simulator:**
+
 ```bash
 # Install Xcode from App Store
 # Open Xcode and install iOS Simulator
@@ -80,6 +91,7 @@ xcrun simctl list devices
 ```
 
 **Android Emulator:**
+
 ```bash
 # Install Android Studio
 # Create an AVD (Android Virtual Device)
@@ -93,6 +105,7 @@ emulator @your_avd_name
 ### 1. Build the Expo App for Testing
 
 **Development Build (recommended for E2E testing):**
+
 ```bash
 # iOS
 npx expo run:ios
@@ -106,6 +119,7 @@ The app will be installed on the simulator/emulator with the bundle ID `xyz.guil
 ### 2. Start the Development Server
 
 In a separate terminal:
+
 ```bash
 pnpm start
 ```
@@ -133,6 +147,7 @@ maestro studio
 ## Test ID Convention
 
 Test IDs follow this naming convention:
+
 - Screens: `{screen-name}-screen` (e.g., `onboarding-screen`)
 - Buttons: `{action}-button` (e.g., `wallet-connect-button`)
 - Inputs: `{field-name}-input` (e.g., `wallet-address-input`)
@@ -144,6 +159,7 @@ Test IDs follow this naming convention:
 For tests that depend on API responses (access checks), you can:
 
 1. **Use environment variables** to switch between mock and real API:
+
    ```yaml
    env:
      MOCK_API_SUCCESS: true
@@ -166,6 +182,7 @@ For tests that depend on API responses (access checks), you can:
 See `.github/workflows/e2e-tests.yml` for automated E2E testing on PR and push events.
 
 The workflow:
+
 1. Sets up Node.js and dependencies
 2. Installs Maestro CLI
 3. Builds Expo development build
@@ -176,6 +193,7 @@ The workflow:
 ## Troubleshooting
 
 ### App Not Found
+
 ```bash
 # Verify app is installed
 xcrun simctl listapps booted | grep guildpass
@@ -185,6 +203,7 @@ npx expo run:ios --device
 ```
 
 ### Test Timeout
+
 - Increase timeout in flow:
   ```yaml
   - assertVisible:
@@ -193,11 +212,13 @@ npx expo run:ios --device
   ```
 
 ### Element Not Found
+
 - Check testID is correctly added to component
 - Verify element is visible (not hidden or scrolled off-screen)
 - Use Maestro Studio to inspect element hierarchy
 
 ### Simulator Issues
+
 ```bash
 # Reset iOS Simulator
 xcrun simctl erase all
@@ -225,6 +246,7 @@ adb reboot
 ## Contributing
 
 When adding new screens or features:
+
 1. Add `testID` props to interactive elements
 2. Create corresponding Maestro flow in `.maestro/`
 3. Update this README with new test coverage

@@ -39,6 +39,26 @@ export class QrPayloadError extends Error {
   }
 }
 
+const QR_PAYLOAD_ERROR_MESSAGES: Record<QrPayloadErrorCode, string> = {
+  [QR_PAYLOAD_ERROR_CODES.MALFORMED_JSON]: "QR code is not a supported GuildPass access payload.",
+  [QR_PAYLOAD_ERROR_CODES.MALFORMED_PAYLOAD]: "QR code payload is malformed.",
+  [QR_PAYLOAD_ERROR_CODES.UNSUPPORTED_TYPE]: "QR code payload type is not supported.",
+  [QR_PAYLOAD_ERROR_CODES.UNSUPPORTED_VERSION]: "QR code payload version is not supported. Please update your app to scan this QR code.",
+  [QR_PAYLOAD_ERROR_CODES.MISSING_GUILD_ID]: "QR code is missing a valid guild ID.",
+  [QR_PAYLOAD_ERROR_CODES.MISSING_RESOURCE_ID]: "QR code is missing a valid resource ID.",
+  [QR_PAYLOAD_ERROR_CODES.INVALID_WALLET_ADDRESS]: "QR code contains an invalid wallet address.",
+  [QR_PAYLOAD_ERROR_CODES.INVALID_WALLET_CHECKSUM]: "QR code contains a wallet address with an invalid checksum. Please rescan the code or contact the guild issuer.",
+  [QR_PAYLOAD_ERROR_CODES.INVALID_EXPIRATION]: "QR code contains an invalid expiration time.",
+  [QR_PAYLOAD_ERROR_CODES.EXPIRED]: "This QR code has expired.",
+  [QR_PAYLOAD_ERROR_CODES.INVALID_SIGNATURE]: "QR code contains an invalid signature.",
+  [QR_PAYLOAD_ERROR_CODES.INVALID_NONCE]: "QR code contains an invalid nonce.",
+  [QR_PAYLOAD_ERROR_CODES.INVALID_KID]: "QR code contains an invalid key ID.",
+  [QR_PAYLOAD_ERROR_CODES.ALREADY_USED]: "This QR code has already been used.",
+};
+
+export const describeQrPayloadError = (code: QrPayloadErrorCode): string =>
+  QR_PAYLOAD_ERROR_MESSAGES[code] ?? "Unable to read QR payload.";
+
 export type AccessQrPayload = {
   type: typeof ACCESS_QR_TYPE;
   version: typeof ACCESS_QR_VERSION;
@@ -185,10 +205,7 @@ export const parseAccessQrPayload = (
     }
 
     if (expiresAt.getTime() <= now.getTime()) {
-      throw new QrPayloadError(
-        QR_PAYLOAD_ERROR_CODES.EXPIRED,
-        "QR code has expired.",
-      );
+      throw new QrPayloadError(QR_PAYLOAD_ERROR_CODES.EXPIRED, "QR code has expired.");
     }
   }
 

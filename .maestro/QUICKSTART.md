@@ -13,17 +13,20 @@ Get up and running with E2E tests in 5 minutes.
 ### 1. Install Maestro
 
 **macOS/Linux:**
+
 ```bash
 curl -Ls "https://get.maestro.mobile.dev" | bash
 ```
 
 **Windows (WSL):**
+
 ```bash
 wsl
 curl -Ls "https://get.maestro.mobile.dev" | bash
 ```
 
 Restart your terminal and verify:
+
 ```bash
 maestro --version
 ```
@@ -75,30 +78,33 @@ npm run test:e2e:studio
 
 ## Test Files
 
-| Test | What It Does | File |
-|------|-------------|------|
-| 1️⃣ Onboarding | App launch → Profile screen | `01-onboarding-to-profile.yaml` |
-| 2️⃣ Wallet Entry | Enter wallet address | `02-wallet-entry.yaml` |
-| 3️⃣ Guild Navigation | Browse guilds and details | `03-guild-navigation.yaml` |
-| 4️⃣ Access Check ✅ | Successful access verification | `04-access-check-success.yaml` |
-| 5️⃣ Access Check ❌ | Failed access verification | `05-access-check-failure.yaml` |
-| 6️⃣ Reset State | Clear app data | `06-reset-app-state.yaml` |
+| Test                | What It Does                   | File                            |
+| ------------------- | ------------------------------ | ------------------------------- |
+| 1️⃣ Onboarding       | App launch → Profile screen    | `01-onboarding-to-profile.yaml` |
+| 2️⃣ Wallet Entry     | Enter wallet address           | `02-wallet-entry.yaml`          |
+| 3️⃣ Guild Navigation | Browse guilds and details      | `03-guild-navigation.yaml`      |
+| 4️⃣ Access Check ✅  | Successful access verification | `04-access-check-success.yaml`  |
+| 5️⃣ Access Check ❌  | Failed access verification     | `05-access-check-failure.yaml`  |
+| 6️⃣ Reset State      | Clear app data                 | `06-reset-app-state.yaml`       |
 
 ## Common Issues
 
 ### "App not found"
+
 ```bash
 # Rebuild the app
 npx expo run:ios --device
 ```
 
 ### "Element not found"
+
 ```bash
 # Open Maestro Studio to debug
 maestro studio
 ```
 
 ### "Simulator not booting"
+
 ```bash
 # iOS
 xcrun simctl boot "iPhone 15"

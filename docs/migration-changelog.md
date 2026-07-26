@@ -18,16 +18,16 @@ Each migration is applied **incrementally** by the migration runner at app start
 
 Creates the full normalized schema:
 
-| Table | Purpose |
-|-------|---------|
-| `schema_migrations` | Tracks applied migrations |
-| `guilds` | Core guild metadata |
-| `guild_configs` | Per-guild configuration |
-| `wallets` | Locally-tracked wallet addresses |
-| `roles` | Guild roles |
-| `memberships` | Wallet memberships in guilds |
-| `user_roles` | Roles assigned to wallets |
-| `access_checks` | Access-check history |
+| Table               | Purpose                          |
+| ------------------- | -------------------------------- |
+| `schema_migrations` | Tracks applied migrations        |
+| `guilds`            | Core guild metadata              |
+| `guild_configs`     | Per-guild configuration          |
+| `wallets`           | Locally-tracked wallet addresses |
+| `roles`             | Guild roles                      |
+| `memberships`       | Wallet memberships in guilds     |
+| `user_roles`        | Roles assigned to wallets        |
+| `access_checks`     | Access-check history             |
 
 Also creates performance indexes on frequently queried columns.
 

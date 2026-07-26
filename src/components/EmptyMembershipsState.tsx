@@ -6,9 +6,7 @@ type EmptyMembershipsStateProps = {
   onConnectDifferentWallet: () => void;
 };
 
-export const EmptyMembershipsState = ({
-  onConnectDifferentWallet,
-}: EmptyMembershipsStateProps) => {
+export const EmptyMembershipsState = ({ onConnectDifferentWallet }: EmptyMembershipsStateProps) => {
   return (
     <View
       className="flex-1 justify-center items-center p-6 bg-background"
@@ -20,11 +18,10 @@ export const EmptyMembershipsState = ({
           🛡️
         </Text>
       </View>
-      <Text className="text-text text-2xl font-bold text-center mb-2">
-        No Memberships Found
-      </Text>
+      <Text className="text-text text-2xl font-bold text-center mb-2">No Memberships Found</Text>
       <Text className="text-text-muted text-center mb-8 px-4">
-        This wallet isn't a member of any guilds yet. Connect a different wallet to view your memberships and roles.
+        This wallet isn't a member of any guilds yet. Connect a different wallet to view your
+        memberships and roles.
       </Text>
       <Button
         title="Connect a different wallet"

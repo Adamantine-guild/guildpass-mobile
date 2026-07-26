@@ -72,10 +72,7 @@ export function WalletConnectProvider({ children }: { children: React.ReactNode 
   return (
     <WalletConnectBridge>
       {children}
-      <WalletConnectModal
-        projectId={projectId}
-        providerMetadata={providerMetadata}
-      />
+      <WalletConnectModal projectId={projectId} providerMetadata={providerMetadata} />
     </WalletConnectBridge>
   );
 }

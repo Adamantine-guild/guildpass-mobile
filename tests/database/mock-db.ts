@@ -76,12 +76,22 @@ function parseCreateTable(sql: string): TableDef | null {
   let depth = 0;
   let current = "";
   for (const ch of body) {
-    if (ch === "(") { depth++; current += ch; }
-    else if (ch === ")") { depth--; current += ch; }
-    else if (ch === "," && depth === 0) {
+    if (ch === "(") {
+      depth++;
+      current += ch;
+    } else if (ch === ")") {
+      depth--;
+      current += ch;
+    } else if (ch === "," && depth === 0) {
       const firstWord = current.trim().split(/\s+/)[0]?.toUpperCase() ?? "";
-      if (firstWord && firstWord !== "PRIMARY" && firstWord !== "FOREIGN" &&
-          firstWord !== "UNIQUE" && firstWord !== "CHECK" && firstWord !== "CONSTRAINT") {
+      if (
+        firstWord &&
+        firstWord !== "PRIMARY" &&
+        firstWord !== "FOREIGN" &&
+        firstWord !== "UNIQUE" &&
+        firstWord !== "CHECK" &&
+        firstWord !== "CONSTRAINT"
+      ) {
         cols.push(current.trim().split(/\s+/)[0]);
       }
       current = "";
@@ -91,8 +101,14 @@ function parseCreateTable(sql: string): TableDef | null {
   }
   // Handle last column definition
   const firstWord = current.trim().split(/\s+/)[0]?.toUpperCase() ?? "";
-  if (firstWord && firstWord !== "PRIMARY" && firstWord !== "FOREIGN" &&
-      firstWord !== "UNIQUE" && firstWord !== "CHECK" && firstWord !== "CONSTRAINT") {
+  if (
+    firstWord &&
+    firstWord !== "PRIMARY" &&
+    firstWord !== "FOREIGN" &&
+    firstWord !== "UNIQUE" &&
+    firstWord !== "CHECK" &&
+    firstWord !== "CONSTRAINT"
+  ) {
     cols.push(current.trim().split(/\s+/)[0]);
   }
 
@@ -115,18 +131,23 @@ function makeRowList(rows: Record<string, unknown>[]): MockResultSetRowList {
   };
 }
 
-export class MockDb implements MockDatabase {
+export class MockDb {
   tables = new Map<string, { columns: string[]; rows: Record<string, unknown>[] }>();
   indexes = new Map<string, IndexDef>();
   transactionStack = 0;
 
   _exec(sql: string, args: (string | number | null)[] = []): MockResultSet {
-    const trimmed = sql.trim();
-    const upper = trimmed.toUpperCase();
+    // Strip leading SQL comments (e.g. -- comment line)
+    const sqlClean = sql
+      .trim()
+      .replace(/^(\s*--[^\n]*\n)+/g, "")
+      .trim();
+    const trimmed = sqlClean;
+    const upper = sqlClean.toUpperCase();
 
     // CREATE TABLE
     if (upper.startsWith("CREATE TABLE")) {
-      const def = parseCreateTable(trimmed);
+      const def = parseCreateTable(sqlClean);
       if (def && !this.tables.has(def.name)) {
         this.tables.set(def.name, { columns: def.columns, rows: [] });
       }
@@ -159,9 +180,12 @@ export class MockDb implements MockDatabase {
             } else {
               // Try to parse inline value (remove quotes)
               const raw = valueTokens[i];
-              if ((raw.startsWith("'") && raw.endsWith("'")) || (raw.startsWith('"') && raw.endsWith('"'))) {
+              if (
+                (raw.startsWith("'") && raw.endsWith("'")) ||
+                (raw.startsWith('"') && raw.endsWith('"'))
+              ) {
                 row[colNames[i]] = raw.slice(1, -1);
-              } else if (raw === "datetime('now')") {
+              } else if (raw.toLowerCase().includes("datetime('now")) {
                 row[colNames[i]] = new Date().toISOString();
               } else {
                 const num = Number(raw);
@@ -174,7 +198,6 @@ export class MockDb implements MockDatabase {
           const pkCol = table.columns[0];
           const existingIdx = table.rows.findIndex((r) => r[pkCol] === row[pkCol]);
           const isReplace = upper.includes("OR REPLACE");
-          const isIgnore = upper.includes("OR IGNORE");
 
           if (existingIdx >= 0) {
             if (isReplace) {
@@ -219,10 +242,21 @@ export class MockDb implements MockDatabase {
           }
 
           // LIMIT / OFFSET
-          const limitMatch = trimmed.match(/LIMIT\s+(\d+)/i);
-          const offsetMatch = trimmed.match(/OFFSET\s+(\d+)/i);
-          const limit = limitMatch ? parseInt(limitMatch[1]) : rows.length;
-          const offset = offsetMatch ? parseInt(offsetMatch[1]) : 0;
+          let limit = rows.length;
+          let offset = 0;
+          if (upper.includes("LIMIT ?")) {
+            const whereClause = whereMatch ? whereMatch[1].trim() : "";
+            const whereArgCount = whereClause ? (whereClause.match(/\?/g) || []).length : 0;
+            limit = Number(args[whereArgCount] ?? rows.length);
+            if (upper.includes("OFFSET ?")) {
+              offset = Number(args[whereArgCount + 1] ?? 0);
+            }
+          } else {
+            const limitMatch = trimmed.match(/LIMIT\s+(\d+)/i);
+            const offsetMatch = trimmed.match(/OFFSET\s+(\d+)/i);
+            if (limitMatch) limit = parseInt(limitMatch[1]);
+            if (offsetMatch) offset = parseInt(offsetMatch[1]);
+          }
 
           rows = rows.slice(offset, offset + limit);
 
@@ -236,10 +270,7 @@ export class MockDb implements MockDatabase {
           if (maxMatch) {
             const col = maxMatch[1];
             const alias = maxMatch[2];
-            const maxVal = rows.reduce(
-              (max, r) => Math.max(max, Number(r[col]) || 0),
-              0,
-            );
+            const maxVal = rows.reduce((max, r) => Math.max(max, Number(r[col]) || 0), 0);
             return { rows: makeRowList([{ [alias]: maxVal }]), insertId: 0, rowsAffected: 0 };
           }
 
@@ -258,11 +289,26 @@ export class MockDb implements MockDatabase {
         if (table) {
           const before = table.rows.length;
 
+          // Special-case: DELETE ... WHERE rowid NOT IN (SELECT rowid FROM ...
+          //               ORDER BY rowid DESC LIMIT ?)
+          // This is the bounded-eviction pattern used by deleteOldestNonces.
+          // In the mock, array indices serve as implicit rowids (0-based,
+          // insertion order).  We keep the last `limit` rows and drop the rest.
+          const evictMatch = trimmed.match(
+            /WHERE\s+rowid\s+NOT\s+IN\s*\(\s*SELECT\s+rowid\s+FROM\s+\w+\s+ORDER\s+BY\s+rowid\s+DESC\s+LIMIT\s+\?\s*\)/i,
+          );
+          if (evictMatch) {
+            const limit = Number(args[0] ?? 0);
+            if (table.rows.length > limit) {
+              // Keep only the newest `limit` rows (tail of the array).
+              table.rows = table.rows.slice(table.rows.length - limit);
+            }
+            return { rows: makeRowList([]), insertId: 0, rowsAffected: before - table.rows.length };
+          }
+
           const whereMatch = trimmed.match(/WHERE\s+(.+)/is);
           if (whereMatch) {
-            table.rows = table.rows.filter(
-              (row) => !this._evalWhere(row, whereMatch[1], args),
-            );
+            table.rows = table.rows.filter((row) => !this._evalWhere(row, whereMatch[1], args));
           } else {
             table.rows = [];
           }
@@ -284,13 +330,14 @@ export class MockDb implements MockDatabase {
           const setMatch = setClause.match(/(\w+)\s*=\s*\?/);
           const whereClause = tableMatch[3];
 
+          const setCount = (setClause.match(/\?/g) || []).length;
+          const setVal = setMatch ? args[0] : undefined;
+          const whereArgs = args.slice(setCount);
+
           let affected = 0;
           for (const row of table.rows) {
-            if (!whereClause || this._evalWhere(row, whereClause, args)) {
+            if (!whereClause || this._evalWhere(row, whereClause, whereArgs)) {
               if (setMatch) {
-                // Find the set value in args after where args
-                const whereArgCount = whereClause ? (whereClause.match(/\?/g) || []).length : 0;
-                const setVal = args[whereArgCount];
                 row[setMatch[1]] = setVal;
               }
               affected++;
@@ -322,18 +369,44 @@ export class MockDb implements MockDatabase {
       return String(row[col] ?? "") === String(val ?? "");
     }
 
-    // Handle "col > ?"
+    // Handle "col > ?"  (numeric-aware)
     const gtMatch = clause.match(/^(\w+)\s*>\s*\?$/);
     if (gtMatch) {
       const col = gtMatch[1];
+      const rowVal = Number(row[col] ?? "");
+      const argVal = Number(args[0] ?? "");
+      if (!isNaN(rowVal) && !isNaN(argVal)) return rowVal > argVal;
       return String(row[col] ?? "") > String(args[0] ?? "");
     }
 
-    // Handle "col < ?"
+    // Handle "col < ?"  (numeric-aware)
     const ltMatch = clause.match(/^(\w+)\s*<\s*\?$/);
     if (ltMatch) {
       const col = ltMatch[1];
+      const rowVal = Number(row[col] ?? "");
+      const argVal = Number(args[0] ?? "");
+      if (!isNaN(rowVal) && !isNaN(argVal)) return rowVal < argVal;
       return String(row[col] ?? "") < String(args[0] ?? "");
+    }
+
+    // Handle "col <= ?"  (numeric-aware)
+    const lteMatch = clause.match(/^(\w+)\s*<=\s*\?$/);
+    if (lteMatch) {
+      const col = lteMatch[1];
+      const rowVal = Number(row[col] ?? "");
+      const argVal = Number(args[0] ?? "");
+      if (!isNaN(rowVal) && !isNaN(argVal)) return rowVal <= argVal;
+      return String(row[col] ?? "") <= String(args[0] ?? "");
+    }
+
+    // Handle "col >= ?"  (numeric-aware)
+    const gteMatch = clause.match(/^(\w+)\s*>=\s*\?$/);
+    if (gteMatch) {
+      const col = gteMatch[1];
+      const rowVal = Number(row[col] ?? "");
+      const argVal = Number(args[0] ?? "");
+      if (!isNaN(rowVal) && !isNaN(argVal)) return rowVal >= argVal;
+      return String(row[col] ?? "") >= String(args[0] ?? "");
     }
 
     // Handle "col = ? AND col2 = ?"
@@ -348,7 +421,9 @@ export class MockDb implements MockDatabase {
     }
 
     // Handle "col = ? AND col2 = ? AND col3 = ?"
-    const and3Match = clause.match(/^(\w+)\s*=\s*\?\s+AND\s+(\w+)\s*=\s*\?\s+AND\s+(\w+)\s*=\s*\?$/);
+    const and3Match = clause.match(
+      /^(\w+)\s*=\s*\?\s+AND\s+(\w+)\s*=\s*\?\s+AND\s+(\w+)\s*=\s*\?$/,
+    );
     if (and3Match) {
       return (
         String(row[and3Match[1]] ?? "") === String(args[0] ?? "") &&
@@ -365,7 +440,7 @@ export class MockDb implements MockDatabase {
       return !new RegExp(pattern).test(String(row[col] ?? ""));
     }
 
-    // Handle "col LIKE ?" 
+    // Handle "col LIKE ?"
     const likeMatch = clause.match(/^(\w+)\s+LIKE\s+'([^']*)'$/);
     if (likeMatch) {
       const col = likeMatch[1];
@@ -443,7 +518,12 @@ function makeMockTx(mock: MockDb): MockTransaction {
           if (def) {
             const master = mock.tables.get("sqlite_master")!;
             if (!master.rows.find((r) => r.name === def.name && r.type === "table")) {
-              master.rows.push({ type: "table", name: def.name, tbl_name: def.name, sql: sqlStatement });
+              master.rows.push({
+                type: "table",
+                name: def.name,
+                tbl_name: def.name,
+                sql: sqlStatement,
+              });
             }
           }
         } else if (upper.startsWith("CREATE INDEX")) {
@@ -451,7 +531,12 @@ function makeMockTx(mock: MockDb): MockTransaction {
           if (def) {
             const master = mock.tables.get("sqlite_master")!;
             if (!master.rows.find((r) => r.name === def.name && r.type === "index")) {
-              master.rows.push({ type: "index", name: def.name, tbl_name: def.table, sql: sqlStatement });
+              master.rows.push({
+                type: "index",
+                name: def.name,
+                tbl_name: def.table,
+                sql: sqlStatement,
+              });
             }
           }
         }

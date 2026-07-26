@@ -25,12 +25,14 @@ exported, synchronized, weakened, or backed up.
 ## Motivation
 
 Current role verification relies on backend API assertions:
+
 - **Trust Model**: Trusting the backend's honesty at query time
 - **Availability**: Requires live network connectivity to the GuildPass backend
 - **Portability**: An existing cryptographic proof can be presented to third parties without backend intervention; the current implementation does not provide cross-device proof storage or recovery
 - **Privacy**: Backend knows when and where roles are being verified
 
 EIP-712 attestations address these limitations by:
+
 - **Cryptographic Verification**: Mathematically proves a guild's issuer approved the role claim
 - **Offline Verification**: Works entirely offline once cached (airplane mode compatible)
 - **Cryptographic portability**: Can be presented to any verifier with the issuer public key
@@ -98,24 +100,24 @@ The `verifyingContract` is a null address for now, as attestations are currently
 
 ```javascript
 RoleAttestation: [
-  { name: 'guildId', type: 'string' },
-  { name: 'roleId', type: 'string' },
-  { name: 'wallet', type: 'address' },
-  { name: 'issuedAt', type: 'uint256' },
-  { name: 'expiresAt', type: 'uint256' }
-]
+  { name: "guildId", type: "string" },
+  { name: "roleId", type: "string" },
+  { name: "wallet", type: "address" },
+  { name: "issuedAt", type: "uint256" },
+  { name: "expiresAt", type: "uint256" },
+];
 ```
 
 ### Attestation Structure
 
 ```typescript
 interface RoleAttestation {
-  guildId: string;           // Guild identifier
-  roleId: string;            // Role identifier
-  wallet: '0x${string}';     // Holder's Ethereum address
-  issuedAt: number;          // Unix timestamp (seconds)
-  expiresAt: number;         // Unix timestamp (seconds)
-  signature: '0x${string}';  // EIP-191 personal_sign or EIP-712 signature
+  guildId: string; // Guild identifier
+  roleId: string; // Role identifier
+  wallet: "0x${string}"; // Holder's Ethereum address
+  issuedAt: number; // Unix timestamp (seconds)
+  expiresAt: number; // Unix timestamp (seconds)
+  signature: "0x${string}"; // EIP-191 personal_sign or EIP-712 signature
 }
 ```
 
@@ -126,13 +128,14 @@ Guilds register their issuer key on-chain (implementation dependent on GuildPass
 ```typescript
 interface GuildIssuerKey {
   guildId: string;
-  issuerAddress: '0x${string}';
-  registeredAt: number;         // When registered on-chain
-  cachedAt: number;             // When cached locally (ms)
+  issuerAddress: "0x${string}";
+  registeredAt: number; // When registered on-chain
+  cachedAt: number; // When cached locally (ms)
 }
 ```
 
 **Key Rotation**: When a guild rotates its issuer key:
+
 1. New key is registered on-chain
 2. Mobile app cache is automatically invalidated (7 day TTL by default)
 3. App fetches new key from backend on next verification
@@ -202,16 +205,16 @@ to minimise work before rejecting an invalid attestation:
 
 ### Error Cases
 
-| Scenario | Behavior |
-|----------|----------|
-| Invalid signature | Rejected, not cached |
-| Expired attestation | Rejected, removed from cache if cached |
-| Revoked issuer key | Rejected with `issuerKeyRevoked: true` |
+| Scenario                              | Behavior                                                   |
+| ------------------------------------- | ---------------------------------------------------------- |
+| Invalid signature                     | Rejected, not cached                                       |
+| Expired attestation                   | Rejected, removed from cache if cached                     |
+| Revoked issuer key                    | Rejected with `issuerKeyRevoked: true`                     |
 | Revocation data unavailable (offline) | Rejected with `revocationCheckSkipped: true` (fail closed) |
-| Missing issuer key (offline) | Fails with "Issuer key not cached - requires online fetch" |
-| Network error fetching attestation | Returns cached version if available |
-| Network error fetching issuer key | Uses cached key if available, otherwise fails |
-| Tampered attestation | Rejected during signature verification |
+| Missing issuer key (offline)          | Fails with "Issuer key not cached - requires online fetch" |
+| Network error fetching attestation    | Returns cached version if available                        |
+| Network error fetching issuer key     | Uses cached key if available, otherwise fails              |
+| Tampered attestation                  | Rejected during signature verification                     |
 
 ## Security Considerations
 
@@ -230,14 +233,14 @@ to minimise work before rejecting an invalid attestation:
 ### Issuer Key Revocation Model
 
 GuildPass attestations adopt the same issuer key revocation model as the QR
-access path (see `docs/qr-key-rotation-protocol.md`).  Each guild publishes
+access path (see `docs/qr-key-rotation-protocol.md`). Each guild publishes
 its key registry (active keys + revoked key set) via the SDK, and the client
 caches it locally with a bounded TTL.
 
 **Key identifier (`kid`)**
 
 An optional `kid` field in `RoleAttestation` identifies which specific issuer
-key signed the proof.  When a guild has multiple rotating keys, including
+key signed the proof. When a guild has multiple rotating keys, including
 `kid` enables the verifier to check whether that particular key has been
 revoked.
 
@@ -259,7 +262,7 @@ validateAttestation()
 
 When the revocation registry data is unavailable (no cached copy and the
 device is offline), `validateAttestation()` **rejects** the attestation with
-`revocationCheckSkipped: true`.  This is the deliberate conservative policy:
+`revocationCheckSkipped: true`. This is the deliberate conservative policy:
 
 - Attestations are designed as **cryptographically portable, long-lived
   proofs** — they may be verified months after issuance by a third-party
@@ -273,11 +276,11 @@ device is offline), `validateAttestation()` **rejects** the attestation with
 
 **Revocation data caching parameters**
 
-| Parameter | Value |
-|-----------|-------|
-| In-memory cache TTL | 15 minutes |
-| Offline trust window | 24 hours |
-| Persisted storage | Expo Secure Store |
+| Parameter            | Value             |
+| -------------------- | ----------------- |
+| In-memory cache TTL  | 15 minutes        |
+| Offline trust window | 24 hours          |
+| Persisted storage    | Expo Secure Store |
 
 These mirror the QR path's parameters exactly, ensuring consistent
 behaviour across both verification paths.
@@ -322,19 +325,13 @@ cross-device recovery.**
 ### 1. Initialize Attestation Service
 
 ```typescript
-import { AttestationService } from '@/features/attestation/attestationService';
-
-// Pseudocode: these callbacks must be supplied by an application-provided
-// backend adapter. The current GuildPass SDK has no attestation service.
-const attestationBackend = {
-  fetchIssuerKey: (guildId: string) => applicationBackend.fetchIssuerKey(guildId),
-  fetchAttestation: (params) => applicationBackend.fetchAttestation(params),
-};
+import { AttestationService } from "@/features/attestation/attestationService";
+import { guildPassClient } from "@/lib/guildpassClient";
 
 const attestationService = new AttestationService({
   chainId: 1, // Ethereum mainnet
-  fetchIssuerKey: attestationBackend.fetchIssuerKey,
-  fetchAttestation: attestationBackend.fetchAttestation,
+  fetchIssuerKey: (guildId) => guildPassClient.attestation.getIssuerKey(guildId),
+  fetchAttestation: (params) => guildPassClient.attestation.getAttestation(params),
 });
 ```
 
@@ -358,13 +355,13 @@ function RoleDisplay({ walletAddress, guildId, roleId }) {
 
   if (error) return <div>Failed: {error}</div>;
   if (isLoading) return <div>Loading attestation...</div>;
-  
+
   if (data?.valid) {
     return <div>
       ✓ Role verified {data.validityStatus}
     </div>;
   }
-  
+
   return <div>Role not verified: {data?.error}</div>;
 }
 ```
@@ -377,7 +374,7 @@ const { data: canVerifyOffline } = useCachedAttestationExists(
   attestationService,
   walletAddress,
   guildId,
-  roleId
+  roleId,
 );
 
 // Verify offline (no network required)
@@ -385,7 +382,7 @@ const { data: result } = useLocalAttestationVerification(
   attestationService,
   walletAddress,
   guildId,
-  roleId
+  roleId,
 );
 ```
 

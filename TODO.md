@@ -1,6 +1,7 @@
 # TODO: Multi-chain role eligibility resolution with RPC fallback
 
 ## Plan (from feature requirement)
+
 1. Locate current role eligibility / multi-chain checks usage in app (screens, stores, SDK calls).
 2. Implement new resolver module in `src/features/access/`:
    - Accept list of `(chainId, requirement)`.
@@ -16,9 +17,9 @@
 7. Document performance characteristics in `docs/`.
 
 ## Progress
+
 - [x] Repo reconnaissance: reviewed `useAccessCheck`, `access-check` screen, `guild detail` screen, and core access-related hooks.
 - [ ] Locate where backend roles/eligibility requirements are computed for access-check.
 - [ ] Implement resolver module + integration points.
 - [ ] Add tests.
 - [ ] Add docs.
-

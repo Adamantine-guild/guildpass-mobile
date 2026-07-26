@@ -1,5 +1,5 @@
 import { View, Text, SafeAreaView } from "react-native";
-import { useState } from "react";
+import React, { useState } from "react";
 import { useRouter } from "expo-router";
 import { Button } from "../src/components/Button";
 import { EmbeddedWalletOnboarding } from "../src/features/wallet/EmbeddedWalletOnboarding";
@@ -35,7 +35,9 @@ export default function Onboarding() {
             />
           ) : (
             <>
-              <Text className="text-text font-semibold text-center">How would you like to continue?</Text>
+              <Text className="text-text font-semibold text-center">
+                How would you like to continue?
+              </Text>
               {isEmbeddedWalletEnabled ? (
                 <Button
                   title="Get started without a wallet"

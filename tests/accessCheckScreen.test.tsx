@@ -1,7 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
-import TestRenderer, { act, type ReactTestRenderer } from "react-test-renderer";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import TestRenderer, { act } from "react-test-renderer";
+import type { ReactTestRenderer } from "react-test-renderer";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ACCESS_DENIED_FIXTURE, ACCESS_GRANTED_FIXTURE } from "./fixtures/access.fixtures";
 import AccessCheck from "../app/access-check";
 import { useAccessHistoryStore } from "../src/features/access/accessHistory.store";
@@ -61,6 +62,13 @@ const biometricAuthMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("react-native", () => ({
+  Animated: {
+    View: "Animated.View",
+    Value: function AnimatedValue(_value: number) {},
+    timing: () => ({ start: (cb?: () => void) => cb?.() }),
+    sequence: () => ({ start: (cb?: () => void) => cb?.() }),
+    loop: () => ({ start: () => {}, stop: () => {} }),
+  },
   View: "View",
   Text: "Text",
   ScrollView: "ScrollView",
@@ -105,6 +113,12 @@ vi.mock("../src/features/guilds/useGuilds", () => ({
     useGuild: () => ({
       data: guildQueryMock.data,
     }),
+    useGuildConfig: () => ({
+      data: { guildId: "guild-alpha", requiredRoles: ["Member"], accessPolicy: "any" },
+    }),
+    useRoles: () => ({
+      data: [{ id: "Member", name: "Member", guildId: "guild-alpha" }],
+    }),
   }),
 }));
 
@@ -118,21 +132,27 @@ vi.mock("expo-local-authentication", () => ({
   authenticateAsync: biometricAuthMocks.authenticateAsync,
 }));
 
+let renderedScreens: ReactTestRenderer[] = [];
+let queryClients: QueryClient[] = [];
+
 const renderScreen = () => {
   const queryClient = new QueryClient({
     defaultOptions: {
-      queries: { retry: false },
-      mutations: { retry: false },
+      queries: { retry: false, gcTime: 0 },
+      mutations: { retry: false, gcTime: 0 },
     },
   });
+  queryClients.push(queryClient);
 
-  return TestRenderer.create(
+  const screen = TestRenderer.create(
     React.createElement(
       QueryClientProvider,
       { client: queryClient },
       React.createElement(AccessCheck),
     ),
   );
+  renderedScreens.push(screen);
+  return screen;
 };
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -156,6 +176,17 @@ describe("AccessCheck screen", () => {
     guildQueryMock.data = { name: "Guild Alpha" };
     useAccessHistoryStore.setState({ entries: [] });
     useNetworkStore.setState({ isOnline: true, isOffline: false });
+  });
+
+  afterEach(() => {
+    for (const screen of renderedScreens) {
+      screen.unmount();
+    }
+    for (const queryClient of queryClients) {
+      queryClient.clear();
+    }
+    renderedScreens = [];
+    queryClients = [];
   });
 
   it("clears the previous result when inputs change after a completed check", async () => {
@@ -378,20 +409,20 @@ describe("AccessCheck screen", () => {
 
     const screenText = outputText(screen!);
     expect(screenText).toContain("Per-chain role eligibility");
-    expect(screenText).toContain("Chain 1");
+    expect(screen!.root.findByProps({ testID: "per-chain-eligibility-row-1" })).toBeDefined();
     expect(screenText).toContain("Resolved");
-    expect(screenText).toContain("Roles: admin, member");
-    expect(screenText).toContain("Chain 10");
+    expect(screenText).toContain("admin, member");
+    expect(screen!.root.findByProps({ testID: "per-chain-eligibility-row-10" })).toBeDefined();
     expect(screenText).toContain("Timed out");
     expect(screenText).toContain("RPC attempt timed out after 500ms");
-    expect(screenText).toContain("Chain 137");
+    expect(screen!.root.findByProps({ testID: "per-chain-eligibility-row-137" })).toBeDefined();
     expect(screenText).toContain("Error");
     expect(screenText).toContain("RPC provider error");
     expect(screenText).toContain("Resolving");
     expect(screenText).toContain("Some chains could not be fully resolved.");
   });
 
-  it("renders the offline banner and disables the check button when offline", async () => {
+  it("renders the offline banner and allows a local verification attempt when offline", async () => {
     useNetworkStore.setState({ isOnline: false, isOffline: true });
 
     let screen: ReactTestRenderer;
@@ -403,7 +434,25 @@ describe("AccessCheck screen", () => {
     const screenText = outputText(screen!);
     expect(screenText).toContain("You are offline. This access result may be outdated");
 
+    await act(async () => {
+      screen!.root
+        .findByProps({ testID: "access-check-guild-id-input" })
+        .props.onChangeText("guild-alpha");
+      screen!.root
+        .findByProps({ testID: "access-check-resource-id-input" })
+        .props.onChangeText("vip-door");
+      await flush();
+    });
+
     const checkButton = screen!.root.findByProps({ accessibilityLabel: "Check Access" });
-    expect(checkButton.props.disabled).toBe(true);
+    expect(checkButton.props.disabled).toBe(false);
+
+    await act(async () => {
+      checkButton.props.onPress();
+      await flush();
+    });
+
+    expect(guildPassClientMock.checkAccess).not.toHaveBeenCalled();
+    expect(outputText(screen!)).toContain("Offline verification requires a cached issuer key");
   });
 });

@@ -11,11 +11,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { migratingSecureStorage } from "../../lib/storage";
-import type {
-  SyncCorrection,
-  SyncEntityMeta,
-  SyncStatus,
-} from "./sync.types";
+import type { SyncCorrection, SyncEntityMeta, SyncStatus } from "./sync.types";
 
 export const MAX_TRACKED_CORRECTIONS = 20;
 
@@ -66,10 +62,7 @@ export const useSyncStore = create<SyncStoreState>()(
           const incomingIds = new Set(incoming.map((c) => c.id));
           // Re-detected divergences replace their previous notice instead of
           // stacking duplicates; keep newest first.
-          const merged = [
-            ...incoming,
-            ...state.corrections.filter((c) => !incomingIds.has(c.id)),
-          ];
+          const merged = [...incoming, ...state.corrections.filter((c) => !incomingIds.has(c.id))];
           if (merged.length <= MAX_TRACKED_CORRECTIONS) {
             return { corrections: merged };
           }

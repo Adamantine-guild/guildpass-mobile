@@ -34,7 +34,7 @@ describe("ErrorBoundary", () => {
     const renderer = TestRenderer.create(
       <ErrorBoundary>
         <Text>All good</Text>
-      </ErrorBoundary>
+      </ErrorBoundary>,
     );
 
     expect(JSON.stringify(renderer.toJSON())).toContain("All good");
@@ -44,7 +44,7 @@ describe("ErrorBoundary", () => {
     const renderer = TestRenderer.create(
       <ErrorBoundary>
         <ThrowOnRender shouldThrow={true} />
-      </ErrorBoundary>
+      </ErrorBoundary>,
     );
 
     expect(JSON.stringify(renderer.toJSON())).toContain("Something went wrong");
@@ -57,7 +57,7 @@ describe("ErrorBoundary", () => {
     const renderer = TestRenderer.create(
       <ErrorBoundary>
         <ThrowOnRender shouldThrow={shouldThrow} />
-      </ErrorBoundary>
+      </ErrorBoundary>,
     );
 
     expect(JSON.stringify(renderer.toJSON())).toContain("Something went wrong");
