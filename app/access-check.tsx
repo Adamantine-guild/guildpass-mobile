@@ -42,10 +42,14 @@ function PerChainEligibilityList({
   perChainRoleEligibility,
   isResolvingRoleEligibility,
   roleEligibilityError,
+  retryingChainIds = [],
+  onRetryChain,
 }: {
   perChainRoleEligibility: PerChainRoleEligibilityResolution[];
   isResolvingRoleEligibility: boolean;
   roleEligibilityError?: string;
+  retryingChainIds?: number[];
+  onRetryChain?: (chainId: number) => void;
 }) {
   if (
     perChainRoleEligibility.length === 0 &&
@@ -78,32 +82,51 @@ function PerChainEligibilityList({
         </Text>
       ) : null}
 
-      {perChainRoleEligibility.map((chain) => (
-        <View
-          key={`${chain.chainId}-${chain.status}`}
-          className="border border-border dark:border-slate-700 rounded-xl p-3 mb-2"
-          testID={`per-chain-eligibility-row-${chain.chainId}`}
-        >
-          <View className="flex-row items-center justify-between">
-            <Text className="text-text dark:text-slate-100 font-semibold">
-              Chain {chain.chainId}
-            </Text>
-            <Text
-              className={`px-2 py-1 rounded-full border text-xs font-semibold ${statusClassName[chain.status]}`}
-            >
-              {statusCopy[chain.status]}
-            </Text>
+      {perChainRoleEligibility.map((chain) => {
+        const isRetrying = retryingChainIds.includes(chain.chainId);
+        const canRetry = chain.chainId > 0 && chain.status !== "resolved" && onRetryChain;
+
+        return (
+          <View
+            key={`${chain.chainId}-${chain.status}`}
+            className="border border-border dark:border-slate-700 rounded-xl p-3 mb-2"
+            testID={`per-chain-eligibility-row-${chain.chainId}`}
+          >
+            <View className="flex-row items-center justify-between">
+              <Text className="text-text dark:text-slate-100 font-semibold">
+                Chain {chain.chainId}
+              </Text>
+              <Text
+                className={`px-2 py-1 rounded-full border text-xs font-semibold ${statusClassName[chain.status]}`}
+              >
+                {statusCopy[chain.status]}
+              </Text>
+            </View>
+            {chain.resolvedRoles && chain.resolvedRoles.length > 0 ? (
+              <Text className="text-text-muted dark:text-slate-400 text-xs mt-2">
+                Roles: {chain.resolvedRoles.join(", ")}
+              </Text>
+            ) : null}
+            {chain.errorMessage ? (
+              <Text className="text-error dark:text-red-400 text-xs mt-2">
+                {chain.errorMessage}
+              </Text>
+            ) : null}
+            {canRetry ? (
+              <Button
+                title="Retry"
+                variant="outline"
+                className="mt-3 py-2 px-4"
+                loading={isRetrying}
+                disabled={isRetrying}
+                testID={`per-chain-eligibility-retry-${chain.chainId}`}
+                accessibilityLabel={`Retry chain ${chain.chainId} role eligibility`}
+                onPress={() => onRetryChain(chain.chainId)}
+              />
+            ) : null}
           </View>
-          {chain.resolvedRoles && chain.resolvedRoles.length > 0 ? (
-            <Text className="text-text-muted dark:text-slate-400 text-xs mt-2">
-              Roles: {chain.resolvedRoles.join(", ")}
-            </Text>
-          ) : null}
-          {chain.errorMessage ? (
-            <Text className="text-error dark:text-red-400 text-xs mt-2">{chain.errorMessage}</Text>
-          ) : null}
-        </View>
-      ))}
+        );
+      })}
     </Card>
   );
 }
@@ -149,6 +172,8 @@ export default function AccessCheck() {
     reset: resetAccessCheck,
     perChainRoleEligibility,
     isResolvingRoleEligibility,
+    resolvingRoleEligibilityChainIds,
+    retryRoleEligibilityChain,
     roleEligibilityError,
   } = accessCheck;
   const recordCheck = useAccessHistoryStore((state) => state.recordCheck);
@@ -419,8 +444,7 @@ export default function AccessCheck() {
               !!addressError ||
               !!guildIdError ||
               !!resourceIdError ||
-              countdown.isExpired ||
-              isOffline
+              countdown.isExpired
             }
           />
           {isOffline ? (
@@ -565,6 +589,8 @@ export default function AccessCheck() {
                 <PerChainEligibilityList
                   perChainRoleEligibility={perChainRoleEligibility}
                   isResolvingRoleEligibility={isResolvingRoleEligibility}
+                  retryingChainIds={resolvingRoleEligibilityChainIds}
+                  onRetryChain={retryRoleEligibilityChain}
                   roleEligibilityError={roleEligibilityError}
                 />
               </View>
@@ -584,6 +610,8 @@ export default function AccessCheck() {
                 <PerChainEligibilityList
                   perChainRoleEligibility={perChainRoleEligibility}
                   isResolvingRoleEligibility={isResolvingRoleEligibility}
+                  retryingChainIds={resolvingRoleEligibilityChainIds}
+                  onRetryChain={retryRoleEligibilityChain}
                   roleEligibilityError={roleEligibilityError}
                 />
               </View>

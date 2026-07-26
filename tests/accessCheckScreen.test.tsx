@@ -33,15 +33,17 @@ const guildPassClientMock = vi.hoisted(() => ({
 }));
 
 const multiChainState = vi.hoisted(() => ({
-  perChain: [] as Array<{
+  perChain: [] as {
     chainId: number;
     status: "resolved" | "timed-out" | "error";
     resolvedRoles?: string[];
     errorMessage?: string;
-  }>,
+  }[],
   isResolving: false,
+  resolvingChainIds: [] as number[],
   error: undefined as string | undefined,
   resolve: vi.fn(async () => undefined),
+  retryChain: vi.fn(async () => undefined),
 }));
 
 const guildQueryMock = vi.hoisted(() => ({
@@ -171,8 +173,10 @@ describe("AccessCheck screen", () => {
     guildPassClientMock.checkAccess.mockReset().mockResolvedValue(ACCESS_GRANTED_FIXTURE);
     multiChainState.perChain = [];
     multiChainState.isResolving = false;
+    multiChainState.resolvingChainIds = [];
     multiChainState.error = undefined;
     multiChainState.resolve.mockReset().mockResolvedValue(undefined);
+    multiChainState.retryChain.mockReset().mockResolvedValue(undefined);
     guildQueryMock.data = { name: "Guild Alpha" };
     useAccessHistoryStore.setState({ entries: [] });
     useNetworkStore.setState({ isOnline: true, isOffline: false });
@@ -424,8 +428,49 @@ describe("AccessCheck screen", () => {
     expect(screen!.root.findByProps({ testID: "per-chain-eligibility-row-137" })).toBeDefined();
     expect(screenText).toContain("Error");
     expect(screenText).toContain("RPC provider error");
+    expect(
+      screen!.root.findByProps({ testID: "per-chain-eligibility-retry-10" }),
+    ).toBeDefined();
+    expect(
+      screen!.root.findByProps({ testID: "per-chain-eligibility-retry-137" }),
+    ).toBeDefined();
     expect(screenText).toContain("Resolving");
     expect(screenText).toContain("Some chains could not be fully resolved.");
+  });
+
+  it("retries only the selected per-chain role eligibility failure", async () => {
+    multiChainState.perChain = [
+      { chainId: 1, status: "resolved", resolvedRoles: ["member"] },
+      { chainId: 10, status: "timed-out", errorMessage: "RPC attempt timed out after 500ms" },
+    ];
+
+    let screen: ReactTestRenderer;
+
+    await act(async () => {
+      screen = renderScreen();
+    });
+
+    await act(async () => {
+      screen.root
+        .findByProps({ testID: "access-check-guild-id-input" })
+        .props.onChangeText("guild-alpha");
+      screen.root
+        .findByProps({ testID: "access-check-resource-id-input" })
+        .props.onChangeText("vip-door");
+      await flush();
+    });
+
+    await act(async () => {
+      screen.root.findByProps({ accessibilityLabel: "Check Access" }).props.onPress();
+      await flush();
+    });
+
+    await act(async () => {
+      screen.root.findByProps({ testID: "per-chain-eligibility-retry-10" }).props.onPress();
+    });
+
+    expect(multiChainState.retryChain).toHaveBeenCalledTimes(1);
+    expect(multiChainState.retryChain).toHaveBeenCalledWith(10);
   });
 
   it("renders the offline banner and allows a local verification attempt when offline", async () => {
