@@ -6,7 +6,7 @@
  */
 
 export const ACCESS_QR_TYPE = "guildpass.access-check";
-export const ACCESS_QR_VERSION = 1;
+export const ACCESS_QR_VERSION = 2;
 
 export type SupportedQrPayloadVersion = {
   readonly type: string;

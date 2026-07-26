@@ -54,7 +54,7 @@ export const buildSignedQrPayload = (
   privateKey: string = TEST_ISSUER_PRIVATE_KEY,
 ) => ({
   type: "guildpass.access-check",
-  version: 1,
+  version: 2,
   guildId: fields.guildId,
   resourceId: fields.resourceId,
   walletAddress: fields.walletAddress,

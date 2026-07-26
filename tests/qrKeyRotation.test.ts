@@ -100,11 +100,9 @@ describe("QR Key Rotation & Revocation Protocol", () => {
       );
 
       const parsed1 = await verifyAndParseAccessQrPayload(payloadV1, now);
-      if (!parsed1.success) throw new Error("Expected success");
       expect(parsed1.payload.kid).toBe("key-v1");
 
       const parsed2 = await verifyAndParseAccessQrPayload(payloadV2, now);
-      if (!parsed2.success) throw new Error("Expected success");
       expect(parsed2.payload.kid).toBe("key-v2");
     });
 
@@ -123,7 +121,6 @@ describe("QR Key Rotation & Revocation Protocol", () => {
       );
 
       const parsed = await verifyAndParseAccessQrPayload(payloadV2, now);
-      if (!parsed.success) throw new Error("Expected success");
       expect(parsed.payload.kid).toBe("key-v2");
     });
   });
@@ -192,10 +189,11 @@ describe("QR Key Rotation & Revocation Protocol", () => {
     it("rejects payload with invalid non-string kid format at structural layer", async () => {
       const malformedKidPayload = JSON.stringify({
         type: "guildpass.access-check",
-        version: 1,
+        version: 2,
         guildId: "guild_abc",
         resourceId: "vip-door",
         expiresAt: "2026-07-20T12:05:00.000Z",
+        signature: "304402204f4c2f9a1b3c5d6e7f8091a2b3c4d5e6f70819a2b3c4d5e6f70819a2b3c4d5e6022033445566778899aabbccddeeff00112233445566778899aabbccddeeff001122",
         kid: "", // empty kid string
       });
 

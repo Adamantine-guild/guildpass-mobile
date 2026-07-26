@@ -18,10 +18,10 @@ describe("buildSigningMessage", () => {
   it("canonicalizes fields in a fixed order with empty strings for absent ones", () => {
     // type + version are pinned to the canonical constants by the scheme.
     expect(buildSigningMessage({ guildId: "g", resourceId: "r" })).toBe(
-      ["guildpass.access-check", "1", "g", "r", "", "", ""].join("\n"),
+      ["guildpass.access-check", "2", "g", "r", "", "", ""].join("\n"),
     );
     expect(buildSigningMessage({ guildId: "g", resourceId: "r", kid: "key-1" })).toBe(
-      ["guildpass.access-check", "1", "g", "r", "", "", "key-1"].join("\n"),
+      ["guildpass.access-check", "2", "g", "r", "", "", "key-1"].join("\n"),
     );
   });
 
