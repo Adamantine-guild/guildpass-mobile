@@ -1,7 +1,7 @@
 import { View, FlatList } from "react-native";
 import { useRouter } from "expo-router";
 import { useWallet } from "../src/features/wallet/useWallet";
-import { useMembership } from "../src/features/membership/useMembership";
+import { useGuilds } from "../src/features/guilds/useGuilds";
 import { AppHeader } from "../src/components/AppHeader";
 import { GuildCard } from "../src/components/GuildCard";
 import { LoadingState } from "../src/components/LoadingState";
@@ -12,21 +12,51 @@ import React from "react";
 export default function Guilds() {
   const router = useRouter();
   const { walletAddress } = useWallet();
-  const { getMembership } = useMembership(walletAddress);
+  const { useWalletGuilds } = useGuilds();
+  const guildsQuery = useWalletGuilds(walletAddress);
 
-  // In a real app, you would fetch all guilds.
-  // For MVP, we'll show a few example guilds that the user can explore.
-  const exampleGuilds = [
-    { id: "guild_abc", name: "Alpha Guild", isActive: true, roleCount: 3 },
-    { id: "guild_xyz", name: "Beta Community", isActive: true, roleCount: 5 },
-    { id: "guild_123", name: "Gamma DAO", isActive: false, roleCount: 2 },
-  ];
+  if (!walletAddress) {
+    return (
+      <View className="flex-1 bg-background" testID="guilds-screen">
+        <AppHeader title="My Guilds" showBack />
+        <EmptyState
+          title="Connect Wallet"
+          message="Connect a wallet to load your GuildPass guilds."
+        />
+      </View>
+    );
+  }
+
+  if (guildsQuery.isLoading) {
+    return (
+      <View className="flex-1 bg-background" testID="guilds-screen">
+        <AppHeader title="My Guilds" showBack />
+        <LoadingState message="Loading your guilds..." />
+      </View>
+    );
+  }
+
+  if (guildsQuery.isError) {
+    return (
+      <View className="flex-1 bg-background" testID="guilds-screen">
+        <AppHeader title="My Guilds" showBack />
+        <ErrorState
+          message={
+            guildsQuery.error instanceof Error
+              ? guildsQuery.error.message
+              : "Unable to load your guilds."
+          }
+          onRetry={() => void guildsQuery.refetch()}
+        />
+      </View>
+    );
+  }
 
   return (
     <View className="flex-1 bg-background" testID="guilds-screen">
       <AppHeader title="My Guilds" showBack />
       <FlatList
-        data={exampleGuilds}
+        data={guildsQuery.data ?? []}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ padding: 16 }}
         testID="guilds-list"
@@ -35,16 +65,14 @@ export default function Guilds() {
             name={item.name}
             id={item.id}
             isActive={item.isActive}
-            roleCount={item.roleCount}
+            roleCount={item.roleCount ?? 0}
             onPress={() => router.push(`/guilds/${item.id}`)}
           />
         )}
         ListEmptyComponent={
           <EmptyState
             title="No Guilds Found"
-            message="You are not a member of any guilds yet."
-            actionTitle="Explore Guilds"
-            onAction={() => {}}
+            message="This wallet is not a member of any guilds yet."
           />
         }
       />
