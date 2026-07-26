@@ -112,6 +112,15 @@
         }
       ],
       [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#4F46E5",
+          "sounds": ["default"],
+          "mode": "production"
+        }
+      ],
+      [
         "expo-build-properties",
         {
           "android": {

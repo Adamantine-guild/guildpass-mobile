@@ -117,3 +117,48 @@ vi.mock("expo-camera", () => ({
   CameraView: () => null,
   useCameraPermissions: vi.fn(() => [{ granted: true }, vi.fn()]),
 }));
+
+// Mock expo-notifications
+vi.mock("expo-notifications", () => ({
+  setNotificationHandler: vi.fn(),
+  getPermissionsAsync: vi.fn(async () => ({
+    status: "granted",
+    canAskAgain: false,
+    granted: true,
+  })),
+  requestPermissionsAsync: vi.fn(async () => ({
+    status: "granted",
+    canAskAgain: false,
+    granted: true,
+  })),
+  getExpoPushTokenAsync: vi.fn(async () => ({
+    data: "ExponentPushToken[mock-token]",
+  })),
+  setNotificationChannelAsync: vi.fn(async () => ({})),
+  addNotificationReceivedListener: vi.fn(() => ({ remove: vi.fn() })),
+  addNotificationResponseReceivedListener: vi.fn(() => ({ remove: vi.fn() })),
+  setBadgeCountAsync: vi.fn(async () => {}),
+  dismissAllNotificationsAsync: vi.fn(async () => {}),
+  PermissionStatus: {
+    GRANTED: "granted",
+    DENIED: "denied",
+    UNDETERMINED: "undetermined",
+  },
+  AndroidImportance: {
+    MAX: 5,
+  },
+}));
+
+// Mock expo-constants
+vi.mock("expo-constants", () => ({
+  default: {
+    isDevice: true,
+    expoConfig: {
+      extra: {
+        eas: {
+          projectId: "mock-project-id",
+        },
+      },
+    },
+  },
+}));
