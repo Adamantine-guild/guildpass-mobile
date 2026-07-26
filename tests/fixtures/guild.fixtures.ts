@@ -20,6 +20,13 @@ export type GuildFixture = {
   isActive: boolean;
 };
 
+export type GuildListItemFixture = {
+  id: string;
+  name: string;
+  isActive: boolean;
+  roleCount?: number;
+};
+
 export type GuildConfigFixture = {
   guildId: string;
   requiredRoles: string[];
@@ -68,6 +75,18 @@ export const GUILD_DETAIL_INACTIVE_FIXTURE: GuildFixture = {
 // ---------------------------------------------------------------------------
 // Guild config
 // ---------------------------------------------------------------------------
+
+export const WALLET_GUILDS_FIXTURE: GuildListItemFixture[] = [
+  { id: GUILD_DETAIL_FIXTURE.id, name: GUILD_DETAIL_FIXTURE.name, isActive: true, roleCount: 3 },
+  {
+    id: GUILD_DETAIL_NO_DESCRIPTION_FIXTURE.id,
+    name: GUILD_DETAIL_NO_DESCRIPTION_FIXTURE.name,
+    isActive: true,
+    roleCount: 0,
+  },
+];
+
+export const WALLET_GUILDS_EMPTY_FIXTURE: GuildListItemFixture[] = [];
 
 export const GUILD_CONFIG_FIXTURE: GuildConfigFixture = {
   guildId: "guild_abc",

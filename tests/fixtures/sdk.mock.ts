@@ -19,7 +19,12 @@
  */
 
 import { vi } from "vitest";
-import { GUILD_DETAIL_FIXTURE, GUILD_CONFIG_FIXTURE, ROLES_LIST_FIXTURE } from "./guild.fixtures";
+import {
+  GUILD_DETAIL_FIXTURE,
+  GUILD_CONFIG_FIXTURE,
+  ROLES_LIST_FIXTURE,
+  WALLET_GUILDS_FIXTURE,
+} from "./guild.fixtures";
 import { MEMBERSHIP_ACTIVE_FIXTURE, USER_ROLES_FIXTURE } from "./membership.fixtures";
 import { ACCESS_GRANTED_FIXTURE } from "./access.fixtures";
 
@@ -35,6 +40,7 @@ import { ACCESS_GRANTED_FIXTURE } from "./access.fixtures";
 export type SdkMock = {
   guilds: {
     getGuild: ReturnType<typeof vi.fn>;
+    getGuildsByWalletAddress: ReturnType<typeof vi.fn>;
     getGuildConfig: ReturnType<typeof vi.fn>;
   };
   roles: {
@@ -63,6 +69,7 @@ export function createSdkMock(): SdkMock {
     _instance = {
       guilds: {
         getGuild: vi.fn().mockResolvedValue(GUILD_DETAIL_FIXTURE),
+        getGuildsByWalletAddress: vi.fn().mockResolvedValue(WALLET_GUILDS_FIXTURE),
         getGuildConfig: vi.fn().mockResolvedValue(GUILD_CONFIG_FIXTURE),
       },
       roles: {
@@ -87,6 +94,9 @@ export function createSdkMock(): SdkMock {
 export function resetSdkMock(): void {
   if (_instance) {
     _instance.guilds.getGuild.mockReset().mockResolvedValue(GUILD_DETAIL_FIXTURE);
+    _instance.guilds.getGuildsByWalletAddress
+      .mockReset()
+      .mockResolvedValue(WALLET_GUILDS_FIXTURE);
     _instance.guilds.getGuildConfig.mockReset().mockResolvedValue(GUILD_CONFIG_FIXTURE);
     _instance.roles.getRoles.mockReset().mockResolvedValue(ROLES_LIST_FIXTURE);
     _instance.roles.getUserRoles.mockReset().mockResolvedValue(USER_ROLES_FIXTURE);
