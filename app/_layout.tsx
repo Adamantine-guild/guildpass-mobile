@@ -1,6 +1,6 @@
 import { Stack } from "expo-router";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
-import { View } from "react-native";
+import { View, useColorScheme } from "react-native";
 import { queryClient } from "../src/lib/queryClient";
 import { asyncStoragePersister } from "../src/lib/queryPersister";
 import { isPersistableQuery, QUERY_GC_TIME_MS } from "../src/lib/offlineCache";
@@ -36,6 +36,8 @@ function SecurityInit() {
 }
 
 export default function RootLayout() {
+  const colorScheme = useColorScheme();
+
   return (
     <ErrorBoundary>
       <SensitiveStorageMigrationGate>
@@ -102,12 +104,12 @@ export default function RootLayout() {
               void triggerSync();
             }}
           >
-            <View className="flex-1 bg-background">
+            <View className="flex-1 bg-background dark:bg-slate-900">
               <WalletConnectProvider>
                 <Stack
                   screenOptions={{
                     headerShown: false,
-                    contentStyle: { backgroundColor: "#f8fafc" },
+                    contentStyle: { backgroundColor: colorScheme === 'dark' ? '#0f172a' : '#f8fafc' },
                   }}
                 >
                   <Stack.Screen name="index" />

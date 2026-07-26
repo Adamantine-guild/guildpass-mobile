@@ -1,4 +1,4 @@
-import { View, FlatList, TextInput, TouchableOpacity, Text, RefreshControl } from "react-native";
+import { View, FlatList, TextInput, TouchableOpacity, Text, RefreshControl, useColorScheme } from "react-native";
 import { useRouter } from "expo-router";
 import { useWallet } from "../src/features/wallet/useWallet";
 import { AppHeader } from "../src/components/AppHeader";
@@ -17,6 +17,7 @@ import { useQueryClient } from "@tanstack/react-query";
 
 export default function Guilds() {
   const router = useRouter();
+  const colorScheme = useColorScheme();
   const { walletAddress, disconnect } = useWallet();
   const { useEnrichedMemberships } = useMembership(walletAddress);
   const membershipsQuery = useEnrichedMemberships();
@@ -50,7 +51,7 @@ export default function Guilds() {
   if (isLoading) {
     return (
       <WalletRequired>
-        <View className="flex-1 bg-background" testID="guilds-screen">
+        <View className="flex-1 bg-background dark:bg-slate-900" testID="guilds-screen">
           <AppHeader title="My Guilds" showBack />
           <GuildListSkeleton />
         </View>
@@ -61,7 +62,7 @@ export default function Guilds() {
   if (error && !memberships) {
     return (
       <WalletRequired>
-        <View className="flex-1 bg-background" testID="guilds-screen">
+        <View className="flex-1 bg-background dark:bg-slate-900" testID="guilds-screen">
           <AppHeader title="My Guilds" showBack />
           {staleState.isOffline ? (
             <StaleDataBanner reason="offline" lastSyncedAt={staleState.lastSyncedAt} />
@@ -75,7 +76,7 @@ export default function Guilds() {
   if (!memberships || memberships.length === 0) {
     return (
       <WalletRequired>
-        <View className="flex-1 bg-background" testID="guilds-screen">
+        <View className="flex-1 bg-background dark:bg-slate-900" testID="guilds-screen">
           <AppHeader title="My Guilds" showBack />
           {staleState.isOffline ? (
             <StaleDataBanner reason="offline" lastSyncedAt={staleState.lastSyncedAt} />
@@ -96,12 +97,12 @@ export default function Guilds() {
     <View>
       {staleBanner}
       <View className="px-4 pt-2 pb-1">
-        <View className="flex-row items-center bg-white rounded-xl px-4 py-3 border border-border">
-          <Text className="text-text-muted mr-2">🔍</Text>
+        <View className="flex-row items-center bg-white dark:bg-slate-800 rounded-xl px-4 py-3 border border-border dark:border-slate-700">
+          <Text className="text-text-muted dark:text-slate-400 mr-2">🔍</Text>
           <TextInput
-            className="flex-1 text-text text-base"
+            className="flex-1 text-text dark:text-slate-100 text-base"
             placeholder="Search guilds..."
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={colorScheme === 'dark' ? '#94a3b8' : '#9ca3af'}
             value={searchQuery}
             onChangeText={setSearchQuery}
             autoCapitalize="none"
@@ -117,7 +118,7 @@ export default function Guilds() {
               testID="guild-search-clear"
               accessibilityLabel="Clear search"
             >
-              <Text className="text-text-muted text-lg ml-2">✕</Text>
+              <Text className="text-text-muted dark:text-slate-400 text-lg ml-2">✕</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -129,7 +130,7 @@ export default function Guilds() {
 
   return (
     <WalletRequired>
-      <View className="flex-1 bg-background" testID="guilds-screen">
+      <View className="flex-1 bg-background dark:bg-slate-900" testID="guilds-screen">
         <AppHeader title="My Guilds" showBack />
         <FlatList
           data={filteredMemberships}

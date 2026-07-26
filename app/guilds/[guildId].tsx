@@ -84,7 +84,7 @@ export default function GuildDetail() {
 
   return (
     <WalletRequired>
-      <View className="flex-1 bg-background" testID="guild-detail-screen">
+      <View className="flex-1 bg-background dark:bg-slate-900" testID="guild-detail-screen">
         {!validGuildId ? (
           <ErrorState message="Invalid guild ID provided" />
         ) : showSkeleton ? (
@@ -141,22 +141,22 @@ export default function GuildDetail() {
               ) : null}
 
               <Card className="mb-6">
-                <Text className="text-2xl font-bold text-text mb-2" testID="guild-name">
+                <Text className="text-2xl font-bold text-text dark:text-slate-100 mb-2" testID="guild-name">
                   {guild.name}
                 </Text>
-                <Text className="text-text-muted mb-4" testID="guild-description">
+                <Text className="text-text-muted dark:text-slate-400 mb-4" testID="guild-description">
                   {guild.description || "No description provided."}
                 </Text>
 
-                <View className="border-t border-border pt-4">
+                <View className="border-t border-border dark:border-slate-700 pt-4">
                   <View className="flex-row justify-between items-center mb-2">
-                    <Text className="text-text-muted">Owner</Text>
+                    <Text className="text-text-muted dark:text-slate-400">Owner</Text>
                     <AddressChip address={guild.ownerAddress} testID="guild-owner" />
                   </View>
                   <View className="flex-row justify-between">
-                    <Text className="text-text-muted">Chain ID</Text>
+                    <Text className="text-text-muted dark:text-slate-400">Chain ID</Text>
                     <Text
-                      className={`font-medium ${groupedRequirements.some((group) => isKnownChainId(group.chainId)) ? "text-text" : "text-text-muted italic"}`}
+                      className={`font-medium ${groupedRequirements.some((group) => isKnownChainId(group.chainId)) ? "text-text dark:text-slate-100" : "text-text-muted dark:text-slate-400 italic"}`}
                       testID="guild-chain-id"
                     >
                       {guildChainLabel}
@@ -166,16 +166,16 @@ export default function GuildDetail() {
               </Card>
 
               <View className="mb-6">
-                <Text className="text-lg font-bold text-text mb-3">Your Membership</Text>
+                <Text className="text-lg font-bold text-text dark:text-slate-100 mb-3">Your Membership</Text>
                 <Card
-                  className={membership?.isActive ? "border-success/30" : ""}
+                  className={membership?.isActive ? "border-success/30 dark:border-green-600/50" : ""}
                   accessibilityLabel={`Membership status: ${membership?.isActive ? "Active Member" : "Not a Member"}`}
                   testID="membership-status-card"
                 >
                   <View className="flex-row justify-between items-center">
-                    <Text className="text-text font-medium">Status</Text>
+                    <Text className="text-text dark:text-slate-100 font-medium">Status</Text>
                     <Text
-                      className={`font-bold ${membership?.isActive ? "text-success" : "text-text-muted"}`}
+                      className={`font-bold ${membership?.isActive ? "text-success dark:text-green-400" : "text-text-muted dark:text-slate-400"}`}
                       testID="membership-status-text"
                     >
                       {membership?.isActive ? "Active Member" : "Not a Member"}
@@ -185,11 +185,11 @@ export default function GuildDetail() {
               </View>
 
               <View className="mb-6">
-                <Text className="text-lg font-bold text-text mb-3">Available Roles</Text>
+                <Text className="text-lg font-bold text-text dark:text-slate-100 mb-3">Available Roles</Text>
                 {groupedRequirements.length > 0 ? (
                   groupedRequirements.map((group) => (
                     <View key={`${group.chainId}`} className="mb-4">
-                      <Text className="text-sm font-semibold text-text-muted mb-2">
+                      <Text className="text-sm font-semibold text-text-muted dark:text-slate-400 mb-2">
                         {group.label}
                       </Text>
                       <View
@@ -209,7 +209,7 @@ export default function GuildDetail() {
                     </View>
                   ))
                 ) : (
-                  <Text className="text-text-muted italic">No roles defined for this guild.</Text>
+                  <Text className="text-text-muted dark:text-slate-400 italic">No roles defined for this guild.</Text>
                 )}
               </View>
             </ScrollView>
