@@ -66,6 +66,22 @@ export default function RootLayout() {
           >
             <View className="flex-1 bg-background dark:bg-slate-900">
               <WalletConnectProvider>
+                <Stack
+                  screenOptions={{
+                    headerShown: false,
+                    contentStyle: { backgroundColor: colorScheme === 'dark' ? '#0f172a' : '#f8fafc' },
+                  }}
+                >
+                  <Stack.Screen name="index" />
+                  <Stack.Screen name="onboarding" />
+                  <Stack.Screen name="profile" />
+                  <Stack.Screen name="guilds" />
+                  <Stack.Screen name="guilds/[guildId]" />
+                  <Stack.Screen name="access-check" />
+                  <Stack.Screen name="access-scanner" />
+                  <Stack.Screen name="settings" />
+                  <Stack.Screen name="deep-link-error" />
+                </Stack>
                 <DeepLinkHandler />
                 <ScreenErrorBoundary screenName="app-stack">
                   <Stack

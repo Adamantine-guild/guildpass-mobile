@@ -18,12 +18,24 @@ import { useQueryClient } from "@tanstack/react-query";
 
 export default function Guilds() {
   const router = useRouter();
+  const colorScheme = useColorScheme();
+  const { walletAddress, disconnect } = useWallet();
+  const { useEnrichedMemberships } = useMembership(walletAddress);
+  const membershipsQuery = useEnrichedMemberships();
+  const { data: memberships, isLoading, error } = membershipsQuery;
+  const staleState = useStaleQuery(membershipsQuery);
   const { walletAddress } = useWallet();
   const { useWalletGuilds } = useGuilds();
   const guildsQuery = useWalletGuilds(walletAddress);
 
   if (!walletAddress) {
     return (
+      <WalletRequired>
+        <View className="flex-1 bg-background dark:bg-slate-900" testID="guilds-screen">
+          <AppHeader title="My Guilds" showBack />
+          <GuildListSkeleton />
+        </View>
+      </WalletRequired>
       <View className="flex-1 bg-background" testID="guilds-screen">
         <AppHeader title="My Guilds" showBack />
         <EmptyState
@@ -36,6 +48,15 @@ export default function Guilds() {
 
   if (guildsQuery.isLoading) {
     return (
+      <WalletRequired>
+        <View className="flex-1 bg-background dark:bg-slate-900" testID="guilds-screen">
+          <AppHeader title="My Guilds" showBack />
+          {staleState.isOffline ? (
+            <StaleDataBanner reason="offline" lastSyncedAt={staleState.lastSyncedAt} />
+          ) : null}
+          <ErrorState message="Failed to load memberships" />
+        </View>
+      </WalletRequired>
       <View className="flex-1 bg-background" testID="guilds-screen">
         <AppHeader title="My Guilds" showBack />
         <LoadingState message="Loading your guilds..." />
@@ -45,6 +66,41 @@ export default function Guilds() {
 
   if (guildsQuery.isError) {
     return (
+      <WalletRequired>
+        <View className="flex-1 bg-background dark:bg-slate-900" testID="guilds-screen">
+          <AppHeader title="My Guilds" showBack />
+          {staleState.isOffline ? (
+            <StaleDataBanner reason="offline" lastSyncedAt={staleState.lastSyncedAt} />
+          ) : null}
+          <EmptyMembershipsState onConnectDifferentWallet={handleConnectDifferentWallet} />
+        </View>
+      </WalletRequired>
+    );
+  }
+
+  const staleBanner = staleState.isOffline ? (
+    <StaleDataBanner reason="offline" lastSyncedAt={staleState.lastSyncedAt} />
+  ) : staleState.isStale && staleState.reason ? (
+    <StaleDataBanner reason={staleState.reason} lastSyncedAt={staleState.lastSyncedAt} />
+  ) : null;
+
+  const searchHeader = (
+    <View>
+      {staleBanner}
+      <View className="px-4 pt-2 pb-1">
+        <View className="flex-row items-center bg-white dark:bg-slate-800 rounded-xl px-4 py-3 border border-border dark:border-slate-700">
+          <Text className="text-text-muted dark:text-slate-400 mr-2">🔍</Text>
+          <TextInput
+            className="flex-1 text-text dark:text-slate-100 text-base"
+            placeholder="Search guilds..."
+            placeholderTextColor={colorScheme === 'dark' ? '#94a3b8' : '#9ca3af'}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
+            clearButtonMode="while-editing"
+            testID="guild-search-input"
+            accessibilityLabel="Search guilds by name"
       <View className="flex-1 bg-background" testID="guilds-screen">
         <AppHeader title="My Guilds" showBack />
         <ErrorState

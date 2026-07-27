@@ -248,6 +248,20 @@ export default function GuildDetail() {
               <View className="mb-6">
                 <Text className="text-lg font-bold text-text dark:text-slate-100 mb-3">Available Roles</Text>
                 {groupedRequirements.length > 0 ? (
+                  groupedRequirements.map((group) => (
+                    <View key={`${group.chainId}`} className="mb-4">
+                      <Text className="text-sm font-semibold text-text-muted dark:text-slate-400 mb-2">
+                        {group.label}
+                      </Text>
+                      <View
+                        className="flex-row flex-wrap"
+                        testID={`guild-roles-list-${group.chainId}`}
+                      >
+                        {group.requirements.map((role) => (
+                          <RequirementCard
+                            key={role.id}
+                            chainId={role.chainId}
+                            testID={`role-requirement-${role.id}`}
                   groupedRequirements.map((group) => {
                     const availability = availabilityByChain.get(group.chainId);
                     const isUnavailable =

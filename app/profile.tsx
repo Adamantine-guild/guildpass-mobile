@@ -247,6 +247,7 @@ export default function Profile() {
               </Text>
               <View className="mb-4">
                 {walletAddress ? (
+                  <WalletAddress address={walletAddress} testID="connected-wallet-address" />
                   <View className="flex-row items-center justify-between">
                     <WalletAddress address={walletAddress} testID="connected-wallet-address" />
                     {isVerified ? (

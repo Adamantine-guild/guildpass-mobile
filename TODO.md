@@ -19,7 +19,7 @@
 ## Progress
 
 - [x] Repo reconnaissance: reviewed `useAccessCheck`, `access-check` screen, `guild detail` screen, and core access-related hooks.
-- [ ] Locate where backend roles/eligibility requirements are computed for access-check.
-- [ ] Implement resolver module + integration points.
-- [ ] Add tests.
-- [ ] Add docs.
+- [x] Locate where backend roles/eligibility requirements are computed for access-check.
+- [x] Implement resolver module + integration points.
+- [x] Add tests (`roleEligibilityResolver.test.ts`, `useMultiChainRoleEligibility.test.ts`, `accessCheckScreen.test.tsx`).
+- [x] Add docs (`docs/multi-chain-role-eligibility.md`).
