@@ -16,7 +16,10 @@ export interface Session {
 
 /** Adapter interface — implement to add SIWE, WalletConnect auth, or backend sessions */
 export interface SessionAdapter {
+  getAccessToken?(): Promise<string | null>;
   signIn(walletAddress: string): Promise<{ token: string; expiresAt: number }>;
   refresh(token: string): Promise<{ token: string; expiresAt: number }>;
   signOut(token: string): Promise<void>;
+  invalidateSession?(): Promise<void>;
+  isAuthenticated?(): boolean;
 }
