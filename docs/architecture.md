@@ -65,6 +65,29 @@ declared in `src/lib/`, so the fan-out is readable, ordered, and awaitable in on
 Adding a cross-feature transition means adding it to one of these modules, not importing
 another feature's store into a hook or component.
 
+### Wallet providers
+
+Three wallet paths are supported, all converging through the `WalletConnector` interface
+into `useWalletStore`:
+
+| Path | Provider | Connection kind | How it works |
+|---|---|---|---|
+| **Manual entry** | None | `manual` | User pastes an EVM address; `createManualConnector` wraps it |
+| **WalletConnect** | WalletConnect v2 | `walletconnect` | WC modal → EIP-1193 → `createWalletConnectConnector` |
+| **Embedded wallet** | Privy (`@privy-io/expo`) | `embedded` | Email OTP or Google OAuth → Privy provisions MPC wallet → `createEmbeddedConnector` wraps the address |
+
+**Key design principle:** Privy is only the provisioning layer. Once the embedded wallet
+address enters `useWalletStore`, every downstream flow (memberships, guilds, access checks,
+sync, attestations) sees a standard EVM address. No screen or hook needs to know the wallet
+was provisioned by Privy.
+
+The embedded path is feature-flagged via `EXPO_PUBLIC_PRIVY_APP_ID` and
+`EXPO_PUBLIC_PRIVY_CLIENT_ID` environment variables. When both are set,
+`isEmbeddedWalletEnabled` is `true` and the onboarding screen offers the social/email option.
+
+See `docs/embedded-wallet-provider.md` for the provider evaluation, security model, and
+custody trade-off documentation.
+
 ### Selectors
 
 Subscribe with a selector, never by calling the store hook bare. `useWalletStore()`

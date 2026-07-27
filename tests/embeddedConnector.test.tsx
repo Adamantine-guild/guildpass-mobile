@@ -132,3 +132,36 @@ describe("connectEmbeddedWallet", () => {
     expect(viaConnector.connectionKind).toBe(viaEmbeddedHelper.connectionKind);
   });
 });
+
+describe("embedded wallet disconnect", () => {
+  it("calls privyLogout when disconnecting an embedded wallet", async () => {
+    // Set up as if connected via embedded wallet
+    useWalletStore.setState({
+      walletAddress: LOWERCASE_ADDRESS,
+      isConnected: true,
+      connectionKind: "embedded",
+      _hasHydrated: true,
+    });
+
+    // Mock the privySession module that useWallet dynamically imports
+    const mockPrivyLogout = vi.fn().mockResolvedValue(undefined);
+    vi.doMock("../src/features/wallet/privySession", () => ({
+      privyLogout: mockPrivyLogout,
+    }));
+
+    const wallet = mountWallet();
+
+    await act(async () => {
+      await wallet.disconnect();
+    });
+
+    expect(mockPrivyLogout).toHaveBeenCalledOnce();
+
+    const state = useWalletStore.getState();
+    expect(state.walletAddress).toBeNull();
+    expect(state.isConnected).toBe(false);
+    expect(state.connectionKind).toBeNull();
+
+    vi.doUnmock("../src/features/wallet/privySession");
+  });
+});
