@@ -141,6 +141,13 @@ export default function AccessScanner() {
     AccessibilityInfo.announceForAccessibility("Processing access QR code.");
 
     try {
+      AccessibilityInfo.announceForAccessibility("Processing access QR code.");
+      const result = await verifyAndParseAccessQrPayload(data);
+      setVerificationSuccess(true);
+      AccessibilityInfo.announceForAccessibility("Signature verified. Opening access check.");
+    try {
+      AccessibilityInfo.announceForAccessibility("Processing access QR code.");
+      const result = await verifyAndParseAccessQrPayload(data);
       await verifyAndParseAccessQrPayload(data);
       setIsProcessingScan(false);
       setVerificationSuccess(true);
@@ -189,6 +196,18 @@ export default function AccessScanner() {
         errorMessage = describeQrSignatureError(error.code);
         isUntrusted = !isRecoverableError(error);
       } else if (error instanceof QrPayloadError) {
+        if (
+          error.code === QR_PAYLOAD_ERROR_CODES.INVALID_SIGNATURE ||
+          error.code === QR_PAYLOAD_ERROR_CODES.UNSUPPORTED_VERSION ||
+          error.code === QR_PAYLOAD_ERROR_CODES.INVALID_KID
+        ) {
+          errorMessage = error.message;
+          isUntrusted = true;
+        } else if (error.code === QR_PAYLOAD_ERROR_CODES.ALREADY_USED) {
+          errorMessage = "This QR code has already been used.";
+        } else {
+          errorMessage = error.message;
+        }
         errorMessage = describeQrPayloadError(error.code);
         isUntrusted = !isRecoverableError(error);
       }
