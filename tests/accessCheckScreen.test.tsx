@@ -295,11 +295,13 @@ describe("AccessCheck screen", () => {
   it("does not show a wallet warning when the QR payload matches the connected wallet", async () => {
     searchParams.qrPayload = JSON.stringify({
       type: "guildpass.access-check",
-      version: 1,
+      version: 2,
       guildId: "guild-alpha",
       resourceId: "vip-door",
       walletAddress: walletState.walletAddress,
       expiresAt: "2099-01-01T00:00:00.000Z",
+      signature: "dummy-sig",
+      kid: "key-1",
     });
 
     let screen: ReactTestRenderer;
@@ -315,11 +317,13 @@ describe("AccessCheck screen", () => {
   it("shows a warning and allows switching back to the connected wallet when the QR wallet differs", async () => {
     searchParams.qrPayload = JSON.stringify({
       type: "guildpass.access-check",
-      version: 1,
+      version: 2,
       guildId: "guild-alpha",
       resourceId: "vip-door",
       walletAddress: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       expiresAt: "2099-01-01T00:00:00.000Z",
+      signature: "dummy-sig",
+      kid: "key-1",
     });
 
     let screen: ReactTestRenderer;
