@@ -6,7 +6,6 @@
  */
 
 import { isWalletScopedQueryRoot } from "../../lib/queryKeys";
-import { PERSISTABLE_QUERY_KEY_ROOTS } from "../../lib/offlineCache";
 import type {
   SyncCorrection,
   SyncCorrectionSeverity,
@@ -15,11 +14,16 @@ import type {
   SyncEntityKind,
 } from "./sync.types";
 
-/** Query-key roots the reconciliation pass covers: derived from the offline
- * cache allowlist so the two never drift. The "access-check" root is a
- * mutation namespace, not a cached server entity, so it is excluded. */
-export const RECONCILED_QUERY_KEY_ROOTS: readonly SyncEntityKind[] =
-  PERSISTABLE_QUERY_KEY_ROOTS.filter((root): root is SyncEntityKind => root !== "access-check");
+/** Query-key roots the reconciliation pass covers. Being persistable and being
+ * server-reconcilable are separate properties; aggregate/client-only roots
+ * such as "memberships" are persisted but refreshed indirectly. */
+export const RECONCILED_QUERY_KEY_ROOTS: readonly SyncEntityKind[] = [
+  "membership",
+  "user-roles",
+  "guild",
+  "guild-config",
+  "guild-roles",
+];
 
 /**
  * Parses a React Query key into a sync entity descriptor.
