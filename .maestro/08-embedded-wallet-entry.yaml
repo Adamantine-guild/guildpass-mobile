@@ -1,19 +1,67 @@
 appId: xyz.guildpass.mobile
 ---
-# E2E Test: Embedded wallet entry point
+# E2E Test: Embedded wallet onboarding flow
+#
 # Run this flow in a build configured with EXPO_PUBLIC_PRIVY_APP_ID and
 # EXPO_PUBLIC_PRIVY_CLIENT_ID. OTP completion is intentionally not automated:
 # it requires a real email inbox and verifies the provider-hosted flow.
+#
+# CI note: For automated CI runs, use a Privy test-mode app ID that returns
+# deterministic OTP codes, or mock the Privy SDK at the provider level.
 
 - launchApp:
     clearState: true
+
+# ── Onboarding screen renders ─────────────────────────────────────────
 - assertVisible:
     id: "onboarding-screen"
 - assertVisible:
     id: "onboarding-embedded-wallet-button"
+
+# ── Tap into embedded wallet flow ──────────────────────────────────────
 - tapOn:
     id: "onboarding-embedded-wallet-button"
 - assertVisible:
     id: "embedded-wallet-onboarding"
+
+# ── Custody disclosure is visible before sign-in ───────────────────────
+- assertVisible:
+    id: "custody-disclosure"
+- assertVisible:
+    text: "About your embedded wallet"
+
+# ── Expand disclosure and verify detail content ────────────────────────
+- tapOn:
+    id: "custody-disclosure-toggle"
+- assertVisible:
+    id: "custody-disclosure-details"
+- assertVisible:
+    text: "How your keys are secured"
+- assertVisible:
+    text: "Trade-offs vs. self-custody"
+- assertVisible:
+    id: "custody-disclosure-learn-more"
+
+# ── Collapse disclosure ────────────────────────────────────────────────
+- tapOn:
+    id: "custody-disclosure-toggle"
+- assertNotVisible:
+    id: "custody-disclosure-details"
+
+# ── Sign-in UI elements are present ───────────────────────────────────
+- assertVisible:
+    id: "social-google-button"
 - assertVisible:
     id: "embedded-wallet-email-input"
+- assertVisible:
+    id: "embedded-wallet-email-button"
+
+# ── "I have a wallet" back button returns to onboarding choice ─────────
+- assertVisible:
+    id: "embedded-wallet-back-button"
+- tapOn:
+    id: "embedded-wallet-back-button"
+- assertVisible:
+    id: "onboarding-embedded-wallet-button"
+- assertVisible:
+    id: "onboarding-get-started-button"

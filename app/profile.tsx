@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, TouchableOpacity } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, RefreshControl } from "react-native";
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "expo-router";
 import { useWallet } from "../src/features/wallet/useWallet";
@@ -25,13 +25,25 @@ const CONNECTION_LABELS: Record<string, string> = {
 
 export default function Profile() {
   const router = useRouter();
-  const { walletAddress, isConnected, connectionKind, connectManually, disconnect } = useWallet();
+  const { walletAddress, isConnected, connectionKind, isVerified, verifyOwnership, connectManually, disconnect } = useWallet();
   const { open } = useWalletConnectModal();
   const { isOffline } = useNetworkStatus();
   const [inputValue, setInputValue] = useState(walletAddress || "");
   const [error, setError] = useState<string | null>(null);
   const [showManualEntry, setShowManualEntry] = useState(false);
   const [wcConnecting, setWcConnecting] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+
+  const handleVerifyOwnership = async () => {
+    setIsVerifying(true);
+    setVerifyError(null);
+    const { success, error } = await verifyOwnership();
+    if (!success) {
+      setVerifyError(error || "Verification failed");
+    }
+    setIsVerifying(false);
+  };
 
   // ── Field-level validation state ────────────────────────────────────
   const [fieldError, setFieldError] = useState<string | null>(null);
@@ -118,10 +130,31 @@ export default function Profile() {
   const membershipsQuery = useMembershipsQuery();
   const staleState = useStaleQuery(membershipsQuery);
 
+  // ── Pull-to-refresh ─────────────────────────────────────────────────
+  const [isManuallyRefreshing, setIsManuallyRefreshing] = useState(false);
+
+  const handleRefresh = useCallback(async () => {
+    if (!isConnected) return;
+    setIsManuallyRefreshing(true);
+    try {
+      await membershipsQuery.refetch();
+    } finally {
+      setIsManuallyRefreshing(false);
+    }
+  }, [isConnected, membershipsQuery.refetch]);
+
+  const isRefreshing = isConnected && (isManuallyRefreshing || membershipsQuery.isRefetching);
+
   return (
     <View className="flex-1 bg-background dark:bg-slate-900" testID="profile-screen">
       <AppHeader title="Profile" />
-      <ScrollView className="flex-1 px-4 py-6">
+      <ScrollView
+        className="flex-1 px-4 py-6"
+        testID="profile-scroll-view"
+        refreshControl={
+          <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} testID="profile-refresh-control" />
+        }
+      >
         {staleState.isOffline ? (
           <StaleDataBanner reason="offline" lastSyncedAt={staleState.lastSyncedAt} />
         ) : staleState.isStale && staleState.reason ? (
@@ -215,8 +248,41 @@ export default function Profile() {
               <View className="mb-4">
                 {walletAddress ? (
                   <WalletAddress address={walletAddress} testID="connected-wallet-address" />
+                  <View className="flex-row items-center justify-between">
+                    <WalletAddress address={walletAddress} testID="connected-wallet-address" />
+                    {isVerified ? (
+                      <View className="bg-green-100 dark:bg-green-900/30 px-2 py-1 rounded">
+                        <Text className="text-green-700 dark:text-green-400 text-xs font-bold">✓ Verified</Text>
+                      </View>
+                    ) : connectionKind === "manual" ? (
+                      <View className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">
+                        <Text className="text-slate-500 dark:text-slate-400 text-xs font-bold">Unverified</Text>
+                      </View>
+                    ) : null}
+                  </View>
                 ) : null}
               </View>
+
+              {!isVerified && connectionKind !== "manual" ? (
+                <View className="mb-4 p-3 bg-primary/10 dark:bg-primary/5 rounded-lg border border-primary/20">
+                  <Text className="text-text dark:text-slate-100 text-sm mb-2 font-medium">
+                    Verify Ownership
+                  </Text>
+                  <Text className="text-text-muted dark:text-slate-400 text-xs mb-3">
+                    Sign a message to verify you control this wallet and unlock full access.
+                  </Text>
+                  {verifyError ? (
+                    <Text className="text-red-500 text-xs mb-3">{verifyError}</Text>
+                  ) : null}
+                  <Button
+                    title={isVerifying ? "Verifying..." : "Verify Wallet"}
+                    onPress={handleVerifyOwnership}
+                    loading={isVerifying}
+                    testID="verify-ownership-button"
+                  />
+                </View>
+              ) : null}
+
               <Button
                 title="Disconnect"
                 onPress={handleDisconnect}

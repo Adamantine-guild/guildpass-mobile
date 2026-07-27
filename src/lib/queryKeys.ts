@@ -59,9 +59,6 @@ export const PERSISTABLE_QUERY_ROOTS: readonly QueryRoot[] = [
   QUERY_ROOTS.GUILD,
   QUERY_ROOTS.GUILD_CONFIG,
   QUERY_ROOTS.GUILD_ROLES,
-  QUERY_ROOTS.ACCESS_CHECK,
-  QUERY_ROOTS.PROFILE,
-  QUERY_ROOTS.USER_PROFILE,
 ];
 
 export function isPersistableQuery(queryKey: readonly unknown[]): boolean {

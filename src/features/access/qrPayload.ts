@@ -40,20 +40,34 @@ export class QrPayloadError extends Error {
 }
 
 const QR_PAYLOAD_ERROR_MESSAGES: Record<QrPayloadErrorCode, string> = {
-  [QR_PAYLOAD_ERROR_CODES.MALFORMED_JSON]: "QR code is not a supported GuildPass access payload.",
-  [QR_PAYLOAD_ERROR_CODES.MALFORMED_PAYLOAD]: "QR code payload is malformed.",
-  [QR_PAYLOAD_ERROR_CODES.UNSUPPORTED_TYPE]: "QR code payload type is not supported.",
-  [QR_PAYLOAD_ERROR_CODES.UNSUPPORTED_VERSION]: "QR code payload version is not supported. Please update your app to scan this QR code.",
-  [QR_PAYLOAD_ERROR_CODES.MISSING_GUILD_ID]: "QR code is missing a valid guild ID.",
-  [QR_PAYLOAD_ERROR_CODES.MISSING_RESOURCE_ID]: "QR code is missing a valid resource ID.",
-  [QR_PAYLOAD_ERROR_CODES.INVALID_WALLET_ADDRESS]: "QR code contains an invalid wallet address.",
-  [QR_PAYLOAD_ERROR_CODES.INVALID_WALLET_CHECKSUM]: "QR code contains a wallet address with an invalid checksum. Please rescan the code or contact the guild issuer.",
-  [QR_PAYLOAD_ERROR_CODES.INVALID_EXPIRATION]: "QR code contains an invalid expiration time.",
-  [QR_PAYLOAD_ERROR_CODES.EXPIRED]: "This QR code has expired.",
-  [QR_PAYLOAD_ERROR_CODES.INVALID_SIGNATURE]: "QR code contains an invalid signature.",
-  [QR_PAYLOAD_ERROR_CODES.INVALID_NONCE]: "QR code contains an invalid nonce.",
-  [QR_PAYLOAD_ERROR_CODES.INVALID_KID]: "QR code contains an invalid key ID.",
-  [QR_PAYLOAD_ERROR_CODES.ALREADY_USED]: "This QR code has already been used.",
+  [QR_PAYLOAD_ERROR_CODES.MALFORMED_JSON]:
+    "This doesn't look like a GuildPass QR code. Make sure you're scanning a valid GuildPass access code.",
+  [QR_PAYLOAD_ERROR_CODES.MALFORMED_PAYLOAD]:
+    "The QR code couldn't be read properly. Try scanning again in better lighting, or ask the guild admin for a fresh code.",
+  [QR_PAYLOAD_ERROR_CODES.UNSUPPORTED_TYPE]:
+    "This QR code type isn't supported. Make sure you're scanning a GuildPass access check code.",
+  [QR_PAYLOAD_ERROR_CODES.UNSUPPORTED_VERSION]:
+    "This QR code uses a newer format. Please update GuildPass to the latest version from the app store to scan it.",
+  [QR_PAYLOAD_ERROR_CODES.MISSING_GUILD_ID]:
+    "This QR code is missing guild information. Ask the guild admin to issue a valid access code.",
+  [QR_PAYLOAD_ERROR_CODES.MISSING_RESOURCE_ID]:
+    "This QR code is missing resource information. Ask the guild admin to issue a valid access code.",
+  [QR_PAYLOAD_ERROR_CODES.INVALID_WALLET_ADDRESS]:
+    "The wallet address in this QR code is invalid. Ask the guild admin to issue a corrected code.",
+  [QR_PAYLOAD_ERROR_CODES.INVALID_WALLET_CHECKSUM]:
+    "The wallet address in this QR code has a checksum error. Try rescanning the code in better lighting, or ask the guild admin to issue a new one.",
+  [QR_PAYLOAD_ERROR_CODES.INVALID_EXPIRATION]:
+    "This QR code has an invalid expiration. Ask the guild admin to issue a new access code.",
+  [QR_PAYLOAD_ERROR_CODES.EXPIRED]:
+    "This QR code has expired. Ask the guild admin to issue a new access code for entry.",
+  [QR_PAYLOAD_ERROR_CODES.INVALID_SIGNATURE]:
+    "The QR code signature is invalid. Do not use this code; ask the guild admin for a fresh one.",
+  [QR_PAYLOAD_ERROR_CODES.INVALID_NONCE]:
+    "This QR code has an invalid security token. Ask the guild admin to issue a new code.",
+  [QR_PAYLOAD_ERROR_CODES.INVALID_KID]:
+    "This QR code uses an unrecognized key. Ask the guild admin to issue a new access code.",
+  [QR_PAYLOAD_ERROR_CODES.ALREADY_USED]:
+    "This QR code has already been used. Each access code can only be used once. Ask the guild admin for a new code.",
 };
 
 export const describeQrPayloadError = (code: QrPayloadErrorCode): string =>

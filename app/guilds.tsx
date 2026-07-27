@@ -1,6 +1,7 @@
 import { View, FlatList, TextInput, TouchableOpacity, Text, RefreshControl, useColorScheme } from "react-native";
 import { useRouter } from "expo-router";
 import { useWallet } from "../src/features/wallet/useWallet";
+import { useGuilds } from "../src/features/guilds/useGuilds";
 import { AppHeader } from "../src/components/AppHeader";
 import { GuildCard } from "../src/components/GuildCard";
 import { GuildListSkeleton } from "../src/components/GuildCardSkeleton";
@@ -23,32 +24,11 @@ export default function Guilds() {
   const membershipsQuery = useEnrichedMemberships();
   const { data: memberships, isLoading, error } = membershipsQuery;
   const staleState = useStaleQuery(membershipsQuery);
+  const { walletAddress } = useWallet();
+  const { useWalletGuilds } = useGuilds();
+  const guildsQuery = useWalletGuilds(walletAddress);
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const debouncedQuery = useDebouncedValue(searchQuery, 300);
-
-  const filteredMemberships = useMemo(() => {
-    if (!memberships) return [];
-    const query = debouncedQuery.trim().toLowerCase();
-    if (!query) return memberships;
-    return memberships.filter((m) => m.guildName.toLowerCase().includes(query));
-  }, [memberships, debouncedQuery]);
-
-  const handleConnectDifferentWallet = async () => {
-    await disconnect();
-    router.replace("/profile");
-  };
-
-  const queryClient = useQueryClient();
-  const [isRefetching, setIsRefetching] = useState(false);
-
-  const handleRefresh = useCallback(async () => {
-    setIsRefetching(true);
-    await queryClient.invalidateQueries({ queryKey: ["memberships", walletAddress] });
-    setIsRefetching(false);
-  }, [queryClient, walletAddress]);
-
-  if (isLoading) {
+  if (!walletAddress) {
     return (
       <WalletRequired>
         <View className="flex-1 bg-background dark:bg-slate-900" testID="guilds-screen">
@@ -56,10 +36,17 @@ export default function Guilds() {
           <GuildListSkeleton />
         </View>
       </WalletRequired>
+      <View className="flex-1 bg-background" testID="guilds-screen">
+        <AppHeader title="My Guilds" showBack />
+        <EmptyState
+          title="Connect Wallet"
+          message="Connect a wallet to load your GuildPass guilds."
+        />
+      </View>
     );
   }
 
-  if (error && !memberships) {
+  if (guildsQuery.isLoading) {
     return (
       <WalletRequired>
         <View className="flex-1 bg-background dark:bg-slate-900" testID="guilds-screen">
@@ -70,10 +57,14 @@ export default function Guilds() {
           <ErrorState message="Failed to load memberships" />
         </View>
       </WalletRequired>
+      <View className="flex-1 bg-background" testID="guilds-screen">
+        <AppHeader title="My Guilds" showBack />
+        <LoadingState message="Loading your guilds..." />
+      </View>
     );
   }
 
-  if (!memberships || memberships.length === 0) {
+  if (guildsQuery.isError) {
     return (
       <WalletRequired>
         <View className="flex-1 bg-background dark:bg-slate-900" testID="guilds-screen">
@@ -110,6 +101,41 @@ export default function Guilds() {
             clearButtonMode="while-editing"
             testID="guild-search-input"
             accessibilityLabel="Search guilds by name"
+      <View className="flex-1 bg-background" testID="guilds-screen">
+        <AppHeader title="My Guilds" showBack />
+        <ErrorState
+          message={
+            guildsQuery.error instanceof Error
+              ? guildsQuery.error.message
+              : "Unable to load your guilds."
+          }
+          onRetry={() => void guildsQuery.refetch()}
+        />
+      </View>
+    );
+  }
+
+  return (
+    <View className="flex-1 bg-background" testID="guilds-screen">
+      <AppHeader title="My Guilds" showBack />
+      <FlatList
+        data={guildsQuery.data ?? []}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={{ padding: 16 }}
+        testID="guilds-list"
+        renderItem={({ item }) => (
+          <GuildCard
+            name={item.name}
+            id={item.id}
+            isActive={item.isActive}
+            roleCount={item.roleCount ?? 0}
+            onPress={() => router.push(`/guilds/${item.id}`)}
+          />
+        )}
+        ListEmptyComponent={
+          <EmptyState
+            title="No Guilds Found"
+            message="This wallet is not a member of any guilds yet."
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity

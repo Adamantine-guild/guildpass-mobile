@@ -11,11 +11,14 @@ export type WalletState = {
   isConnected: boolean;
   /** Which provider established the current connection */
   connectionKind: WalletConnectionKind;
+  /** Whether ownership of the wallet has been verified via a signature */
+  isVerified: boolean;
   _hasHydrated: boolean;
 };
 
 export type WalletActions = {
-  setWalletAddress: (address: string | null, kind?: WalletConnectionKind) => void;
+  setWalletAddress: (address: string | null, kind?: WalletConnectionKind, isVerified?: boolean) => void;
+  setVerified: (status: boolean) => void;
   disconnect: () => void;
   setHasHydrated: (state: boolean) => void;
 };

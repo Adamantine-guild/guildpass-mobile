@@ -1,0 +1,32 @@
+appId: xyz.guildpass.mobile
+---
+# E2E Test: Embedded wallet disconnect flow
+#
+# Verifies that an embedded-wallet connection displays the correct connection
+# label on the profile screen and that disconnect returns the user to onboarding.
+#
+# Prerequisites: This flow assumes the app is already connected with an embedded
+# wallet. In CI, seed the wallet store directly via Maestro's runScript or use a
+# Privy test-mode build that auto-completes login.
+#
+# NOTE: Full Privy SDK logout verification cannot be done in E2E without mocking
+# the provider. This test verifies the UI contract: disconnect clears the wallet
+# state and navigates back to onboarding.
+
+# ── Verify embedded wallet is shown on profile ─────────────────────────
+- assertVisible:
+    id: "profile-screen"
+- assertVisible:
+    id: "profile-connected"
+- assertVisible:
+    text: "Embedded Wallet"
+- assertVisible:
+    id: "connected-wallet-address"
+
+# ── Disconnect ─────────────────────────────────────────────────────────
+- tapOn:
+    id: "wallet-disconnect-button"
+
+# ── Verify return to wallet connect form ───────────────────────────────
+- assertVisible:
+    id: "wallet-connect-form"

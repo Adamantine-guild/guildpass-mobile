@@ -1,0 +1,21 @@
+appId: xyz.guildpass.mobile
+---
+# E2E Test: Access Check Deep Link Missing resourceId
+# Validates: Malformed access-check links show the specific parameter error.
+
+- launchApp:
+    clearState: true
+
+- openLink:
+    link: "guildpass://access-check?guildId=alpha-guild"
+
+- extendedWaitUntil:
+    visible:
+      id: "deep-link-error-screen"
+    timeout: 10000
+- assertVisible:
+    text: "Invalid Link"
+- assertVisible:
+    text: "Access check link requires both guildId and resourceId parameters."
+- assertNotVisible:
+    text: "The link you followed is not supported or is malformed."

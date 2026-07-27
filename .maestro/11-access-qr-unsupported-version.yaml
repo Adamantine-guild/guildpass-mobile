@@ -1,0 +1,33 @@
+appId: xyz.guildpass.mobile
+---
+# E2E Test: Unsupported QR Version
+# Validates: Scanner rejects a future/unsupported QR payload version with the update guidance.
+
+- launchApp:
+    clearState: true
+    permissions:
+      camera: allow
+
+# Open access check directly so the scanner route is reachable without API data.
+- openLink:
+    link: "guildpass://access-check?guildId=alpha-guild&resourceId=vip-door"
+- extendedWaitUntil:
+    visible:
+      id: "access-check-screen"
+    timeout: 10000
+
+# Navigate to scanner and simulate the unsupported-version QR fixture.
+- tapOn:
+    id: "scan-qr-button"
+- assertVisible:
+    text: "Point your camera at a GuildPass access QR code."
+- tapOn:
+    id: "test-unsupported-qr-version-scan"
+
+# Assert the specific error state, not the generic fallback.
+- assertVisible:
+    text: "Untrusted QR code"
+- assertVisible:
+    text: "QR code payload version is not supported. Please update your app to scan this QR code."
+- assertNotVisible:
+    text: "Unable to read QR payload."

@@ -227,6 +227,8 @@ export const useAccessCheck = () => {
     mutateAsync,
     perChainRoleEligibility: multiChain.perChain as PerChainRoleEligibilityResolution[],
     isResolvingRoleEligibility: multiChain.isResolving,
+    resolvingRoleEligibilityChainIds: multiChain.resolvingChainIds,
+    retryRoleEligibilityChain: multiChain.retryChain,
     roleEligibilityError: multiChain.error,
   };
 };

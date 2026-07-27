@@ -17,6 +17,9 @@ const buildPayload = (overrides = {}) =>
     guildId: "guild_abc",
     resourceId: "vip-door",
     expiresAt: "2026-06-23T12:05:00.000Z",
+    kid: "test-kid",
+    signature: "fake-signature",
+    nonce: "fake-nonce",
     ...overrides,
   });
 
@@ -25,7 +28,7 @@ describe("SUPPORTED_QR_PAYLOAD_VERSIONS", () => {
     expect(SUPPORTED_QR_PAYLOAD_VERSIONS).toEqual([
       {
         type: "guildpass.access-check",
-        version: 1,
+        version: 2,
       },
     ]);
   });
@@ -45,6 +48,8 @@ describe("parseAccessQrPayload", () => {
       resourceId: "vip-door",
       walletAddress: "0x1234567890123456789012345678901234567890",
       expiresAt: "2026-06-23T12:05:00.000Z",
+      kid: "test-kid",
+      nonce: "fake-nonce",
     });
   });
 
@@ -86,7 +91,7 @@ describe("parseAccessQrPayload", () => {
 
   it("rejects unsupported payload versions with QR_PAYLOAD_UNSUPPORTED_VERSION code and update suggestion", () => {
     try {
-      parseAccessQrPayload(buildPayload({ version: 2 }), now);
+      parseAccessQrPayload(buildPayload({ version: 1 }), now);
       expect.fail("Should have thrown QrPayloadError");
     } catch (e) {
       expect(e).toBeInstanceOf(QrPayloadError);
@@ -97,9 +102,9 @@ describe("parseAccessQrPayload", () => {
     }
   });
 
-  it("distinguishes version: 2 from unknown type values by error code", () => {
+  it("distinguishes version: 1 from unknown type values by error code", () => {
     try {
-      parseAccessQrPayload(buildPayload({ version: 2 }), now);
+      parseAccessQrPayload(buildPayload({ version: 1 }), now);
       expect.fail("Should have thrown");
     } catch (e) {
       expect((e as QrPayloadError).code).toBe(QR_PAYLOAD_ERROR_CODES.UNSUPPORTED_VERSION);
@@ -113,7 +118,7 @@ describe("parseAccessQrPayload", () => {
     }
 
     try {
-      parseAccessQrPayload(buildPayload({ type: "unknown.type", version: 2 }), now);
+      parseAccessQrPayload(buildPayload({ type: "unknown.type", version: 1 }), now);
       expect.fail("Should have thrown");
     } catch (e) {
       expect((e as QrPayloadError).code).toBe(QR_PAYLOAD_ERROR_CODES.UNSUPPORTED_TYPE);
@@ -139,6 +144,8 @@ describe("parseAccessQrPayload", () => {
       guildId: "guild_abc",
       resourceId: "vip-door",
       expiresAt: "2026-06-23T12:05:00.000Z",
+      kid: "test-kid",
+      nonce: "fake-nonce",
     });
   });
 
