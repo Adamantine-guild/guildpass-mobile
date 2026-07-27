@@ -20,12 +20,8 @@ import { hashKey } from "@tanstack/react-query";
 import type { QueryClient } from "@tanstack/react-query";
 import { computeEntityVersion, describeSyncableQuery, diffEntity } from "./reconcile";
 import { prioritizeDescriptors } from "./syncPriority";
-import {
-  DEFAULT_RETRY_CONFIG,
-  RetryAborted,
-  runWithRetry,
-  type RetryConfig,
-} from "./retryPolicy";
+import { rebuildMembershipsAggregateFromCache } from "../passes/passCache";
+import { DEFAULT_RETRY_CONFIG, RetryAborted, runWithRetry, type RetryConfig } from "./retryPolicy";
 import type {
   SyncCorrection,
   SyncEntityDescriptor,
@@ -198,15 +194,23 @@ export function createSyncEngine(deps: SyncEngineDeps): SyncEngine {
     const corrections: SyncCorrection[] = [];
     const errors: SyncRunError[] = [];
     const metaEntries: Record<string, SyncEntityMeta> = {};
+    const walletsToRefresh = new Set<string>();
     let entitiesUpdated = 0;
     let abortedOffline = false;
 
     results.forEach((result, index) => {
+      const descriptor = descriptors[index];
       if (result.status === "fulfilled") {
         if (result.value === null) return; // entity vanished mid-pass
         corrections.push(...result.value.corrections);
         metaEntries[result.value.metaKey] = result.value.meta;
         if (result.value.updated) entitiesUpdated += 1;
+        if (
+          descriptor.walletAddress &&
+          (descriptor.kind === "membership" || descriptor.kind === "user-roles")
+        ) {
+          walletsToRefresh.add(descriptor.walletAddress);
+        }
       } else if (result.reason instanceof RetryAborted) {
         // Connectivity vanished mid-pass. Not an entity error: the entity was
         // never disproven, so it keeps its existing meta and is left for the
@@ -225,6 +229,9 @@ export function createSyncEngine(deps: SyncEngineDeps): SyncEngine {
     // forward progress instead of being discarded wholesale.
     syncStore.getState().recordEntityMetaBatch(metaEntries);
     syncStore.getState().addCorrections(corrections);
+    walletsToRefresh.forEach((walletAddress) => {
+      rebuildMembershipsAggregateFromCache(queryClient, walletAddress);
+    });
 
     const finishedAt = now();
     if (errors.length > 0) {

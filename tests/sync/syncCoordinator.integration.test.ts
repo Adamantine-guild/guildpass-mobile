@@ -371,12 +371,8 @@ describe("sync under intermittent connectivity", () => {
     await pass;
 
     // And the full order still has every tier-1 entity ahead of every tier-2.
-    const lastTierOne = order.findLastIndex(
-      (k) => k === "membership" || k === "user-roles",
-    );
-    const firstTierTwo = order.findIndex(
-      (k) => k !== "membership" && k !== "user-roles",
-    );
+    const lastTierOne = order.findLastIndex((k) => k === "membership" || k === "user-roles");
+    const firstTierTwo = order.findIndex((k) => k !== "membership" && k !== "user-roles");
     expect(lastTierOne).toBeLessThan(firstTierTwo);
   });
 
@@ -485,10 +481,17 @@ describe("sync under intermittent connectivity", () => {
 
     expect(summary?.status).toBe("completed");
     expect(summary?.errors).toStrictEqual([]);
-    // The unreconcilable entry is skipped, not counted and not destroyed.
+    // The unreconcilable entry is skipped, not counted, and refreshed from
+    // reconciled membership/role entities rather than left stale.
     expect(summary?.entitiesChecked).toBe(2);
     expect(queryClient.getQueryData(["memberships", TEST_WALLET_ADDRESS])).toStrictEqual([
-      { guildId: GUILD_ID },
+      {
+        guildId: GUILD_ID,
+        isActive: true,
+        roleCount: 2,
+        status: "active",
+        lastSyncedAt: expect.any(Number),
+      },
     ]);
     expect(useSyncStore.getState().status).toBe("idle");
   });

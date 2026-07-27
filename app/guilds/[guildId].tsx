@@ -28,6 +28,11 @@ import type {
   AccessRequirement,
   PerChainRoleEligibilityResolution,
 } from "../../src/features/access/roleEligibilityResolver";
+import {
+  getGuildPassStatusLabel,
+  resolveGuildPassStatus,
+  type GuildPassStatus,
+} from "../../src/features/passes/passCache";
 import React from "react";
 
 type GuildDetailRole = {
@@ -35,6 +40,42 @@ type GuildDetailRole = {
   name: string;
   chainId?: number;
   requirements?: AccessRequirement[];
+};
+
+const MEMBERSHIP_STATUS_STYLES: Record<
+  GuildPassStatus,
+  { text: string; border: string; cachePill: string; cacheText: string }
+> = {
+  active: {
+    text: "text-success dark:text-green-400",
+    border: "border-success/30 dark:border-green-600/50",
+    cachePill: "bg-success/10",
+    cacheText: "text-success",
+  },
+  inactive: {
+    text: "text-text-muted dark:text-slate-400",
+    border: "",
+    cachePill: "bg-text-muted/10",
+    cacheText: "text-text-muted",
+  },
+  expired: {
+    text: "text-secondary",
+    border: "border-secondary/40",
+    cachePill: "bg-secondary/10",
+    cacheText: "text-secondary",
+  },
+  revoked: {
+    text: "text-error",
+    border: "border-error/40",
+    cachePill: "bg-error/10",
+    cacheText: "text-error",
+  },
+  unknown: {
+    text: "text-text-muted dark:text-slate-400",
+    border: "",
+    cachePill: "bg-text-muted/10",
+    cacheText: "text-text-muted",
+  },
 };
 
 function ChainUnavailableState({
@@ -104,6 +145,10 @@ export default function GuildDetail() {
   const { data: guildConfig } = guildConfigQuery;
 
   const staleState = useCombinedStaleState([guildQuery, membershipQuery, rolesQuery]);
+  const membershipStatus = resolveGuildPassStatus(membership);
+  const membershipStatusLabel = getGuildPassStatusLabel(membershipStatus);
+  const membershipStatusStyle = MEMBERSHIP_STATUS_STYLES[membershipStatus];
+  const isShowingCachedMembership = staleState.isOffline && membership !== undefined;
   const fallbackChainId = guild?.chainId ?? 1;
   const detailRoles = roles as GuildDetailRole[] | undefined;
   const normalizedRequirements = normalizeRoleRequirements(
@@ -125,17 +170,14 @@ export default function GuildDetail() {
     enabled: !!validGuildId && !!walletAddress && !!detailRoles,
   });
   const availabilityByChain = React.useMemo(
-    () =>
-      new Map(
-        chainAvailability.perChain.map((chain) => [chain.chainId, chain] as const),
-      ),
+    () => new Map(chainAvailability.perChain.map((chain) => [chain.chainId, chain] as const)),
     [chainAvailability.perChain],
   );
   const guildChainLabel =
     groupedRequirements.length === 0
-      ? isKnownChainId(guild?.chainId ?? 1)
-        ? `${getChainDisplayName(guild?.chainId ?? 1)} (${guild?.chainId ?? 1})`
-        : `Unsupported network (chain: ${guild?.chainId ?? 1})`
+      ? isKnownChainId(fallbackChainId)
+        ? `${getChainDisplayName(fallbackChainId)} (${fallbackChainId})`
+        : `Unsupported network (chain: ${fallbackChainId})`
       : groupedRequirements.length === 1
         ? groupedRequirements[0]?.label
         : `Multiple networks (${groupedRequirements.map((group) => group.label).join(", ")})`;
@@ -202,10 +244,16 @@ export default function GuildDetail() {
               ) : null}
 
               <Card className="mb-6">
-                <Text className="text-2xl font-bold text-text dark:text-slate-100 mb-2" testID="guild-name">
+                <Text
+                  className="text-2xl font-bold text-text dark:text-slate-100 mb-2"
+                  testID="guild-name"
+                >
                   {guild.name}
                 </Text>
-                <Text className="text-text-muted dark:text-slate-400 mb-4" testID="guild-description">
+                <Text
+                  className="text-text-muted dark:text-slate-400 mb-4"
+                  testID="guild-description"
+                >
                   {guild.description || "No description provided."}
                 </Text>
 
@@ -227,41 +275,45 @@ export default function GuildDetail() {
               </Card>
 
               <View className="mb-6">
-                <Text className="text-lg font-bold text-text dark:text-slate-100 mb-3">Your Membership</Text>
+                <Text className="text-lg font-bold text-text dark:text-slate-100 mb-3">
+                  Your Membership
+                </Text>
                 <Card
-                  className={membership?.isActive ? "border-success/30 dark:border-green-600/50" : ""}
-                  accessibilityLabel={`Membership status: ${membership?.isActive ? "Active Member" : "Not a Member"}`}
+                  className={membershipStatusStyle.border}
+                  accessibilityLabel={`Membership status: ${membershipStatusLabel}${
+                    isShowingCachedMembership ? ", cached offline" : ""
+                  }`}
                   testID="membership-status-card"
                 >
                   <View className="flex-row justify-between items-center">
                     <Text className="text-text dark:text-slate-100 font-medium">Status</Text>
                     <Text
-                      className={`font-bold ${membership?.isActive ? "text-success dark:text-green-400" : "text-text-muted dark:text-slate-400"}`}
+                      className={`font-bold ${membershipStatusStyle.text}`}
                       testID="membership-status-text"
                     >
-                      {membership?.isActive ? "Active Member" : "Not a Member"}
+                      {membershipStatusLabel}
                     </Text>
                   </View>
+                  {isShowingCachedMembership ? (
+                    <View className="flex-row justify-end mt-3">
+                      <View className={`px-3 py-1 rounded-full ${membershipStatusStyle.cachePill}`}>
+                        <Text
+                          className={`text-xs font-bold ${membershipStatusStyle.cacheText}`}
+                          testID="membership-offline-cache-pill"
+                        >
+                          Cached offline
+                        </Text>
+                      </View>
+                    </View>
+                  ) : null}
                 </Card>
               </View>
 
               <View className="mb-6">
-                <Text className="text-lg font-bold text-text dark:text-slate-100 mb-3">Available Roles</Text>
+                <Text className="text-lg font-bold text-text dark:text-slate-100 mb-3">
+                  Available Roles
+                </Text>
                 {groupedRequirements.length > 0 ? (
-                  groupedRequirements.map((group) => (
-                    <View key={`${group.chainId}`} className="mb-4">
-                      <Text className="text-sm font-semibold text-text-muted dark:text-slate-400 mb-2">
-                        {group.label}
-                      </Text>
-                      <View
-                        className="flex-row flex-wrap"
-                        testID={`guild-roles-list-${group.chainId}`}
-                      >
-                        {group.requirements.map((role) => (
-                          <RequirementCard
-                            key={role.id}
-                            chainId={role.chainId}
-                            testID={`role-requirement-${role.id}`}
                   groupedRequirements.map((group) => {
                     const availability = availabilityByChain.get(group.chainId);
                     const isUnavailable =
@@ -315,7 +367,9 @@ export default function GuildDetail() {
                     );
                   })
                 ) : (
-                  <Text className="text-text-muted dark:text-slate-400 italic">No roles defined for this guild.</Text>
+                  <Text className="text-text-muted dark:text-slate-400 italic">
+                    No roles defined for this guild.
+                  </Text>
                 )}
               </View>
             </ScrollView>

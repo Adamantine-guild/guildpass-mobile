@@ -19,6 +19,7 @@ import {
 } from "../../src/features/sync/syncEngine";
 import { useSyncStore } from "../../src/features/sync/sync.store";
 import { computeEntityVersion } from "../../src/features/sync/reconcile";
+import { queryKeys } from "../../src/lib/queryKeys";
 import {
   MEMBERSHIP_ACTIVE_FIXTURE,
   TEST_WALLET_ADDRESS,
@@ -128,6 +129,41 @@ describe("sync engine – acceptance scenario: cached grant revoked server-side"
     });
     expect(useSyncStore.getState().status).toBe("idle");
     expect(useSyncStore.getState().lastSyncCompletedAt).toBe(now);
+  });
+
+  it("refreshes the wallet pass list aggregate after reconnect reconciliation", async () => {
+    queryClient.setQueryData(queryKeys.memberships.byWallet(TEST_WALLET_ADDRESS), [
+      {
+        guildId: "guild_abc",
+        isActive: true,
+        roleCount: 2,
+        status: "active",
+      },
+    ]);
+    const engine = createSyncEngine({
+      queryClient,
+      fetchers: makeFetchers({
+        membership: vi.fn().mockResolvedValue({ ...MEMBERSHIP_REVOKED, status: "revoked" }),
+        "user-roles": vi.fn().mockResolvedValue([]),
+      }),
+      syncStore: useSyncStore,
+      sleep: async () => {},
+      isOnline: () => true,
+    });
+
+    await engine.runReconciliation();
+
+    expect(
+      queryClient.getQueryData(queryKeys.memberships.byWallet(TEST_WALLET_ADDRESS)),
+    ).toStrictEqual([
+      {
+        guildId: "guild_abc",
+        isActive: false,
+        roleCount: 0,
+        status: "revoked",
+        lastSyncedAt: expect.any(Number),
+      },
+    ]);
   });
 });
 

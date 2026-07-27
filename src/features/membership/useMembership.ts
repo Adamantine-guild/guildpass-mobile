@@ -1,65 +1,110 @@
-import { useQuery, useQueries } from "@tanstack/react-query";
+import { onlineManager, useQuery, useQueries, useQueryClient } from "@tanstack/react-query";
 import { guildPassClient } from "../../lib/guildpassClient";
 import { queryKeys } from "../../lib/queryKeys";
+import {
+  getCachedMembershipSummaries,
+  normalizeMembershipForPassSummary,
+  type CachedGuildPassSummary,
+} from "../passes/passCache";
 
-export type NormalizedMembership = {
-  guildId: string;
-  isActive: boolean;
-  roleCount: number;
-};
+export type NormalizedMembership = CachedGuildPassSummary;
 
 export type EnrichedMembership = NormalizedMembership & {
   guildName: string;
 };
 
 export const useMembership = (walletAddress: string | null) => {
+  const queryClient = useQueryClient();
+
   const useMembershipQuery = (guildId: string) => {
-    return useQuery({
-      queryKey: queryKeys.membership.byWalletAndGuild(walletAddress ?? "", guildId),
-      queryFn: () =>
-        guildPassClient.membership.getMembership({
+    const queryKey = queryKeys.membership.byWalletAndGuild(walletAddress ?? "", guildId);
+
+    return useQuery<any>({
+      queryKey,
+      queryFn: async () => {
+        const cached = queryClient.getQueryData(queryKey);
+        if (!onlineManager.isOnline() && cached !== undefined) {
+          return cached as any;
+        }
+
+        return guildPassClient.membership.getMembership({
           walletAddress: walletAddress!,
           guildId,
-        }),
+        });
+      },
       enabled: !!walletAddress && !!guildId,
       networkMode: "offlineFirst",
+      refetchOnReconnect: "always",
     });
   };
 
   const useUserRoles = (guildId: string) => {
-    return useQuery({
-      queryKey: queryKeys.userRoles.byWalletAndGuild(walletAddress ?? "", guildId),
-      queryFn: () =>
-        guildPassClient.roles.getUserRoles({
+    const queryKey = queryKeys.userRoles.byWalletAndGuild(walletAddress ?? "", guildId);
+
+    return useQuery<any>({
+      queryKey,
+      queryFn: async () => {
+        const cached = queryClient.getQueryData(queryKey);
+        if (!onlineManager.isOnline() && cached !== undefined) {
+          return cached as any;
+        }
+
+        return guildPassClient.roles.getUserRoles({
           walletAddress: walletAddress!,
           guildId,
-        }),
+        });
+      },
       enabled: !!walletAddress && !!guildId,
       networkMode: "offlineFirst",
+      refetchOnReconnect: "always",
     });
   };
 
   const useMembershipsQuery = () => {
-    return useQuery({
-      queryKey: queryKeys.memberships.byWallet(walletAddress ?? ""),
+    const queryKey = queryKeys.memberships.byWallet(walletAddress ?? "");
+
+    return useQuery<NormalizedMembership[]>({
+      queryKey,
       queryFn: async () => {
         if (!walletAddress) return [];
-        const { getDatabase } = await import("../../database/connection");
-        const dal = await import("../../database/dal");
-        const db = getDatabase();
-        const rows = await dal.getMembershipsByWallet(db, walletAddress);
+        const cached = getCachedMembershipSummaries(queryClient, walletAddress);
 
-        return rows.map((row) => {
-          const membership = JSON.parse(row.raw_json);
-          return {
-            guildId: row.guild_id,
-            isActive: row.status === "active",
-            roleCount: membership.roles?.length || 0,
-          } satisfies NormalizedMembership;
-        });
+        if (!onlineManager.isOnline() && cached !== undefined) {
+          return cached;
+        }
+
+        try {
+          const { getDatabase } = await import("../../database/connection");
+          const dal = await import("../../database/dal");
+          const db = getDatabase();
+          const rows = await dal.getMembershipsByWallet(db, walletAddress);
+
+          if (rows.length > 0) {
+            return rows
+              .map((row) => {
+                const membership = JSON.parse(row.raw_json);
+                return normalizeMembershipForPassSummary(membership, {
+                  fallbackGuildId: row.guild_id,
+                  fallbackRoleCount: membership.roles?.length,
+                  lastSyncedAt: new Date(row.updated_at).getTime(),
+                });
+              })
+              .filter((entry): entry is NormalizedMembership => entry !== null);
+          }
+        } catch (error) {
+          // The encrypted TanStack cache is the reliable offline source. The
+          // SQLite layer is optional here until a wallet-wide membership API
+          // exists and can keep it populated.
+          if (cached === undefined) {
+            throw error;
+          }
+        }
+
+        return cached ?? [];
       },
       enabled: !!walletAddress,
       networkMode: "offlineFirst",
+      refetchOnReconnect: "always",
     });
   };
 
@@ -68,13 +113,25 @@ export const useMembership = (walletAddress: string | null) => {
     const memberships = membershipsQuery.data ?? [];
 
     const guildNameQueries = useQueries({
-      queries: memberships.map((m) => ({
-        queryKey: queryKeys.guild.byId(m.guildId),
-        queryFn: () => guildPassClient.guilds.getGuild({ guildId: m.guildId }),
-        enabled: !!m.guildId,
-        staleTime: 1000 * 60 * 5,
-        networkMode: "offlineFirst" as const,
-      })),
+      queries: memberships.map((m) => {
+        const queryKey = queryKeys.guild.byId(m.guildId);
+
+        return {
+          queryKey,
+          queryFn: async () => {
+            const cached = queryClient.getQueryData(queryKey);
+            if (!onlineManager.isOnline() && cached !== undefined) {
+              return cached as any;
+            }
+
+            return guildPassClient.guilds.getGuild({ guildId: m.guildId });
+          },
+          enabled: !!m.guildId,
+          staleTime: 1000 * 60 * 5,
+          networkMode: "offlineFirst" as const,
+          refetchOnReconnect: "always" as const,
+        };
+      }),
     });
 
     const enriched = memberships.map((m, i) => {
@@ -87,6 +144,8 @@ export const useMembership = (walletAddress: string | null) => {
             : undefined) ?? m.guildId,
         isActive: m.isActive,
         roleCount: m.roleCount,
+        status: m.status,
+        lastSyncedAt: m.lastSyncedAt,
       } satisfies EnrichedMembership;
     });
 
