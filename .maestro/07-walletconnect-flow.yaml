@@ -56,6 +56,8 @@ appId: xyz.guildpass.mobile
     id: "connected-wallet-address"
 - assertVisible:
     text: "Manual Entry"
+- assertVisible:
+    text: "Unverified"
 
 # ── Step 7: Navigate to guilds and back ────────────────────────────────
 - tapOn:

@@ -40,7 +40,7 @@ Each store lives in the feature that owns it and is the only owner of its state.
 
 | Store | Location | Owns | Persistence |
 | ----- | -------- | ---- | ----------- |
-| `useWalletStore` | `features/wallet/wallet.store.ts` | Connected address, connection status, connector kind | SecureStore |
+| `useWalletStore` | `features/wallet/wallet.store.ts` | Connected address, connection status, connector kind, cryptographic verification state (`isVerified`) | SecureStore |
 | `useSessionStore` | `features/session/session.store.ts` | Auth status, token, expiry, session adapter | SecureStore |
 | `useSyncStore` | `features/sync/sync.store.ts` | Sync status, per-entity sync metadata, unacknowledged corrections | SecureStore |
 | `useReconciliationStore` | `features/notifications/reconciliation.store.ts` | Highest processed `roleChangeSeq` per (guild, wallet) | SecureStore |
@@ -75,6 +75,8 @@ into `useWalletStore`:
 | **Manual entry** | None | `manual` | User pastes an EVM address; `createManualConnector` wraps it |
 | **WalletConnect** | WalletConnect v2 | `walletconnect` | WC modal → EIP-1193 → `createWalletConnectConnector` |
 | **Embedded wallet** | Privy (`@privy-io/expo`) | `embedded` | Email OTP or Google OAuth → Privy provisions MPC wallet → `createEmbeddedConnector` wraps the address |
+
+**Trust Model & Verification:** Connecting a wallet via WalletConnect or entering one manually populates the address, but does not inherently prove cryptographic ownership. The `isVerified` state in `useWalletStore` tracks whether the user has successfully signed a verification message (`personal_sign`). Manually entered wallets are permanently unverified. Connected wallets require an explicit signature before `isVerified` becomes true, enabling stronger trust guarantees.
 
 **Key design principle:** Privy is only the provisioning layer. Once the embedded wallet
 address enters `useWalletStore`, every downstream flow (memberships, guilds, access checks,
