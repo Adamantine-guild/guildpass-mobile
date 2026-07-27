@@ -2,6 +2,10 @@ import { onlineManager, useQuery, useQueryClient, type QueryClient } from "@tans
 import { guildPassClient } from "../../lib/guildpassClient";
 import { appConfig } from "../../config/appConfig";
 import { queryKeys } from "../../lib/queryKeys";
+import {
+  GuildNotFoundError,
+  guildsService,
+} from "../../services/guilds/guildsService";
 import { getCachedMembershipSummaries, type GuildPassStatus } from "../passes/passCache";
 
 export type GuildListItem = {
@@ -13,12 +17,7 @@ export type GuildListItem = {
   lastSyncedAt?: number;
 };
 
-export class GuildNotFoundError extends Error {
-  constructor(guildId: string) {
-    super(`Guild not found: ${guildId}`);
-    this.name = "GuildNotFoundError";
-  }
-}
+export { GuildNotFoundError };
 
 export const walletGuildsQueryKey = (walletAddress: string | null | undefined) =>
   queryKeys.walletGuilds.byWallet(walletAddress ?? "");
@@ -107,14 +106,7 @@ export const useGuilds = () => {
           return cached as any;
         }
 
-        try {
-          return await guildPassClient.guilds.getGuild({ guildId });
-        } catch (error) {
-          if (error instanceof Error && /not found/i.test(error.message)) {
-            throw new GuildNotFoundError(guildId);
-          }
-          throw error;
-        }
+        return guildsService.getGuild(guildId);
       },
       enabled: !!guildId,
       networkMode: "offlineFirst",
@@ -133,7 +125,7 @@ export const useGuilds = () => {
           return cached as any;
         }
 
-        return guildPassClient.guilds.getGuildConfig({ guildId });
+        return guildsService.getGuildConfig(guildId);
       },
       enabled: !!guildId,
       networkMode: "offlineFirst",
@@ -152,7 +144,7 @@ export const useGuilds = () => {
           return cached as any;
         }
 
-        return guildPassClient.roles.getRoles({ guildId });
+        return guildsService.getRoles(guildId);
       },
       enabled: !!guildId,
       networkMode: "offlineFirst",
