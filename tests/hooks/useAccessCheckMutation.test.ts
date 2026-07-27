@@ -4,6 +4,7 @@ import TestRenderer, { act } from "react-test-renderer";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ACCESS_CHECK_PARAMS, ACCESS_GRANTED_FIXTURE } from "../fixtures/access.fixtures";
 import { useAccessCheck } from "../../src/features/access/useAccessCheck";
+import { queryKeys } from "../../src/lib/queryKeys";
 
 const guildPassClientMock = vi.hoisted(() => ({
   checkAccess: vi.fn(),
@@ -53,6 +54,7 @@ function renderAccessCheckHook() {
   );
 
   return {
+    queryClient,
     get current() {
       if (!hookValue) {
         throw new Error("Hook did not render");
@@ -87,6 +89,15 @@ describe("useAccessCheck mutation flow", () => {
     expect(res.syncStatus).toBe("confirmed_online");
     expect(guildPassClientMock.checkAccess).toHaveBeenCalledTimes(1);
     expect(guildPassClientMock.checkAccess).toHaveBeenCalledWith(ACCESS_CHECK_PARAMS);
+    expect(
+      result.queryClient.getQueryData(
+        queryKeys.accessCheck.byParams(
+          ACCESS_CHECK_PARAMS.walletAddress,
+          ACCESS_CHECK_PARAMS.guildId,
+          ACCESS_CHECK_PARAMS.resourceId,
+        ),
+      ),
+    ).toMatchObject(ACCESS_GRANTED_FIXTURE);
   });
 
   it("uses the access-check mutation key", async () => {
