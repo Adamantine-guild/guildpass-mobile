@@ -14,6 +14,7 @@ export const useWallet = (): {
   walletAddress: string | null;
   isConnected: boolean;
   connectionKind: "manual" | "walletconnect" | "embedded" | "coinbase" | "metamask" | null;
+  isVerified: boolean;
   isHydrated: boolean;
   connectManually: (address: string) => { success: boolean; error?: string };
   /** Store an EVM address created by an embedded wallet provider. */
@@ -26,6 +27,7 @@ export const useWallet = (): {
     request(args: { method: string }): Promise<unknown>;
     disconnect(): Promise<void>;
   }) => Promise<{ success: boolean; error?: string }>;
+  verifyOwnership: () => Promise<{ success: boolean; error?: string }>;
   disconnect: () => Promise<void>;
 } => {
   const walletAddress = useWalletStore((s) => s.walletAddress);
@@ -35,10 +37,13 @@ export const useWallet = (): {
   const setWalletAddress = useWalletStore((s) => s.setWalletAddress);
   const storeDisconnect = useWalletStore((s) => s.disconnect);
 
+  const isVerified = useWalletStore((s) => s.isVerified);
+  const setVerified = useWalletStore((s) => s.setVerified);
+
   const connectManually = (address: string): { success: boolean; error?: string } => {
     const result = validateAndNormalizeAddress(address);
     if (!result.valid) return { success: false, error: result.error };
-    setWalletAddress(result.address, "manual");
+    setWalletAddress(result.address, "manual", false);
     void startWalletSession(result.address!);
     return { success: true };
   };
@@ -59,7 +64,8 @@ export const useWallet = (): {
       if (!accounts.length) return { success: false, error: "No accounts returned" };
       const result = validateAndNormalizeAddress(accounts[0]);
       if (!result.valid) return { success: false, error: result.error };
-      setWalletAddress(result.address, connector.type);
+      // Connected but not yet verified
+      setWalletAddress(result.address, connector.type, false);
       await startWalletSession(result.address!);
       return { success: true };
     } catch (e) {
@@ -78,6 +84,55 @@ export const useWallet = (): {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [setWalletAddress],
   );
+
+  const verifyOwnership = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
+    if (!isConnected || !walletAddress) {
+      return { success: false, error: "No wallet connected" };
+    }
+    
+    if (connectionKind === "manual") {
+      return { success: false, error: "Manual entries cannot be cryptographically verified" };
+    }
+
+    try {
+      // 1. Get the provider. For WalletConnect, it's stored globally.
+      const wcProvider = getWalletConnectProvider();
+      if (!wcProvider) {
+        return { success: false, error: "No active WalletConnect provider found" };
+      }
+
+      // 2. Request signature
+      const message = "Sign this message to verify your wallet ownership for GuildPass.";
+      
+      const { verifyMessage, stringToHex } = await import("viem");
+      const hexMessage = stringToHex(message);
+      
+      const signature = await wcProvider.request({
+        method: "personal_sign",
+        params: [hexMessage, walletAddress.toLowerCase()],
+      }) as string;
+
+      if (!signature) {
+        return { success: false, error: "User rejected the signature request" };
+      }
+
+      // 3. Verify signature using viem
+      const isValid = await verifyMessage({
+        address: walletAddress as `0x${string}`,
+        message,
+        signature: signature as `0x${string}`,
+      });
+
+      if (isValid) {
+        setVerified(true);
+        return { success: true };
+      } else {
+        return { success: false, error: "Signature verification failed" };
+      }
+    } catch (e) {
+      return { success: false, error: e instanceof Error ? e.message : "Verification failed" };
+    }
+  }, [isConnected, walletAddress, connectionKind, setVerified]);
 
   const disconnect = useCallback(async () => {
     // If connected via WalletConnect, tear down the WC session first
@@ -107,11 +162,13 @@ export const useWallet = (): {
     walletAddress,
     isConnected,
     connectionKind,
+    isVerified,
     isHydrated,
     connectManually,
     connectEmbeddedWallet,
     connectWithConnector,
     connectWalletConnect,
+    verifyOwnership,
     disconnect,
   };
 };
