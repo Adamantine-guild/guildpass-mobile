@@ -40,7 +40,7 @@ Each store lives in the feature that owns it and is the only owner of its state.
 
 | Store | Location | Owns | Persistence |
 | ----- | -------- | ---- | ----------- |
-| `useWalletStore` | `features/wallet/wallet.store.ts` | Connected address, connection status, connector kind | SecureStore |
+| `useWalletStore` | `features/wallet/wallet.store.ts` | Connected address, connection status, connector kind, cryptographic verification state (`isVerified`) | SecureStore |
 | `useSessionStore` | `features/session/session.store.ts` | Auth status, token, expiry, session adapter | SecureStore |
 | `useSyncStore` | `features/sync/sync.store.ts` | Sync status, per-entity sync metadata, unacknowledged corrections | SecureStore |
 | `useReconciliationStore` | `features/notifications/reconciliation.store.ts` | Highest processed `roleChangeSeq` per (guild, wallet) | SecureStore |
@@ -64,6 +64,31 @@ declared in `src/lib/`, so the fan-out is readable, ordered, and awaitable in on
 
 Adding a cross-feature transition means adding it to one of these modules, not importing
 another feature's store into a hook or component.
+
+### Wallet providers
+
+Three wallet paths are supported, all converging through the `WalletConnector` interface
+into `useWalletStore`:
+
+| Path | Provider | Connection kind | How it works |
+|---|---|---|---|
+| **Manual entry** | None | `manual` | User pastes an EVM address; `createManualConnector` wraps it |
+| **WalletConnect** | WalletConnect v2 | `walletconnect` | WC modal → EIP-1193 → `createWalletConnectConnector` |
+| **Embedded wallet** | Privy (`@privy-io/expo`) | `embedded` | Email OTP or Google OAuth → Privy provisions MPC wallet → `createEmbeddedConnector` wraps the address |
+
+**Trust Model & Verification:** Connecting a wallet via WalletConnect or entering one manually populates the address, but does not inherently prove cryptographic ownership. The `isVerified` state in `useWalletStore` tracks whether the user has successfully signed a verification message (`personal_sign`). Manually entered wallets are permanently unverified. Connected wallets require an explicit signature before `isVerified` becomes true, enabling stronger trust guarantees.
+
+**Key design principle:** Privy is only the provisioning layer. Once the embedded wallet
+address enters `useWalletStore`, every downstream flow (memberships, guilds, access checks,
+sync, attestations) sees a standard EVM address. No screen or hook needs to know the wallet
+was provisioned by Privy.
+
+The embedded path is feature-flagged via `EXPO_PUBLIC_PRIVY_APP_ID` and
+`EXPO_PUBLIC_PRIVY_CLIENT_ID` environment variables. When both are set,
+`isEmbeddedWalletEnabled` is `true` and the onboarding screen offers the social/email option.
+
+See `docs/embedded-wallet-provider.md` for the provider evaluation, security model, and
+custody trade-off documentation.
 
 ### Selectors
 

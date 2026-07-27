@@ -28,19 +28,28 @@ const statusCopy: Record<PerChainRoleEligibilityResolution["status"], string> = 
 };
 
 const statusClassName: Record<PerChainRoleEligibilityResolution["status"], string> = {
-  resolved: "bg-success/10 text-success border-success/30 dark:bg-green-900/30 dark:text-green-400 dark:border-green-600/50",
-  "timed-out": "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-600/50",
-  error: "bg-error/10 text-error border-error/30 dark:bg-red-900/30 dark:text-red-400 dark:border-red-600/50",
+  resolved:
+    "bg-success/10 text-success border-success/30 dark:bg-green-900/30 dark:text-green-400 dark:border-green-600/50",
+  "timed-out":
+    "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-600/50",
+  error:
+    "bg-error/10 text-error border-error/30 dark:bg-red-900/30 dark:text-red-400 dark:border-red-600/50",
 };
+
+const firstParam = (value?: string | string[]) => (Array.isArray(value) ? value[0] : value);
 
 function PerChainEligibilityList({
   perChainRoleEligibility,
   isResolvingRoleEligibility,
   roleEligibilityError,
+  retryingChainIds = [],
+  onRetryChain,
 }: {
   perChainRoleEligibility: PerChainRoleEligibilityResolution[];
   isResolvingRoleEligibility: boolean;
   roleEligibilityError?: string;
+  retryingChainIds?: number[];
+  onRetryChain?: (chainId: number) => void;
 }) {
   if (
     perChainRoleEligibility.length === 0 &&
@@ -55,49 +64,86 @@ function PerChainEligibilityList({
       <View className="flex-row items-center justify-between mb-3">
         <Text className="text-text dark:text-slate-100 font-bold">Per-chain role eligibility</Text>
         {isResolvingRoleEligibility ? (
-          <Text className="text-primary text-xs font-semibold" testID="per-chain-eligibility-loading">
+          <Text
+            className="text-primary text-xs font-semibold"
+            testID="per-chain-eligibility-loading"
+          >
             Resolving
           </Text>
         ) : null}
       </View>
 
       {roleEligibilityError ? (
-        <Text className="text-error dark:text-red-400 text-sm mb-3" testID="per-chain-eligibility-error">
+        <Text
+          className="text-error dark:text-red-400 text-sm mb-3"
+          testID="per-chain-eligibility-error"
+        >
           {roleEligibilityError}
         </Text>
       ) : null}
 
-      {perChainRoleEligibility.map((chain) => (
-        <View
-          key={`${chain.chainId}-${chain.status}`}
-          className="border border-border dark:border-slate-700 rounded-xl p-3 mb-2"
-          testID={`per-chain-eligibility-row-${chain.chainId}`}
-        >
-          <View className="flex-row items-center justify-between">
-            <Text className="text-text dark:text-slate-100 font-semibold">Chain {chain.chainId}</Text>
-            <Text
-              className={`px-2 py-1 rounded-full border text-xs font-semibold ${statusClassName[chain.status]}`}
-            >
-              {statusCopy[chain.status]}
-            </Text>
+      {perChainRoleEligibility.map((chain) => {
+        const isRetrying = retryingChainIds.includes(chain.chainId);
+        const canRetry = chain.chainId > 0 && chain.status !== "resolved" && onRetryChain;
+
+        return (
+          <View
+            key={`${chain.chainId}-${chain.status}`}
+            className="border border-border dark:border-slate-700 rounded-xl p-3 mb-2"
+            testID={`per-chain-eligibility-row-${chain.chainId}`}
+          >
+            <View className="flex-row items-center justify-between">
+              <Text className="text-text dark:text-slate-100 font-semibold">
+                Chain {chain.chainId}
+              </Text>
+              <Text
+                className={`px-2 py-1 rounded-full border text-xs font-semibold ${statusClassName[chain.status]}`}
+              >
+                {statusCopy[chain.status]}
+              </Text>
+            </View>
+            {chain.resolvedRoles && chain.resolvedRoles.length > 0 ? (
+              <Text className="text-text-muted dark:text-slate-400 text-xs mt-2">
+                Roles: {chain.resolvedRoles.join(", ")}
+              </Text>
+            ) : null}
+            {chain.errorMessage ? (
+              <Text className="text-error dark:text-red-400 text-xs mt-2">
+                {chain.errorMessage}
+              </Text>
+            ) : null}
+            {canRetry ? (
+              <Button
+                title="Retry"
+                variant="outline"
+                className="mt-3 py-2 px-4"
+                loading={isRetrying}
+                disabled={isRetrying}
+                testID={`per-chain-eligibility-retry-${chain.chainId}`}
+                accessibilityLabel={`Retry chain ${chain.chainId} role eligibility`}
+                onPress={() => onRetryChain(chain.chainId)}
+              />
+            ) : null}
           </View>
-          {chain.resolvedRoles && chain.resolvedRoles.length > 0 ? (
-            <Text className="text-text-muted dark:text-slate-400 text-xs mt-2">
-              Roles: {chain.resolvedRoles.join(", ")}
-            </Text>
-          ) : null}
-          {chain.errorMessage ? (
-            <Text className="text-error dark:text-red-400 text-xs mt-2">{chain.errorMessage}</Text>
-          ) : null}
-        </View>
-      ))}
+        );
+      })}
     </Card>
   );
 }
 
 export default function AccessCheck() {
   const router = useRouter();
-  const { qrPayload } = useLocalSearchParams<{ qrPayload?: string | string[] }>();
+  const {
+    qrPayload,
+    guildId: deepLinkGuildId,
+    resourceId: deepLinkResourceId,
+    walletAddress: deepLinkWalletAddress,
+  } = useLocalSearchParams<{
+    qrPayload?: string | string[];
+    guildId?: string | string[];
+    resourceId?: string | string[];
+    walletAddress?: string | string[];
+  }>();
   const { walletAddress: currentWallet } = useWallet();
   const [address, setAddress] = useState(currentWallet || "");
   const [guildId, setGuildId] = useState("");
@@ -126,6 +172,8 @@ export default function AccessCheck() {
     reset: resetAccessCheck,
     perChainRoleEligibility,
     isResolvingRoleEligibility,
+    resolvingRoleEligibilityChainIds,
+    retryRoleEligibilityChain,
     roleEligibilityError,
   } = accessCheck;
   const recordCheck = useAccessHistoryStore((state) => state.recordCheck);
@@ -167,6 +215,39 @@ export default function AccessCheck() {
       resetAccessCheck();
     }
   }, [currentWallet, qrPayload, resetAccessCheck]);
+
+  useEffect(() => {
+    if (
+      qrPayload ||
+      (deepLinkGuildId === undefined &&
+        deepLinkResourceId === undefined &&
+        deepLinkWalletAddress === undefined)
+    ) {
+      return;
+    }
+
+    const nextGuildId = firstParam(deepLinkGuildId)?.trim() ?? "";
+    const nextResourceId = firstParam(deepLinkResourceId)?.trim() ?? "";
+    const nextWalletAddress = firstParam(deepLinkWalletAddress)?.trim() ?? "";
+
+    setGuildId(nextGuildId);
+    setResourceId(nextResourceId);
+    setAddress(nextWalletAddress || currentWallet || "");
+    setScannedPayload(null);
+    setWalletWarningDecision(null);
+    setScanError(null);
+    setAddressError(null);
+    setGuildIdError(nextGuildId ? null : "Guild ID is required");
+    setResourceIdError(nextResourceId ? null : "Resource ID is required");
+    resetAccessCheck();
+  }, [
+    currentWallet,
+    deepLinkGuildId,
+    deepLinkResourceId,
+    deepLinkWalletAddress,
+    qrPayload,
+    resetAccessCheck,
+  ]);
 
   const handleAddressChange = (nextAddress: string) => {
     setAddress(nextAddress);
@@ -328,11 +409,15 @@ export default function AccessCheck() {
               accessibilityHint="Enter the guild identifier"
               testID="access-check-guild-id-input"
             />
-            {guildIdError && <Text className="text-error dark:text-red-400 text-sm mt-1">{guildIdError}</Text>}
+            {guildIdError && (
+              <Text className="text-error dark:text-red-400 text-sm mt-1">{guildIdError}</Text>
+            )}
           </View>
 
           <View className="mt-4">
-            <Text className="text-text-muted dark:text-slate-400 mb-2 font-medium">Resource ID</Text>
+            <Text className="text-text-muted dark:text-slate-400 mb-2 font-medium">
+              Resource ID
+            </Text>
             <TextInput
               value={resourceId}
               onChangeText={handleResourceIdChange}
@@ -342,7 +427,9 @@ export default function AccessCheck() {
               accessibilityHint="Enter the resource identifier"
               testID="access-check-resource-id-input"
             />
-            {resourceIdError && <Text className="text-error dark:text-red-400 text-sm mt-1">{resourceIdError}</Text>}
+            {resourceIdError && (
+              <Text className="text-error dark:text-red-400 text-sm mt-1">{resourceIdError}</Text>
+            )}
           </View>
 
           <Button
@@ -357,8 +444,7 @@ export default function AccessCheck() {
               !!addressError ||
               !!guildIdError ||
               !!resourceIdError ||
-              countdown.isExpired ||
-              isOffline
+              countdown.isExpired
             }
           />
           {isOffline ? (
@@ -382,7 +468,9 @@ export default function AccessCheck() {
             accessibilityLabel="Wallet address mismatch warning. This QR payload uses a different wallet address from your connected wallet."
           >
             <Text className="text-primary font-bold">Wallet address mismatch</Text>
-            <Text className="text-text dark:text-slate-100 text-sm mt-2">{walletMismatchWarning}</Text>
+            <Text className="text-text dark:text-slate-100 text-sm mt-2">
+              {walletMismatchWarning}
+            </Text>
             <View className="mt-4">
               <Button
                 title="Use connected wallet"
@@ -424,11 +512,15 @@ export default function AccessCheck() {
             </Text>
             <View className="flex-row justify-between py-1">
               <Text className="text-text-muted dark:text-slate-400">Guild ID</Text>
-              <Text className="text-text dark:text-slate-100 font-medium">{scannedPayload.guildId}</Text>
+              <Text className="text-text dark:text-slate-100 font-medium">
+                {scannedPayload.guildId}
+              </Text>
             </View>
             <View className="flex-row justify-between py-1">
               <Text className="text-text-muted dark:text-slate-400">Resource ID</Text>
-              <Text className="text-text dark:text-slate-100 font-medium">{scannedPayload.resourceId}</Text>
+              <Text className="text-text dark:text-slate-100 font-medium">
+                {scannedPayload.resourceId}
+              </Text>
             </View>
             {scannedPayload.expiresAt && (
               <View
@@ -464,7 +556,10 @@ export default function AccessCheck() {
             }}
           >
             {countdown.isExpired && scannedPayload?.expiresAt && (
-              <Card className="mb-12 border-2 border-error bg-error/5 dark:border-red-600 dark:bg-red-900/30" accessibilityRole="alert">
+              <Card
+                className="mb-12 border-2 border-error bg-error/5 dark:border-red-600 dark:bg-red-900/30"
+                accessibilityRole="alert"
+              >
                 <View className="items-center">
                   <View className="w-16 h-16 rounded-full items-center justify-center mb-4 bg-error dark:bg-red-600">
                     <Text className="text-white text-3xl">!</Text>
@@ -494,13 +589,15 @@ export default function AccessCheck() {
                 <PerChainEligibilityList
                   perChainRoleEligibility={perChainRoleEligibility}
                   isResolvingRoleEligibility={isResolvingRoleEligibility}
+                  retryingChainIds={resolvingRoleEligibilityChainIds}
+                  onRetryChain={retryRoleEligibilityChain}
                   roleEligibilityError={roleEligibilityError}
                 />
               </View>
             )}
 
             {error && !result && !countdown.isExpired && (
-              <View className="mb-6">
+              <View className="mb-6" testID="access-check-error">
                 <ErrorState
                   message={
                     isOffline
@@ -513,6 +610,8 @@ export default function AccessCheck() {
                 <PerChainEligibilityList
                   perChainRoleEligibility={perChainRoleEligibility}
                   isResolvingRoleEligibility={isResolvingRoleEligibility}
+                  retryingChainIds={resolvingRoleEligibilityChainIds}
+                  onRetryChain={retryRoleEligibilityChain}
                   roleEligibilityError={roleEligibilityError}
                 />
               </View>

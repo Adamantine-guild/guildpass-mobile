@@ -48,13 +48,62 @@ This directory contains end-to-end tests for GuildPass Mobile using [Maestro](ht
 - ✅ Confirms app returns to disconnected state
 - **File**: `06-reset-app-state.yaml`
 
+### 07. WalletConnect UI and Manual Fallback
+
+- ✅ Validates WalletConnect UI entry point
+- ✅ Tests manual-entry fallback flow
+- ✅ Confirms disconnect returns to the connect form
+- **File**: `07-walletconnect-flow.yaml`
+
 ### 08. Social/email embedded wallet entry
 
-- âœ… Verifies the configured social/email onboarding branch and its email input
+- ✅ Verifies the configured social/email onboarding branch and its email input
 - **File**: `08-embedded-wallet-entry.yaml`
 - **Note**: Run this flow explicitly against a development build configured with
   `EXPO_PUBLIC_PRIVY_APP_ID` and `EXPO_PUBLIC_PRIVY_CLIENT_ID`. It is excluded
   from the default suite because OTP sign-in requires a real provider account.
+
+### 09. Access Scanner Rescan Path
+
+- ✅ Tests scanner rejection UI
+- ✅ Confirms expired QR messaging is specific
+- ✅ Verifies Scan Again clears the error state
+- **File**: `09-access-scanner-rescan.yaml`
+
+### 10. Expired QR Payload
+
+- ✅ Simulates an expired access QR payload through the scanner test fixture
+- ✅ Asserts the specific `This QR code has expired.` error
+- ✅ Confirms the generic QR fallback message is not shown
+- **File**: `10-access-qr-expired.yaml`
+
+### 11. Unsupported QR Version
+
+- ✅ Simulates an unsupported future QR payload version through the scanner test fixture
+- ✅ Asserts the specific update-required QR version error
+- ✅ Confirms the generic QR fallback message is not shown
+- **File**: `11-access-qr-unsupported-version.yaml`
+
+### 12. Malformed QR JSON
+
+- ✅ Simulates non-JSON QR contents through the scanner test fixture
+- ✅ Asserts the specific malformed GuildPass payload error
+- ✅ Confirms the generic QR fallback message is not shown
+- **File**: `12-access-qr-malformed-json.yaml`
+
+### 13. Access-check Deep Link Missing resourceId
+
+- ✅ Opens `guildpass://access-check?guildId=alpha-guild`
+- ✅ Asserts the specific missing `resourceId` parameter error
+- ✅ Confirms the generic deep-link fallback message is not shown
+- **File**: `13-deep-link-access-check-missing-resource-id.yaml`
+
+### 14. Guild-detail Deep Link Invalid guildId
+
+- ✅ Opens `guildpass://guild/%20`
+- ✅ Asserts the specific invalid `guildId` error
+- ✅ Confirms the generic deep-link fallback message is not shown
+- **File**: `14-deep-link-guild-detail-invalid-guild-id.yaml`
 
 ## Prerequisites
 
@@ -137,6 +186,9 @@ maestro test .maestro/01-onboarding-to-profile.yaml
 maestro test --format junit --output test-results .maestro/
 ```
 
+The default suite is defined in `.maestro/config.yaml` and includes all flows except
+`08-embedded-wallet-entry.yaml`, which depends on a real OTP provider account.
+
 ### 4. Interactive Mode (Debugging)
 
 ```bash
@@ -155,6 +207,10 @@ Test IDs follow this naming convention:
 - Results: `{feature}-result` or `{feature}-error`
 
 ## Network Mocking
+
+QR edge-case flows use dev-only scanner fixture buttons to exercise the same scanner error UI
+without relying on physical camera frame injection. Deep-link edge-case flows use Maestro
+`openLink` commands with malformed or incomplete URLs.
 
 For tests that depend on API responses (access checks), you can:
 
@@ -204,10 +260,11 @@ npx expo run:ios --device
 
 ### Test Timeout
 
-- Increase timeout in flow:
+- Use `extendedWaitUntil` for longer waits:
   ```yaml
-  - assertVisible:
-      id: "element-id"
+  - extendedWaitUntil:
+      visible:
+        id: "element-id"
       timeout: 10000
   ```
 

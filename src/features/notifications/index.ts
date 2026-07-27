@@ -28,12 +28,6 @@
 
 export { useReconciliation } from "./useReconciliation";
 export {
-  useBackgroundSync,
-  registerBackgroundSyncTask,
-  unregisterBackgroundSyncTask,
-  BACKGROUND_SYNC_TASK_NAME,
-} from "./useBackgroundSync";
-export {
   useReconciliationStore,
   entityCompositeKey,
   parseEntityCompositeKey,
@@ -46,3 +40,10 @@ export type {
   PushWakeUpHint,
   OnRoleChangeApplied,
 } from "./reconciliation.types";
+
+// Push Notifications
+export * from "./pushNotifications.types";
+export { usePushNotificationsStore } from "./pushNotifications.store";
+export * from "./pushNotifications.service";
+export { usePushNotifications } from "./usePushNotifications";
+export { PushNotificationRationale } from "./PushNotificationRationale";

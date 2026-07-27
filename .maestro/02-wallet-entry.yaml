@@ -5,7 +5,8 @@ appId: xyz.guildpass.mobile
 #   1. Invalid addresses show specific error text and disable submission
 #   2. A valid address can be entered and connected
 
-- launchApp
+- launchApp:
+    clearState: true
 - tapOn:
     id: "onboarding-get-started-button"
 - assertVisible:
@@ -64,6 +65,11 @@ appId: xyz.guildpass.mobile
 - inputText: "0x1234567890123456789012345678901234567890"
 - tapOn:
     id: "wallet-connect-button"
+- extendedWaitUntil:
+    visible:
+      id: "guilds-screen"
+    timeout: 10000
+- pressKey: "back"
 - assertVisible:
     id: "profile-connected"
 - assertVisible:

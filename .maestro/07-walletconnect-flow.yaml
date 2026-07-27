@@ -44,13 +44,20 @@ appId: xyz.guildpass.mobile
 - tapOn:
     id: "wallet-connect-button"
 
-# ── Step 6: Verify connected state shows address and connection kind ───
+# ── Step 6: Verify connection lands on guilds, then return to profile ───
+- extendedWaitUntil:
+    visible:
+      id: "guilds-screen"
+    timeout: 10000
+- pressKey: "back"
 - assertVisible:
     id: "profile-connected"
 - assertVisible:
     id: "connected-wallet-address"
 - assertVisible:
     text: "Manual Entry"
+- assertVisible:
+    text: "Unverified"
 
 # ── Step 7: Navigate to guilds and back ────────────────────────────────
 - tapOn:

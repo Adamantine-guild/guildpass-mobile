@@ -1,15 +1,52 @@
 import { useQuery } from "@tanstack/react-query";
 import { guildPassClient } from "../../lib/guildpassClient";
-import { queryKeys } from "../../lib/queryKeys";
+import { appConfig } from "../../config/appConfig";
 
-export class GuildNotFoundError extends Error {
-  constructor(guildId: string) {
-    super(`Guild not found: ${guildId}`);
-    this.name = "GuildNotFoundError";
+export type GuildListItem = {
+  id: string;
+  name: string;
+  isActive: boolean;
+  roleCount?: number;
+};
+
+export const walletGuildsQueryKey = (walletAddress: string | null | undefined) => [
+  "wallet-guilds",
+  walletAddress ?? "",
+];
+
+export const fetchGuildsByWalletAddress = async (
+  walletAddress: string,
+): Promise<GuildListItem[]> => {
+  const guildsClient = guildPassClient.guilds as typeof guildPassClient.guilds & {
+    getGuildsByWalletAddress?: (params: { walletAddress: string }) => Promise<GuildListItem[]>;
+  };
+
+  if (guildsClient.getGuildsByWalletAddress) {
+    return guildsClient.getGuildsByWalletAddress({ walletAddress });
   }
-}
+
+  const response = await fetch(
+    `${appConfig.apiUrl}/guilds?walletAddress=${encodeURIComponent(walletAddress)}`,
+  );
+
+  if (!response.ok) {
+    throw new Error("Unable to load guilds for this wallet.");
+  }
+
+  const data = (await response.json()) as GuildListItem[] | { guilds?: GuildListItem[] };
+  return Array.isArray(data) ? data : data.guilds ?? [];
+};
 
 export const useGuilds = () => {
+  const useWalletGuilds = (walletAddress: string | null | undefined) => {
+    return useQuery({
+      queryKey: walletGuildsQueryKey(walletAddress),
+      queryFn: () => fetchGuildsByWalletAddress(walletAddress ?? ""),
+      enabled: !!walletAddress,
+      networkMode: "offlineFirst",
+    });
+  };
+
   const useGuild = (guildId: string) => {
     return useQuery({
       queryKey: queryKeys.guild.byId(guildId),
@@ -47,9 +84,11 @@ export const useGuilds = () => {
   };
 
   return {
+    getGuildsByWalletAddress: useWalletGuilds,
     getGuild: useGuild,
     getGuildConfig: useGuildConfig,
     getRoles: useRoles,
+    useWalletGuilds,
     useGuild,
     useGuildConfig,
     useRoles,

@@ -25,13 +25,25 @@ const CONNECTION_LABELS: Record<string, string> = {
 
 export default function Profile() {
   const router = useRouter();
-  const { walletAddress, isConnected, connectionKind, connectManually, disconnect } = useWallet();
+  const { walletAddress, isConnected, connectionKind, isVerified, verifyOwnership, connectManually, disconnect } = useWallet();
   const { open } = useWalletConnectModal();
   const { isOffline } = useNetworkStatus();
   const [inputValue, setInputValue] = useState(walletAddress || "");
   const [error, setError] = useState<string | null>(null);
   const [showManualEntry, setShowManualEntry] = useState(false);
   const [wcConnecting, setWcConnecting] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+
+  const handleVerifyOwnership = async () => {
+    setIsVerifying(true);
+    setVerifyError(null);
+    const { success, error } = await verifyOwnership();
+    if (!success) {
+      setVerifyError(error || "Verification failed");
+    }
+    setIsVerifying(false);
+  };
 
   // ── Field-level validation state ────────────────────────────────────
   const [fieldError, setFieldError] = useState<string | null>(null);
@@ -235,9 +247,41 @@ export default function Profile() {
               </Text>
               <View className="mb-4">
                 {walletAddress ? (
-                  <WalletAddress address={walletAddress} testID="connected-wallet-address" />
+                  <View className="flex-row items-center justify-between">
+                    <WalletAddress address={walletAddress} testID="connected-wallet-address" />
+                    {isVerified ? (
+                      <View className="bg-green-100 dark:bg-green-900/30 px-2 py-1 rounded">
+                        <Text className="text-green-700 dark:text-green-400 text-xs font-bold">✓ Verified</Text>
+                      </View>
+                    ) : connectionKind === "manual" ? (
+                      <View className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">
+                        <Text className="text-slate-500 dark:text-slate-400 text-xs font-bold">Unverified</Text>
+                      </View>
+                    ) : null}
+                  </View>
                 ) : null}
               </View>
+
+              {!isVerified && connectionKind !== "manual" ? (
+                <View className="mb-4 p-3 bg-primary/10 dark:bg-primary/5 rounded-lg border border-primary/20">
+                  <Text className="text-text dark:text-slate-100 text-sm mb-2 font-medium">
+                    Verify Ownership
+                  </Text>
+                  <Text className="text-text-muted dark:text-slate-400 text-xs mb-3">
+                    Sign a message to verify you control this wallet and unlock full access.
+                  </Text>
+                  {verifyError ? (
+                    <Text className="text-red-500 text-xs mb-3">{verifyError}</Text>
+                  ) : null}
+                  <Button
+                    title={isVerifying ? "Verifying..." : "Verify Wallet"}
+                    onPress={handleVerifyOwnership}
+                    loading={isVerifying}
+                    testID="verify-ownership-button"
+                  />
+                </View>
+              ) : null}
+
               <Button
                 title="Disconnect"
                 onPress={handleDisconnect}

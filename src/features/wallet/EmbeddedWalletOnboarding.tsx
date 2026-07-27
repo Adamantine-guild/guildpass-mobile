@@ -7,6 +7,7 @@ import {
   usePrivy,
 } from "@privy-io/expo";
 import { Button } from "../../components/Button";
+import { CustodyDisclosure } from "./CustodyDisclosure";
 import { useWallet } from "./useWallet";
 
 type Props = { onComplete(): void; onBack(): void };
@@ -81,6 +82,7 @@ export function EmbeddedWalletOnboarding({ onComplete, onBack }: Props) {
       <Text className="text-text-muted text-center">
         Sign in with email or Google. A secure wallet will be created for you automatically.
       </Text>
+      <CustodyDisclosure />
       <Button
         title="Continue with Google"
         onPress={loginWithGoogle}
