@@ -12,6 +12,24 @@ then reproduced again after restoring them.
 Resolving the SDK package entry point is outside the scope of refactor #218 and
 does not block that work. It should be investigated separately.
 
+## Project typecheck fails on pre-existing JSX syntax errors
+
+Running `tsc --noEmit` fails with multiple JSX syntax errors in:
+
+- `app/access-check.tsx`
+- `app/access-scanner.tsx`
+- `app/deep-link-error.tsx`
+- `app/pending-changes.tsx`
+- `app/profile.tsx`
+
+These errors predate this PR. The contents of all five files were verified to
+match `upstream/main` byte for byte, and none of the errors are related to the
+files changed by this PR.
+
+This does not block the API-layer refactor, but the
+`pnpm typecheck passes` checklist item cannot be marked honestly until the
+base-branch errors are resolved separately.
+
 ## GuildPass SDK does not support app session token injection
 
 The GuildPass SDK does not currently expose a mechanism to inject the app's
