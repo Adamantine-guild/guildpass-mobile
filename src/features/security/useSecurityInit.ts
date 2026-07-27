@@ -14,20 +14,17 @@
 
 import { useEffect, useRef } from "react";
 import { AppState, AppStateStatus } from "react-native";
-import { initializeSecureFetch } from "../lib/secureFetch";
+import { initializeSecureFetch } from "../../lib/secureFetch";
 import {
   assessDeviceIntegrity,
   configureDeviceIntegrity,
   getIntegrityResponsePolicy,
   checkIntegrityTransition,
-} from "../features/security/deviceIntegrity";
-import { useSessionStore } from "../features/session/session.store";
-import { useIntegrityWarningStore } from "../features/security/integrityWarning.store";
-import {
-  enforcePinConfigurationAtStartup,
-  logPinningStatus,
-} from "../features/security/certificatePinning";
-import { appConfig } from "../config/appConfig";
+} from "./deviceIntegrity";
+import { useSessionStore } from "../session/session.store";
+import { useIntegrityWarningStore } from "./integrityWarning.store";
+import { enforcePinConfigurationAtStartup, logPinningStatus } from "./certificatePinning";
+import { appConfig } from "../../config/appConfig";
 
 /**
  * Configure and initialize all security hardening features.
@@ -62,9 +59,7 @@ export function useSecurityInit(): void {
         .filter((c) => !c.passed)
         .map((c) => `${c.check}: ${c.detail ?? "failed"}`)
         .join("; ");
-      console.warn(
-        `[GuildPass Security] Device integrity check FAILED: ${failures}`,
-      );
+      console.warn(`[GuildPass Security] Device integrity check FAILED: ${failures}`);
     } else {
       console.log("[GuildPass Security] Device integrity check PASSED.");
     }
@@ -88,9 +83,7 @@ export function useSecurityInit(): void {
 
       // Guard against rapid background/foreground cycles
       if (isHandlingCompromise) {
-        console.warn(
-          "[GuildPass Security] Already handling a compromise detection — skipping.",
-        );
+        console.warn("[GuildPass Security] Already handling a compromise detection — skipping.");
         return;
       }
       isHandlingCompromise = true;
@@ -100,50 +93,53 @@ export function useSecurityInit(): void {
       if (policy === "block") {
         // Set a detailed explanation *before* invalidating so the login screen
         // can read it if it renders synchronously after the state change.
-        useIntegrityWarningStore.getState().setWarning(
-          "Device compromised — session terminated.",
-          "blocked_session",
-          "Your session was terminated because device integrity checks " +
-          "detected that your device may be rooted or jailbroken. " +
-          "Please secure your device and try again.",
-        );
+        useIntegrityWarningStore
+          .getState()
+          .setWarning(
+            "Device compromised — session terminated.",
+            "blocked_session",
+            "Your session was terminated because device integrity checks " +
+              "detected that your device may be rooted or jailbroken. " +
+              "Please secure your device and try again.",
+          );
 
         // Invalidate the active session — forces the user to re-authenticate.
-        useSessionStore.getState().endSession().catch(() => {
-          console.error(
-            "[GuildPass Security] Failed to end session after compromise detection.",
-          );
-        }).finally(() => {
-          isHandlingCompromise = false;
-        });
+        useSessionStore
+          .getState()
+          .endSession()
+          .catch(() => {
+            console.error("[GuildPass Security] Failed to end session after compromise detection.");
+          })
+          .finally(() => {
+            isHandlingCompromise = false;
+          });
 
         console.warn(
           "[GuildPass Security] Device integrity violation detected on foreground — " +
-          "session invalidated per 'block' policy. User must re-authenticate.",
+            "session invalidated per 'block' policy. User must re-authenticate.",
         );
       } else {
         // 'warn' policy — surface a dismissible warning so the user stays
         // informed without being forcibly logged out.
-        useIntegrityWarningStore.getState().setWarning(
-          "Device integrity has changed since the last check. " +
-          "Your device may be rooted or jailbroken. " +
-          "Please verify your device security.",
-          "warned_user",
-          null,
-        );
+        useIntegrityWarningStore
+          .getState()
+          .setWarning(
+            "Device integrity has changed since the last check. " +
+              "Your device may be rooted or jailbroken. " +
+              "Please verify your device security.",
+            "warned_user",
+            null,
+          );
         isHandlingCompromise = false;
 
         console.warn(
           "[GuildPass Security] Device integrity violation detected on foreground — " +
-          "warning displayed per 'warn' policy.",
+            "warning displayed per 'warn' policy.",
         );
       }
     };
 
-    const subscription = AppState.addEventListener(
-      "change",
-      handleAppStateChange,
-    );
+    const subscription = AppState.addEventListener("change", handleAppStateChange);
 
     return () => {
       subscription.remove();

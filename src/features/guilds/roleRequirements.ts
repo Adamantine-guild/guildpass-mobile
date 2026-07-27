@@ -31,7 +31,9 @@ export function normalizeRoleRequirements(
     return {
       id: role.id,
       name: role.name,
-      chainId: Number.isFinite(role.chainId) ? role.chainId! : configRequirement?.chainId ?? fallbackChainId,
+      chainId: Number.isFinite(role.chainId)
+        ? role.chainId!
+        : (configRequirement?.chainId ?? fallbackChainId),
     };
   });
 }

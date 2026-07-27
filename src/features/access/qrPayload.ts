@@ -39,6 +39,40 @@ export class QrPayloadError extends Error {
   }
 }
 
+const QR_PAYLOAD_ERROR_MESSAGES: Record<QrPayloadErrorCode, string> = {
+  [QR_PAYLOAD_ERROR_CODES.MALFORMED_JSON]:
+    "This doesn't look like a GuildPass QR code. Make sure you're scanning a valid GuildPass access code.",
+  [QR_PAYLOAD_ERROR_CODES.MALFORMED_PAYLOAD]:
+    "The QR code couldn't be read properly. Try scanning again in better lighting, or ask the guild admin for a fresh code.",
+  [QR_PAYLOAD_ERROR_CODES.UNSUPPORTED_TYPE]:
+    "This QR code type isn't supported. Make sure you're scanning a GuildPass access check code.",
+  [QR_PAYLOAD_ERROR_CODES.UNSUPPORTED_VERSION]:
+    "This QR code uses a newer format. Please update GuildPass to the latest version from the app store to scan it.",
+  [QR_PAYLOAD_ERROR_CODES.MISSING_GUILD_ID]:
+    "This QR code is missing guild information. Ask the guild admin to issue a valid access code.",
+  [QR_PAYLOAD_ERROR_CODES.MISSING_RESOURCE_ID]:
+    "This QR code is missing resource information. Ask the guild admin to issue a valid access code.",
+  [QR_PAYLOAD_ERROR_CODES.INVALID_WALLET_ADDRESS]:
+    "The wallet address in this QR code is invalid. Ask the guild admin to issue a corrected code.",
+  [QR_PAYLOAD_ERROR_CODES.INVALID_WALLET_CHECKSUM]:
+    "The wallet address in this QR code has a checksum error. Try rescanning the code in better lighting, or ask the guild admin to issue a new one.",
+  [QR_PAYLOAD_ERROR_CODES.INVALID_EXPIRATION]:
+    "This QR code has an invalid expiration. Ask the guild admin to issue a new access code.",
+  [QR_PAYLOAD_ERROR_CODES.EXPIRED]:
+    "This QR code has expired. Ask the guild admin to issue a new access code for entry.",
+  [QR_PAYLOAD_ERROR_CODES.INVALID_SIGNATURE]:
+    "The QR code signature is invalid. Do not use this code; ask the guild admin for a fresh one.",
+  [QR_PAYLOAD_ERROR_CODES.INVALID_NONCE]:
+    "This QR code has an invalid security token. Ask the guild admin to issue a new code.",
+  [QR_PAYLOAD_ERROR_CODES.INVALID_KID]:
+    "This QR code uses an unrecognized key. Ask the guild admin to issue a new access code.",
+  [QR_PAYLOAD_ERROR_CODES.ALREADY_USED]:
+    "This QR code has already been used. Each access code can only be used once. Ask the guild admin for a new code.",
+};
+
+export const describeQrPayloadError = (code: QrPayloadErrorCode): string =>
+  QR_PAYLOAD_ERROR_MESSAGES[code] ?? "Unable to read QR payload.";
+
 export type AccessQrPayload = {
   type: typeof ACCESS_QR_TYPE;
   version: typeof ACCESS_QR_VERSION;
@@ -49,13 +83,13 @@ export type AccessQrPayload = {
   /**
    * Key ID (kid) indicating which versioned issuer public key was used to sign the payload.
    */
-  kid?: string;
+  kid: string;
   /**
    * DER-encoded, hex-secp256k1 signature over the canonical signing message
    * (see qrSignature.buildSigningMessage). Verified against the guild's
-   * published issuer public key. Optional during the migration window.
+   * published issuer public key.
    */
-  signature?: string;
+  signature: string;
   /**
    * Unique per-issuance identifier used for client-side replay protection
    * (see qrReplayGuard.ts). A payload photographed or screen-recorded before
@@ -71,7 +105,7 @@ export type ParsedAccessQrPayload = {
   resourceId: string;
   walletAddress?: string;
   expiresAt?: string;
-  kid?: string;
+  kid: string;
   nonce?: string;
 };
 
@@ -185,23 +219,16 @@ export const parseAccessQrPayload = (
     }
 
     if (expiresAt.getTime() <= now.getTime()) {
-      throw new QrPayloadError(
-        QR_PAYLOAD_ERROR_CODES.EXPIRED,
-        "QR code has expired.",
-      );
+      throw new QrPayloadError(QR_PAYLOAD_ERROR_CODES.EXPIRED, "QR code has expired.");
     }
   }
 
-  // During the migration window the signature field is optional at the
-  // structural layer; cryptographic verification is enforced separately by
-  // verifyAndParseAccessQrPayload when the feature flag is enabled.
   if (
-    decodedPayload.signature !== undefined &&
-    (!isNonEmptyString(decodedPayload.signature) || !hasNoControlChars(decodedPayload.signature))
+    !isNonEmptyString(decodedPayload.signature) || !hasNoControlChars(decodedPayload.signature)
   ) {
     throw new QrPayloadError(
       QR_PAYLOAD_ERROR_CODES.INVALID_SIGNATURE,
-      "QR code contains an invalid signature.",
+      "QR code contains an invalid or missing signature.",
     );
   }
 
@@ -218,10 +245,10 @@ export const parseAccessQrPayload = (
     );
   }
 
-  if (decodedPayload.kid !== undefined && !isValidIdentifier(decodedPayload.kid)) {
+  if (!isValidIdentifier(decodedPayload.kid)) {
     throw new QrPayloadError(
       QR_PAYLOAD_ERROR_CODES.INVALID_KID,
-      "QR code contains an invalid key ID.",
+      "QR code contains an invalid or missing key ID.",
     );
   }
 
@@ -232,7 +259,7 @@ export const parseAccessQrPayload = (
       ? decodedPayload.walletAddress
       : undefined,
     expiresAt: isNonEmptyString(decodedPayload.expiresAt) ? decodedPayload.expiresAt : undefined,
-    kid: isNonEmptyString(decodedPayload.kid) ? decodedPayload.kid.trim() : undefined,
+    kid: decodedPayload.kid.trim(),
     nonce: isNonEmptyString(decodedPayload.nonce) ? decodedPayload.nonce : undefined,
   };
 };

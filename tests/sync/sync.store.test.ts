@@ -4,10 +4,7 @@
  */
 
 import { beforeEach, describe, expect, it } from "vitest";
-import {
-  MAX_TRACKED_CORRECTIONS,
-  useSyncStore,
-} from "../../src/features/sync/sync.store";
+import { MAX_TRACKED_CORRECTIONS, useSyncStore } from "../../src/features/sync/sync.store";
 import type { SyncCorrection } from "../../src/features/sync/sync.types";
 
 function makeCorrection(overrides: Partial<SyncCorrection> = {}): SyncCorrection {
@@ -75,9 +72,7 @@ describe("sync store – corrections", () => {
     ]);
 
     useSyncStore.getState().acknowledgeCorrection(revoked.id);
-    expect(useSyncStore.getState().corrections.map((c) => c.id)).toStrictEqual([
-      rolesRemoved.id,
-    ]);
+    expect(useSyncStore.getState().corrections.map((c) => c.id)).toStrictEqual([rolesRemoved.id]);
 
     useSyncStore.getState().acknowledgeAllCorrections();
     expect(useSyncStore.getState().corrections).toStrictEqual([]);
@@ -108,9 +103,7 @@ describe("sync store – corrections", () => {
     );
     // The critical correction arrives last in the incoming batch — recency
     // alone would evict it.
-    useSyncStore
-      .getState()
-      .addCorrections([...infoFlood, makeCorrection({ id: "critical-1" })]);
+    useSyncStore.getState().addCorrections([...infoFlood, makeCorrection({ id: "critical-1" })]);
 
     const corrections = useSyncStore.getState().corrections;
     expect(corrections).toHaveLength(MAX_TRACKED_CORRECTIONS);

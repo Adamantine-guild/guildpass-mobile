@@ -9,6 +9,7 @@ This document summarizes the end-to-end testing implementation for GuildPass Mob
 ### Testing Framework: Maestro
 
 **Why Maestro?**
+
 - Expo-compatible without ejecting
 - Simple YAML-based test syntax
 - Cross-platform (single test for iOS & Android)
@@ -19,20 +20,26 @@ This document summarizes the end-to-end testing implementation for GuildPass Mob
 ### Test Coverage (100% Acceptance Criteria Met)
 
 #### ✅ 1. Onboarding to Profile Navigation
+
 **File**: `.maestro/01-onboarding-to-profile.yaml`
+
 - Validates onboarding screen display
 - Tests "Get Started" button navigation
 - Confirms profile screen loads correctly
 
 #### ✅ 2. Manual Wallet Entry
+
 **File**: `.maestro/02-wallet-entry.yaml`
+
 - Tests wallet address input field
 - Validates wallet connection flow
 - Confirms connected state displays correct address
 - Tests wallet validation
 
 #### ✅ 3. Guild List and Detail Navigation
+
 **File**: `.maestro/03-guild-navigation.yaml`
+
 - Tests navigation to guilds list from profile
 - Validates guild cards display correctly
 - Tests navigation to guild detail screen
@@ -40,7 +47,9 @@ This document summarizes the end-to-end testing implementation for GuildPass Mob
 - Validates role list rendering
 
 #### ✅ 4. Access Check Success Path
+
 **File**: `.maestro/04-access-check-success.yaml`
+
 - Tests navigation to access check screen
 - Validates form inputs (wallet, guild ID, resource ID)
 - Tests successful access check submission
@@ -48,14 +57,18 @@ This document summarizes the end-to-end testing implementation for GuildPass Mob
 - Includes environment variable for API mocking
 
 #### ✅ 5. Access Check Failure Path
+
 **File**: `.maestro/05-access-check-failure.yaml`
+
 - Tests invalid access check scenario
 - Validates error handling
 - Confirms error message display
 - Tests with invalid guild/resource IDs
 
 #### ✅ 6. Reset App State
+
 **File**: `.maestro/06-reset-app-state.yaml`
+
 - Tests navigation to settings screen
 - Validates settings display (API URL, Chain ID, SDK version)
 - Tests reset app state button
@@ -64,6 +77,7 @@ This document summarizes the end-to-end testing implementation for GuildPass Mob
 ### Files Modified
 
 #### Screen Files (Added testID props)
+
 1. `app/onboarding.tsx` - Added testIDs for screen, title, subtitle, button
 2. `app/profile.tsx` - Added testIDs for wallet input, connect/disconnect buttons, navigation cards
 3. `app/guilds.tsx` - Added testIDs for screen, list
@@ -72,15 +86,18 @@ This document summarizes the end-to-end testing implementation for GuildPass Mob
 6. `app/settings.tsx` - Added testIDs for config values, reset button
 
 #### Component Files (Added testID prop support)
+
 1. `src/components/Button.tsx` - Added optional testID prop
 2. `src/components/WalletInput.tsx` - Added optional testID prop
 
 #### Documentation Files Created
+
 1. `.maestro/README.md` - Comprehensive E2E testing documentation
 2. `docs/e2e-testing-guide.md` - Detailed guide for contributors
 3. `docs/E2E_IMPLEMENTATION_SUMMARY.md` - This file
 
 #### Configuration Files Created
+
 1. `.maestro/config.yaml` - Maestro test suite configuration
 2. `.maestro/01-onboarding-to-profile.yaml` - Onboarding test flow
 3. `.maestro/02-wallet-entry.yaml` - Wallet connection test flow
@@ -90,9 +107,11 @@ This document summarizes the end-to-end testing implementation for GuildPass Mob
 7. `.maestro/06-reset-app-state.yaml` - Settings reset test flow
 
 #### CI/CD Files
+
 1. `.github/workflows/e2e-tests.yml` - GitHub Actions workflow for automated E2E testing
 
 #### Updated Files
+
 1. `package.json` - Added E2E test scripts
 2. `README.md` - Added E2E testing documentation section
 3. `.gitignore` - Added Maestro test result exclusions
@@ -100,6 +119,7 @@ This document summarizes the end-to-end testing implementation for GuildPass Mob
 ## Test ID Naming Convention
 
 Established consistent naming pattern:
+
 - **Screens**: `{screen-name}-screen` (e.g., `onboarding-screen`)
 - **Buttons**: `{action}-button` (e.g., `wallet-connect-button`)
 - **Inputs**: `{field-name}-input` (e.g., `wallet-address-input`)
@@ -134,11 +154,13 @@ pnpm test:e2e:studio
 ### CI/CD
 
 Tests run automatically on:
+
 - Push to `main` or `develop` branches
 - Pull requests targeting `main` or `develop`
 - Manual workflow dispatch
 
 Results are uploaded as GitHub Actions artifacts including:
+
 - JUnit test results
 - Screen recordings (`.mp4`)
 
@@ -152,6 +174,7 @@ env:
 ```
 
 Three mocking strategies documented:
+
 1. Mock Service Worker (MSW) - Recommended for complex scenarios
 2. Environment variables - Simple endpoint switching
 3. Conditional mocking in app code - Development-only mocks
@@ -159,6 +182,7 @@ Three mocking strategies documented:
 ## Documentation
 
 ### For Contributors
+
 - `.maestro/README.md` - Quick reference for running tests
 - `docs/e2e-testing-guide.md` - Comprehensive guide including:
   - Installation instructions
@@ -169,21 +193,22 @@ Three mocking strategies documented:
   - CI/CD integration
 
 ### For Maintainers
+
 - GitHub Actions workflow configured for iOS and Android
 - Artifact uploads for debugging
 - Test result exports in JUnit format
 
 ## Acceptance Criteria Status
 
-| Criterion | Status | Implementation |
-|-----------|--------|----------------|
-| E2E tests cover onboarding to profile navigation | ✅ Complete | `01-onboarding-to-profile.yaml` |
-| E2E tests cover manual wallet entry | ✅ Complete | `02-wallet-entry.yaml` |
-| E2E tests cover guild list and guild detail navigation | ✅ Complete | `03-guild-navigation.yaml` |
-| E2E tests cover access check success path | ✅ Complete | `04-access-check-success.yaml` |
-| E2E tests cover access check failure path | ✅ Complete | `05-access-check-failure.yaml` |
-| E2E tests cover reset app state | ✅ Complete | `06-reset-app-state.yaml` |
-| README documents how to run the E2E suite locally | ✅ Complete | Updated `README.md` with E2E section |
+| Criterion                                              | Status      | Implementation                       |
+| ------------------------------------------------------ | ----------- | ------------------------------------ |
+| E2E tests cover onboarding to profile navigation       | ✅ Complete | `01-onboarding-to-profile.yaml`      |
+| E2E tests cover manual wallet entry                    | ✅ Complete | `02-wallet-entry.yaml`               |
+| E2E tests cover guild list and guild detail navigation | ✅ Complete | `03-guild-navigation.yaml`           |
+| E2E tests cover access check success path              | ✅ Complete | `04-access-check-success.yaml`       |
+| E2E tests cover access check failure path              | ✅ Complete | `05-access-check-failure.yaml`       |
+| E2E tests cover reset app state                        | ✅ Complete | `06-reset-app-state.yaml`            |
+| README documents how to run the E2E suite locally      | ✅ Complete | Updated `README.md` with E2E section |
 
 ## Benefits
 
@@ -239,6 +264,7 @@ When modifying screens:
 ## Contact
 
 For questions about E2E testing implementation:
+
 - Open an issue on GitHub
 - Contact maintainer: cerealboxx123@gmail.com
 - Review documentation in `docs/e2e-testing-guide.md`

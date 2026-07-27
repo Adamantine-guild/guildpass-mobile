@@ -37,7 +37,4 @@ export type {
   PinningConfig,
 } from "./security.types";
 
-export {
-  GUILDPASS_API_DOMAIN,
-  GUILDPASS_STAGING_DOMAIN,
-} from "./security.types";
+export { GUILDPASS_API_DOMAIN, GUILDPASS_STAGING_DOMAIN } from "./security.types";

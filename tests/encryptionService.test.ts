@@ -7,10 +7,7 @@
  */
 
 import { describe, it, expect, beforeEach } from "vitest";
-import {
-  EncryptionService,
-  EncryptionError,
-} from "../src/lib/encryptionService";
+import { EncryptionService, EncryptionError } from "../src/lib/encryptionService";
 
 const KEY_BYTES = new Uint8Array(32);
 for (let i = 0; i < KEY_BYTES.length; i++) {
@@ -49,14 +46,10 @@ beforeEach(() => {
 describe("EncryptionService – key handling", () => {
   it("rejects raw keys that are not exactly 32 bytes", async () => {
     const tooShort = new Uint8Array(16).buffer;
-    await expect(
-      service.encrypt("hello", tooShort),
-    ).rejects.toMatchObject({ code: "INVALID_KEY" });
+    await expect(service.encrypt("hello", tooShort)).rejects.toMatchObject({ code: "INVALID_KEY" });
 
     const tooLong = new Uint8Array(64).buffer;
-    await expect(
-      service.encrypt("hello", tooLong),
-    ).rejects.toMatchObject({ code: "INVALID_KEY" });
+    await expect(service.encrypt("hello", tooLong)).rejects.toMatchObject({ code: "INVALID_KEY" });
   });
 
   it("validates keys via the public validateKey helper", async () => {
@@ -68,16 +61,8 @@ describe("EncryptionService – key handling", () => {
     const cryptoKey = await service.importKey(KEY_BUFFER);
     expect(await service.validateKey(cryptoKey)).toBe(true);
 
-    const { encrypted, nonce, authTag } = await service.encrypt(
-      "payload",
-      cryptoKey,
-    );
-    const { decrypted } = await service.decrypt(
-      encrypted,
-      nonce,
-      authTag,
-      cryptoKey,
-    );
+    const { encrypted, nonce, authTag } = await service.encrypt("payload", cryptoKey);
+    const { decrypted } = await service.decrypt(encrypted, nonce, authTag, cryptoKey);
     expect(decrypted).toBe("payload");
   });
 });
@@ -90,16 +75,8 @@ describe("EncryptionService – round-trip integrity (Req 6.1)", () => {
   });
 
   it("round-trips a typical-sized cache payload exactly", async () => {
-    const { encrypted, nonce, authTag } = await service.encrypt(
-      TYPICAL_PAYLOAD,
-      KEY_BUFFER,
-    );
-    const { decrypted } = await service.decrypt(
-      encrypted,
-      nonce,
-      authTag,
-      KEY_BUFFER,
-    );
+    const { encrypted, nonce, authTag } = await service.encrypt(TYPICAL_PAYLOAD, KEY_BUFFER);
+    const { decrypted } = await service.decrypt(encrypted, nonce, authTag, KEY_BUFFER);
     // EncryptionService.decrypt auto-parses JSON payloads, so the round-trip
     // value is the rehydrated object graph, not the original string.
     expect(decrypted).toEqual(JSON.parse(TYPICAL_PAYLOAD));
@@ -126,18 +103,18 @@ describe("EncryptionService – tamper detection (Req 6.2 / 1.6)", () => {
     tampered[0] ^= 0xff; // flip a single bit in the first byte
     const tamperedBuffer = tampered.buffer.slice(0);
 
-    await expect(
-      service.decrypt(tamperedBuffer, nonce, authTag, KEY_BUFFER),
-    ).rejects.toMatchObject({ code: "AUTHENTICATION_FAILED" });
+    await expect(service.decrypt(tamperedBuffer, nonce, authTag, KEY_BUFFER)).rejects.toMatchObject(
+      { code: "AUTHENTICATION_FAILED" },
+    );
   });
 
   it("rejects a flipped auth-tag byte", async () => {
     const { encrypted, nonce, authTag } = await service.encrypt("secret", KEY_BUFFER);
     const tamperedTag = new Uint8Array(authTag);
     tamperedTag[0] ^= 0x01;
-    await expect(
-      service.decrypt(encrypted, nonce, tamperedTag, KEY_BUFFER),
-    ).rejects.toMatchObject({ code: "AUTHENTICATION_FAILED" });
+    await expect(service.decrypt(encrypted, nonce, tamperedTag, KEY_BUFFER)).rejects.toMatchObject({
+      code: "AUTHENTICATION_FAILED",
+    });
   });
 
   it("rejects a wrong key with AUTHENTICATION_FAILED", async () => {

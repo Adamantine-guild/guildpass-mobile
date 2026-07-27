@@ -77,7 +77,7 @@ async function getCurrentVersion(db: SQLite.WebSQLDatabase): Promise<number> {
         [],
         (_tx, resultSet) => {
           const rows = resultSet.rows as unknown as SchemaMigrationRow[];
-          const version = rows.length > 0 ? rows[0].version ?? 0 : 0;
+          const version = rows.length > 0 ? (rows[0].version ?? 0) : 0;
           resolve(version);
         },
         () => {

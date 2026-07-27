@@ -8,9 +8,6 @@ module.exports = {
     },
   },
   rules: {
-    "import/no-unresolved": [
-      "error",
-      { ignore: ["^@guildpass/sdk$"] },
-    ],
+    "import/no-unresolved": ["error", { ignore: ["^@guildpass/sdk$"] }],
   },
 };

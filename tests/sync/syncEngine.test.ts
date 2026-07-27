@@ -19,6 +19,7 @@ import {
 } from "../../src/features/sync/syncEngine";
 import { useSyncStore } from "../../src/features/sync/sync.store";
 import { computeEntityVersion } from "../../src/features/sync/reconcile";
+import { queryKeys } from "../../src/lib/queryKeys";
 import {
   MEMBERSHIP_ACTIVE_FIXTURE,
   TEST_WALLET_ADDRESS,
@@ -73,6 +74,8 @@ describe("sync engine – acceptance scenario: cached grant revoked server-side"
       queryClient,
       fetchers,
       syncStore: useSyncStore,
+      // #225 added per-entity retry; keep these assertions off the real clock.
+      sleep: async () => {},
       isOnline: () => true,
     });
 
@@ -107,6 +110,8 @@ describe("sync engine – acceptance scenario: cached grant revoked server-side"
         "user-roles": vi.fn().mockResolvedValue([]),
       }),
       syncStore: useSyncStore,
+      // #225 added per-entity retry; keep these assertions off the real clock.
+      sleep: async () => {},
       isOnline: () => true,
       now: () => now,
     });
@@ -125,6 +130,41 @@ describe("sync engine – acceptance scenario: cached grant revoked server-side"
     expect(useSyncStore.getState().status).toBe("idle");
     expect(useSyncStore.getState().lastSyncCompletedAt).toBe(now);
   });
+
+  it("refreshes the wallet pass list aggregate after reconnect reconciliation", async () => {
+    queryClient.setQueryData(queryKeys.memberships.byWallet(TEST_WALLET_ADDRESS), [
+      {
+        guildId: "guild_abc",
+        isActive: true,
+        roleCount: 2,
+        status: "active",
+      },
+    ]);
+    const engine = createSyncEngine({
+      queryClient,
+      fetchers: makeFetchers({
+        membership: vi.fn().mockResolvedValue({ ...MEMBERSHIP_REVOKED, status: "revoked" }),
+        "user-roles": vi.fn().mockResolvedValue([]),
+      }),
+      syncStore: useSyncStore,
+      sleep: async () => {},
+      isOnline: () => true,
+    });
+
+    await engine.runReconciliation();
+
+    expect(
+      queryClient.getQueryData(queryKeys.memberships.byWallet(TEST_WALLET_ADDRESS)),
+    ).toStrictEqual([
+      {
+        guildId: "guild_abc",
+        isActive: false,
+        roleCount: 0,
+        status: "revoked",
+        lastSyncedAt: expect.any(Number),
+      },
+    ]);
+  });
 });
 
 describe("sync engine – behaviour", () => {
@@ -142,6 +182,8 @@ describe("sync engine – behaviour", () => {
       queryClient,
       fetchers,
       syncStore: useSyncStore,
+      // #225 added per-entity retry; keep these assertions off the real clock.
+      sleep: async () => {},
       isOnline: () => false,
     });
 
@@ -161,6 +203,8 @@ describe("sync engine – behaviour", () => {
         membership: vi.fn().mockResolvedValue({ ...MEMBERSHIP_ACTIVE_FIXTURE }),
       }),
       syncStore: useSyncStore,
+      // #225 added per-entity retry; keep these assertions off the real clock.
+      sleep: async () => {},
       isOnline: () => true,
     });
 
@@ -170,9 +214,7 @@ describe("sync engine – behaviour", () => {
     expect(summary.entitiesUpdated).toBe(0);
     expect(useSyncStore.getState().corrections).toStrictEqual([]);
     // Metadata still refreshes: the entity was confirmed against the server.
-    expect(
-      useSyncStore.getState().entityMeta[serializeQueryKey(MEMBERSHIP_KEY)],
-    ).toBeDefined();
+    expect(useSyncStore.getState().entityMeta[serializeQueryKey(MEMBERSHIP_KEY)]).toBeDefined();
   });
 
   it("continues reconciling other entities when one fetch fails", async () => {
@@ -186,6 +228,8 @@ describe("sync engine – behaviour", () => {
         guild: vi.fn().mockResolvedValue(deactivatedGuild),
       }),
       syncStore: useSyncStore,
+      // #225 added per-entity retry; keep these assertions off the real clock.
+      sleep: async () => {},
       isOnline: () => true,
     });
 
@@ -213,6 +257,8 @@ describe("sync engine – behaviour", () => {
       queryClient,
       fetchers,
       syncStore: useSyncStore,
+      // #225 added per-entity retry; keep these assertions off the real clock.
+      sleep: async () => {},
       isOnline: () => true,
     });
 
@@ -228,6 +274,8 @@ describe("sync engine – behaviour", () => {
       queryClient,
       fetchers: makeFetchers({ membership: vi.fn().mockResolvedValue(undefined) }),
       syncStore: useSyncStore,
+      // #225 added per-entity retry; keep these assertions off the real clock.
+      sleep: async () => {},
       isOnline: () => true,
     });
 
@@ -248,6 +296,8 @@ describe("sync engine – behaviour", () => {
       queryClient,
       fetchers: makeFetchers({ membership }),
       syncStore: useSyncStore,
+      // #225 added per-entity retry; keep these assertions off the real clock.
+      sleep: async () => {},
       isOnline: () => true,
     });
 
@@ -272,6 +322,8 @@ describe("sync engine – behaviour", () => {
       queryClient,
       fetchers: makeFetchers({ membership }),
       syncStore: useSyncStore,
+      // #225 added per-entity retry; keep these assertions off the real clock.
+      sleep: async () => {},
       isOnline: () => true,
     });
 

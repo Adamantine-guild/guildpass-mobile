@@ -5,7 +5,6 @@
  * unit-tested without a network, a QueryClient, or any UI.
  */
 
-import { PERSISTABLE_QUERY_KEY_ROOTS } from "../../lib/offlineCache";
 import { isWalletScopedQueryRoot } from "../../lib/queryKeys";
 import type {
   SyncCorrection,
@@ -15,13 +14,16 @@ import type {
   SyncEntityKind,
 } from "./sync.types";
 
-/** Query-key roots the reconciliation pass covers: derived from the offline
- * cache allowlist so the two never drift. The "access-check" root is a
- * mutation namespace, not a cached server entity, so it is excluded. */
-export const RECONCILED_QUERY_KEY_ROOTS: readonly SyncEntityKind[] =
-  PERSISTABLE_QUERY_KEY_ROOTS.filter(
-    (root): root is SyncEntityKind => root !== "access-check",
-  );
+/** Query-key roots the reconciliation pass covers. Being persistable and being
+ * server-reconcilable are separate properties; aggregate/client-only roots
+ * such as "memberships" are persisted but refreshed indirectly. */
+export const RECONCILED_QUERY_KEY_ROOTS: readonly SyncEntityKind[] = [
+  "membership",
+  "user-roles",
+  "guild",
+  "guild-config",
+  "guild-roles",
+];
 
 /**
  * Parses a React Query key into a sync entity descriptor.
@@ -32,9 +34,7 @@ export const RECONCILED_QUERY_KEY_ROOTS: readonly SyncEntityKind[] =
  *   ["user-roles", walletAddress, guildId]
  *   ["guild", guildId] / ["guild-config", guildId] / ["guild-roles", guildId]
  */
-export function describeSyncableQuery(
-  queryKey: readonly unknown[],
-): SyncEntityDescriptor | null {
+export function describeSyncableQuery(queryKey: readonly unknown[]): SyncEntityDescriptor | null {
   const root = queryKey[0];
   if (typeof root !== "string") return null;
   const kind = RECONCILED_QUERY_KEY_ROOTS.find((k) => k === root);
@@ -113,13 +113,8 @@ function roleNames(value: unknown): string[] | null {
   return names;
 }
 
-function correctionId(
-  type: SyncCorrectionType,
-  descriptor: SyncEntityDescriptor,
-): string {
-  return [type, descriptor.kind, descriptor.guildId, descriptor.walletAddress ?? "-"].join(
-    ":",
-  );
+function correctionId(type: SyncCorrectionType, descriptor: SyncEntityDescriptor): string {
+  return [type, descriptor.kind, descriptor.guildId, descriptor.walletAddress ?? "-"].join(":");
 }
 
 function makeCorrection(
@@ -310,6 +305,10 @@ export function diffEntity(
     case "guild-roles":
       // Guild-wide role catalogs are refreshed silently; they do not change
       // what the current user can access on their own.
+      return [];
+    default:
+      // memberships, profile, user-profile — no diff logic yet; the server
+      // value is adopted silently with no corrections surfaced.
       return [];
   }
 }

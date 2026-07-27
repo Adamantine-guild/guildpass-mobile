@@ -1,4 +1,5 @@
 import React from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import TestRenderer, { act } from "react-test-renderer";
 import { describe, expect, it, vi } from "vitest";
 import { AccessHistoryList } from "../src/components/AccessHistoryList";
@@ -9,12 +10,40 @@ vi.mock("react-native", () => ({
   Text: "Text",
   ScrollView: "ScrollView",
   TouchableOpacity: "TouchableOpacity",
+  Platform: { OS: "ios", select: (objs: Record<string, unknown>) => objs.ios ?? objs.default },
+  DeviceEventEmitter: {
+    addListener: vi.fn(() => ({ remove: vi.fn() })),
+    removeListener: vi.fn(),
+    emit: vi.fn(),
+  },
+  NativeModules: {},
+  NativeEventEmitter: vi.fn(() => ({
+    addListener: vi.fn(() => ({ remove: vi.fn() })),
+    removeListener: vi.fn(),
+  })),
+  Linking: {
+    openURL: vi.fn(),
+    canOpenURL: vi.fn(),
+    addEventListener: vi.fn(() => ({ remove: vi.fn() })),
+  },
 }));
+
+vi.mock("../src/features/guilds/useGuildName", () => ({
+  useResolvedGuildName: (guildId: string) => (guildId === "guild-alpha" ? "Guild Alpha" : guildId),
+}));
+
+function renderWithClient(ui: React.ReactElement) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+    },
+  });
+  return TestRenderer.create(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+}
 
 const entry: AccessHistoryEntry = {
   id: "entry-1",
   guildId: "guild-alpha",
-  guildName: "Guild Alpha",
   resourceId: "vip-door",
   resourceName: "VIP Door",
   status: "denied",
@@ -26,7 +55,7 @@ const entry: AccessHistoryEntry = {
 
 describe("AccessHistoryList", () => {
   it("renders the header and count while collapsed", () => {
-    const renderer = TestRenderer.create(<AccessHistoryList entries={[entry]} onClear={vi.fn()} />);
+    const renderer = renderWithClient(<AccessHistoryList entries={[entry]} onClear={vi.fn()} />);
 
     const heading = renderer.root.findByProps({
       className: "text-lg font-bold text-text mb-3",
@@ -34,14 +63,14 @@ describe("AccessHistoryList", () => {
 
     const output = JSON.stringify(renderer.toJSON());
 
-    expect(heading.children.join("")).toBe("Recent Access Checks (1)");
+    expect(heading.children!.join("")).toBe("Recent Access Checks (1)");
     expect(output).toContain("Clear");
     expect(output).toContain("Show");
     expect(output).not.toContain("VIP Door");
   });
 
   it("expands to show entry details and collapses again", () => {
-    const renderer = TestRenderer.create(<AccessHistoryList entries={[entry]} onClear={vi.fn()} />);
+    const renderer = renderWithClient(<AccessHistoryList entries={[entry]} onClear={vi.fn()} />);
 
     act(() => {
       renderer.root.findByProps({ accessibilityLabel: "Expand access history" }).props.onPress();
@@ -64,7 +93,7 @@ describe("AccessHistoryList", () => {
 
   it("calls onClear exactly once", () => {
     const onClear = vi.fn();
-    const renderer = TestRenderer.create(<AccessHistoryList entries={[entry]} onClear={onClear} />);
+    const renderer = renderWithClient(<AccessHistoryList entries={[entry]} onClear={onClear} />);
 
     act(() => {
       renderer.root.findByProps({ accessibilityLabel: "Clear History" }).props.onPress();
@@ -74,7 +103,7 @@ describe("AccessHistoryList", () => {
   });
 
   it("shows the empty state when expanded", () => {
-    const renderer = TestRenderer.create(<AccessHistoryList entries={[]} onClear={vi.fn()} />);
+    const renderer = renderWithClient(<AccessHistoryList entries={[]} onClear={vi.fn()} />);
 
     act(() => {
       renderer.root.findByProps({ accessibilityLabel: "Expand access history" }).props.onPress();
@@ -84,7 +113,7 @@ describe("AccessHistoryList", () => {
   });
 
   it("does not render sensitive values when expanded", () => {
-    const renderer = TestRenderer.create(<AccessHistoryList entries={[entry]} onClear={vi.fn()} />);
+    const renderer = renderWithClient(<AccessHistoryList entries={[entry]} onClear={vi.fn()} />);
 
     act(() => {
       renderer.root.findByProps({ accessibilityLabel: "Expand access history" }).props.onPress();

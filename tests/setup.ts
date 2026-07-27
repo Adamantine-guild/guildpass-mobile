@@ -1,7 +1,46 @@
 import { vi } from "vitest";
 
-// Define __DEV__ for React Native/Expo modules in node test environment
+// Define __DEV__ and default EXPO_PUBLIC env vars for React Native/Expo modules in node test environment
 (global as any).__DEV__ = true;
+process.env.EXPO_PUBLIC_API_URL = process.env.EXPO_PUBLIC_API_URL || "https://api.guildpass.xyz";
+process.env.EXPO_PUBLIC_CHAIN_ID = process.env.EXPO_PUBLIC_CHAIN_ID || "1";
+
+// Global mock for react-native to avoid Flow import typeof syntax in Node
+vi.mock("react-native", () => ({
+  Platform: {
+    OS: "ios",
+    select: (objs: Record<string, unknown>) => objs.ios ?? objs.default,
+  },
+  AppState: {
+    currentState: "active",
+    addEventListener: vi.fn(() => ({ remove: vi.fn() })),
+    removeEventListener: vi.fn(),
+  },
+  DeviceEventEmitter: {
+    addListener: vi.fn(() => ({ remove: vi.fn() })),
+    removeListener: vi.fn(),
+    emit: vi.fn(),
+  },
+  NativeModules: {},
+  NativeEventEmitter: vi.fn(() => ({
+    addListener: vi.fn(() => ({ remove: vi.fn() })),
+    removeListener: vi.fn(),
+  })),
+  Linking: {
+    openURL: vi.fn(),
+    canOpenURL: vi.fn(),
+    addEventListener: vi.fn(() => ({ remove: vi.fn() })),
+  },
+  View: "View",
+  Text: "Text",
+  ScrollView: "ScrollView",
+  TextInput: "TextInput",
+  TouchableOpacity: "TouchableOpacity",
+  ActivityIndicator: "ActivityIndicator",
+  SafeAreaView: "SafeAreaView",
+  Pressable: "Pressable",
+  StyleSheet: { create: (styles: Record<string, unknown>) => styles },
+}));
 
 // Mock AsyncStorage
 vi.mock("@react-native-async-storage/async-storage", () => ({
@@ -67,3 +106,59 @@ vi.mock("expo-sqlite", () => {
     },
   };
 });
+
+// Mock expo-camera and expo-camera/next
+vi.mock("expo-camera/next", () => ({
+  CameraView: () => null,
+  useCameraPermissions: vi.fn(() => [{ granted: true }, vi.fn()]),
+}));
+vi.mock("expo-camera", () => ({
+  Camera: () => null,
+  CameraView: () => null,
+  useCameraPermissions: vi.fn(() => [{ granted: true }, vi.fn()]),
+}));
+
+// Mock expo-notifications
+vi.mock("expo-notifications", () => ({
+  setNotificationHandler: vi.fn(),
+  getPermissionsAsync: vi.fn(async () => ({
+    status: "granted",
+    canAskAgain: false,
+    granted: true,
+  })),
+  requestPermissionsAsync: vi.fn(async () => ({
+    status: "granted",
+    canAskAgain: false,
+    granted: true,
+  })),
+  getExpoPushTokenAsync: vi.fn(async () => ({
+    data: "ExponentPushToken[mock-token]",
+  })),
+  setNotificationChannelAsync: vi.fn(async () => ({})),
+  addNotificationReceivedListener: vi.fn(() => ({ remove: vi.fn() })),
+  addNotificationResponseReceivedListener: vi.fn(() => ({ remove: vi.fn() })),
+  setBadgeCountAsync: vi.fn(async () => {}),
+  dismissAllNotificationsAsync: vi.fn(async () => {}),
+  PermissionStatus: {
+    GRANTED: "granted",
+    DENIED: "denied",
+    UNDETERMINED: "undetermined",
+  },
+  AndroidImportance: {
+    MAX: 5,
+  },
+}));
+
+// Mock expo-constants
+vi.mock("expo-constants", () => ({
+  default: {
+    isDevice: true,
+    expoConfig: {
+      extra: {
+        eas: {
+          projectId: "mock-project-id",
+        },
+      },
+    },
+  },
+}));

@@ -5,10 +5,7 @@ import {
   QR_SIGNATURE_ERROR_CODES,
   verifyQrSignature,
 } from "../src/features/access/qrSignature";
-import {
-  signQrPayload,
-  TEST_ISSUER_PUBLIC_KEY,
-} from "./fixtures/qrSignature.fixtures";
+import { signQrPayload, TEST_ISSUER_PUBLIC_KEY } from "./fixtures/qrSignature.fixtures";
 
 const fields = {
   guildId: "guild_abc",
@@ -21,10 +18,10 @@ describe("buildSigningMessage", () => {
   it("canonicalizes fields in a fixed order with empty strings for absent ones", () => {
     // type + version are pinned to the canonical constants by the scheme.
     expect(buildSigningMessage({ guildId: "g", resourceId: "r" })).toBe(
-      ["guildpass.access-check", "1", "g", "r", "", "", ""].join("\n"),
+      ["guildpass.access-check", "2", "g", "r", "", "", ""].join("\n"),
     );
     expect(buildSigningMessage({ guildId: "g", resourceId: "r", kid: "key-1" })).toBe(
-      ["guildpass.access-check", "1", "g", "r", "", "", "key-1"].join("\n"),
+      ["guildpass.access-check", "2", "g", "r", "", "", "key-1"].join("\n"),
     );
   });
 
@@ -56,7 +53,11 @@ describe("verifyQrSignature", () => {
     const signature = signQrPayload(fields);
     let caught: unknown;
     try {
-      verifyQrSignature({ ...fields, resourceId: "tampered-door" }, signature, TEST_ISSUER_PUBLIC_KEY);
+      verifyQrSignature(
+        { ...fields, resourceId: "tampered-door" },
+        signature,
+        TEST_ISSUER_PUBLIC_KEY,
+      );
     } catch (e) {
       caught = e;
     }
@@ -85,7 +86,9 @@ describe("verifyQrSignature", () => {
       caught = e;
     }
     expect(caught).toBeInstanceOf(QrSignatureError);
-    expect((caught as QrSignatureError).code).toBe(QR_SIGNATURE_ERROR_CODES.INVALID_SIGNATURE_FORMAT);
+    expect((caught as QrSignatureError).code).toBe(
+      QR_SIGNATURE_ERROR_CODES.INVALID_SIGNATURE_FORMAT,
+    );
   });
 
   it("rejects an invalid public key with PUBLIC_KEY_UNAVAILABLE", () => {

@@ -20,12 +20,20 @@ export type GuildFixture = {
   isActive: boolean;
 };
 
+export type GuildListItemFixture = {
+  id: string;
+  name: string;
+  isActive: boolean;
+  roleCount?: number;
+};
+
 export type GuildConfigFixture = {
   guildId: string;
   requiredRoles: string[];
   accessPolicy: "any" | "all";
   /** Hex-encoded secp256k1 public key the guild uses to sign QR payloads. */
   issuerPublicKey?: string;
+  issuerKeys?: Record<string, string> | Array<{ kid: string; publicKey: string; status?: "active" | "revoked" }>;
   /** Optional per-requirement chain metadata from the backend. */
   requirements?: Array<{
     id: string;
@@ -107,11 +115,24 @@ export const GUILD_DETAIL_INACTIVE_FIXTURE: GuildFixture = {
 // Guild config
 // ---------------------------------------------------------------------------
 
+export const WALLET_GUILDS_FIXTURE: GuildListItemFixture[] = [
+  { id: GUILD_DETAIL_FIXTURE.id, name: GUILD_DETAIL_FIXTURE.name, isActive: true, roleCount: 3 },
+  {
+    id: GUILD_DETAIL_NO_DESCRIPTION_FIXTURE.id,
+    name: GUILD_DETAIL_NO_DESCRIPTION_FIXTURE.name,
+    isActive: true,
+    roleCount: 0,
+  },
+];
+
+export const WALLET_GUILDS_EMPTY_FIXTURE: GuildListItemFixture[] = [];
+
 export const GUILD_CONFIG_FIXTURE: GuildConfigFixture = {
   guildId: "guild_abc",
   requiredRoles: ["member", "admin"],
   accessPolicy: "any",
   issuerPublicKey: TEST_ISSUER_PUBLIC_KEY,
+  issuerKeys: { "key-1": TEST_ISSUER_PUBLIC_KEY },
 };
 
 export const GUILD_MIXED_CHAIN_CONFIG_FIXTURE: GuildConfigFixture = {

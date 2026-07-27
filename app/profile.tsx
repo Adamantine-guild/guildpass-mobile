@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, TouchableOpacity } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, RefreshControl } from "react-native";
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "expo-router";
 import { useWallet } from "../src/features/wallet/useWallet";
@@ -6,7 +6,7 @@ import { useWalletConnectModal } from "../src/features/wallet/WalletConnectProvi
 import { useWalletStore } from "../src/features/wallet/wallet.store";
 import { AppHeader } from "../src/components/AppHeader";
 import { Card } from "../src/components/Card";
-import { AddressChip } from "../src/components/AddressChip";
+import { WalletAddress } from "../src/components/WalletAddress";
 import { WalletInput } from "../src/components/WalletInput";
 import { Button } from "../src/components/Button";
 import { StaleDataBanner } from "../src/components/StaleDataBanner";
@@ -25,13 +25,25 @@ const CONNECTION_LABELS: Record<string, string> = {
 
 export default function Profile() {
   const router = useRouter();
-  const { walletAddress, isConnected, connectionKind, connectManually, disconnect } = useWallet();
+  const { walletAddress, isConnected, connectionKind, isVerified, verifyOwnership, connectManually, disconnect } = useWallet();
   const { open } = useWalletConnectModal();
   const { isOffline } = useNetworkStatus();
   const [inputValue, setInputValue] = useState(walletAddress || "");
   const [error, setError] = useState<string | null>(null);
   const [showManualEntry, setShowManualEntry] = useState(false);
   const [wcConnecting, setWcConnecting] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+
+  const handleVerifyOwnership = async () => {
+    setIsVerifying(true);
+    setVerifyError(null);
+    const { success, error } = await verifyOwnership();
+    if (!success) {
+      setVerifyError(error || "Verification failed");
+    }
+    setIsVerifying(false);
+  };
 
   // ── Field-level validation state ────────────────────────────────────
   const [fieldError, setFieldError] = useState<string | null>(null);
@@ -76,9 +88,7 @@ export default function Profile() {
     };
   }, []);
 
-  const isAddressValid = inputValue.trim()
-    ? validateAddressInput(inputValue).valid
-    : false;
+  const isAddressValid = inputValue.trim() ? validateAddressInput(inputValue).valid : false;
 
   // ── WalletConnect flow ──────────────────────────────────────────────
   const handleWalletConnect = async () => {
@@ -120,10 +130,31 @@ export default function Profile() {
   const membershipsQuery = useMembershipsQuery();
   const staleState = useStaleQuery(membershipsQuery);
 
+  // ── Pull-to-refresh ─────────────────────────────────────────────────
+  const [isManuallyRefreshing, setIsManuallyRefreshing] = useState(false);
+
+  const handleRefresh = useCallback(async () => {
+    if (!isConnected) return;
+    setIsManuallyRefreshing(true);
+    try {
+      await membershipsQuery.refetch();
+    } finally {
+      setIsManuallyRefreshing(false);
+    }
+  }, [isConnected, membershipsQuery.refetch]);
+
+  const isRefreshing = isConnected && (isManuallyRefreshing || membershipsQuery.isRefetching);
+
   return (
-    <View className="flex-1 bg-background" testID="profile-screen">
+    <View className="flex-1 bg-background dark:bg-slate-900" testID="profile-screen">
       <AppHeader title="Profile" />
-      <ScrollView className="flex-1 px-4 py-6">
+      <ScrollView
+        className="flex-1 px-4 py-6"
+        testID="profile-scroll-view"
+        refreshControl={
+          <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} testID="profile-refresh-control" />
+        }
+      >
         {staleState.isOffline ? (
           <StaleDataBanner reason="offline" lastSyncedAt={staleState.lastSyncedAt} />
         ) : staleState.isStale && staleState.reason ? (
@@ -131,20 +162,20 @@ export default function Profile() {
         ) : null}
         {!isConnected ? (
           <View testID="wallet-connect-form">
-            <Text className="text-2xl font-bold text-text mb-2">Connect Wallet</Text>
-            <Text className="text-text-muted mb-8">
+            <Text className="text-2xl font-bold text-text dark:text-slate-100 mb-2">Connect Wallet</Text>
+            <Text className="text-text-muted dark:text-slate-400 mb-8">
               Connect your wallet to view your memberships and roles.
             </Text>
 
             {/* ── WalletConnect primary CTA ── */}
             <Card className="mb-6">
               <View className="flex-row items-center mb-4">
-                <View className="w-10 h-10 bg-primary/10 rounded-full items-center justify-center mr-3">
+                <View className="w-10 h-10 bg-primary/10 dark:bg-primary/20 rounded-full items-center justify-center mr-3">
                   <Text className="text-primary text-lg">🔗</Text>
                 </View>
                 <View className="flex-1">
-                  <Text className="text-lg font-bold text-text">WalletConnect</Text>
-                  <Text className="text-text-muted text-sm">
+                  <Text className="text-lg font-bold text-text dark:text-slate-100">WalletConnect</Text>
+                  <Text className="text-text-muted dark:text-slate-400 text-sm">
                     Connect with MetaMask, Trust Wallet, Rainbow & more
                   </Text>
                 </View>
@@ -159,9 +190,9 @@ export default function Profile() {
 
             {/* ── Divider ── */}
             <View className="flex-row items-center mb-6">
-              <View className="flex-1 h-px bg-border" />
-              <Text className="mx-4 text-text-muted text-sm">or</Text>
-              <View className="flex-1 h-px bg-border" />
+              <View className="flex-1 h-px bg-border dark:bg-slate-700" />
+              <Text className="mx-4 text-text-muted dark:text-slate-400 text-sm">or</Text>
+              <View className="flex-1 h-px bg-border dark:bg-slate-700" />
             </View>
 
             {/* ── Manual entry fallback ── */}
@@ -202,7 +233,7 @@ export default function Profile() {
                   className="items-center mt-4 py-2"
                   testID="hide-manual-entry-button"
                 >
-                  <Text className="text-text-muted text-sm">Cancel</Text>
+                  <Text className="text-text-muted dark:text-slate-400 text-sm">Cancel</Text>
                 </TouchableOpacity>
               </Card>
             )}
@@ -210,15 +241,48 @@ export default function Profile() {
         ) : (
           <View testID="profile-connected">
             <Card className="mb-6">
-              <Text className="text-text-muted text-sm mb-1">
+              <Text className="text-text-muted dark:text-slate-400 text-sm mb-1">
                 CONNECTED WALLET
                 {connectionKind ? ` · ${CONNECTION_LABELS[connectionKind] ?? connectionKind}` : ""}
               </Text>
               <View className="mb-4">
                 {walletAddress ? (
-                  <AddressChip address={walletAddress} testID="connected-wallet-address" />
+                  <WalletAddress address={walletAddress} testID="connected-wallet-address" />
+                  <View className="flex-row items-center justify-between">
+                    <WalletAddress address={walletAddress} testID="connected-wallet-address" />
+                    {isVerified ? (
+                      <View className="bg-green-100 dark:bg-green-900/30 px-2 py-1 rounded">
+                        <Text className="text-green-700 dark:text-green-400 text-xs font-bold">✓ Verified</Text>
+                      </View>
+                    ) : connectionKind === "manual" ? (
+                      <View className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">
+                        <Text className="text-slate-500 dark:text-slate-400 text-xs font-bold">Unverified</Text>
+                      </View>
+                    ) : null}
+                  </View>
                 ) : null}
               </View>
+
+              {!isVerified && connectionKind !== "manual" ? (
+                <View className="mb-4 p-3 bg-primary/10 dark:bg-primary/5 rounded-lg border border-primary/20">
+                  <Text className="text-text dark:text-slate-100 text-sm mb-2 font-medium">
+                    Verify Ownership
+                  </Text>
+                  <Text className="text-text-muted dark:text-slate-400 text-xs mb-3">
+                    Sign a message to verify you control this wallet and unlock full access.
+                  </Text>
+                  {verifyError ? (
+                    <Text className="text-red-500 text-xs mb-3">{verifyError}</Text>
+                  ) : null}
+                  <Button
+                    title={isVerifying ? "Verifying..." : "Verify Wallet"}
+                    onPress={handleVerifyOwnership}
+                    loading={isVerifying}
+                    testID="verify-ownership-button"
+                  />
+                </View>
+              ) : null}
+
               <Button
                 title="Disconnect"
                 onPress={handleDisconnect}
@@ -239,8 +303,8 @@ export default function Profile() {
               >
                 <Card className="flex-row justify-between items-center">
                   <View>
-                    <Text className="text-xl font-bold text-text">My Guilds</Text>
-                    <Text className="text-text-muted">View your memberships and roles</Text>
+                    <Text className="text-xl font-bold text-text dark:text-slate-100">My Guilds</Text>
+                    <Text className="text-text-muted dark:text-slate-400">View your memberships and roles</Text>
                   </View>
                   <Text className="text-primary text-2xl">→</Text>
                 </Card>
@@ -257,8 +321,8 @@ export default function Profile() {
               >
                 <Card className="flex-row justify-between items-center">
                   <View>
-                    <Text className="text-xl font-bold text-text">Access Check</Text>
-                    <Text className="text-text-muted">Verify resource access status</Text>
+                    <Text className="text-xl font-bold text-text dark:text-slate-100">Access Check</Text>
+                    <Text className="text-text-muted dark:text-slate-400">Verify resource access status</Text>
                   </View>
                   <Text className="text-primary text-2xl">→</Text>
                 </Card>
@@ -275,8 +339,8 @@ export default function Profile() {
               >
                 <Card className="flex-row justify-between items-center">
                   <View>
-                    <Text className="text-xl font-bold text-text">App Settings</Text>
-                    <Text className="text-text-muted">Configuration and info</Text>
+                    <Text className="text-xl font-bold text-text dark:text-slate-100">App Settings</Text>
+                    <Text className="text-text-muted dark:text-slate-400">Configuration and info</Text>
                   </View>
                   <Text className="text-primary text-2xl">→</Text>
                 </Card>

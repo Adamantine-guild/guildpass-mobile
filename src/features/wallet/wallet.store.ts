@@ -10,9 +10,10 @@ export const useWalletStore = create<WalletState & WalletActions & { _hasHydrate
       walletAddress: null,
       isConnected: false,
       connectionKind: null,
+      isVerified: false,
       _hasHydrated: false,
       setHasHydrated: (state) => set({ _hasHydrated: state }),
-      setWalletAddress: (address, kind?: WalletConnectionKind) => {
+      setWalletAddress: (address, kind?: WalletConnectionKind, isVerified?: boolean) => {
         const result = validateAndNormalizeAddress(address);
         if (!result.valid) {
           return;
@@ -21,27 +22,31 @@ export const useWalletStore = create<WalletState & WalletActions & { _hasHydrate
           walletAddress: result.address,
           isConnected: true,
           connectionKind: kind ?? "manual",
+          isVerified: isVerified ?? false,
         });
       },
+      setVerified: (status: boolean) => set({ isVerified: status }),
       disconnect: () =>
         set({
           walletAddress: null,
           isConnected: false,
           connectionKind: null,
+          isVerified: false,
         }),
     }),
     {
       name: "wallet-storage",
       storage: createJSONStorage(() => migratingSecureStorage),
-      // Only persist the address, not transient WC session state
+      // Only persist the address, connection state, and verification status
       partialize: (state) => ({
         walletAddress: state.walletAddress,
         isConnected: state.isConnected,
         connectionKind: state.connectionKind,
+        isVerified: state.isVerified,
       }),
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true);
       },
-    }
-  )
+    },
+  ),
 );

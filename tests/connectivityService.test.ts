@@ -43,7 +43,7 @@ describe("ConnectivityService", () => {
     // Simulating offline event
     const offlineState = { isConnected: false, isInternetReachable: false };
     const listener = mockNetInfo.addEventListener.mock.calls[0][0];
-    
+
     await listener(offlineState);
 
     expect(useNetworkStore.getState().isOnline).toBe(false);

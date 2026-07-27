@@ -51,9 +51,7 @@
           }
         }
       },
-      "associatedDomains": [
-        "applinks:guildpass.xyz"
-      ]
+      "associatedDomains": ["applinks:guildpass.xyz"]
     },
     "android": {
       "adaptiveIcon": {
@@ -111,6 +109,15 @@
         "expo-camera",
         {
           "cameraPermission": "Allow GuildPass to scan access check QR codes."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#4F46E5",
+          "sounds": ["default"],
+          "mode": "production"
         }
       ],
       [

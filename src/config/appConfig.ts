@@ -29,7 +29,7 @@ const ConfigSchema = z.object({
 
 export type AppConfig = z.infer<typeof ConfigSchema>;
 
-function loadConfig(): AppConfig {
+export function loadConfig(): AppConfig {
   const rawConfig = {
     apiUrl: Constants.expoConfig?.extra?.apiUrl ?? process.env.EXPO_PUBLIC_API_URL,
     chainId: Constants.expoConfig?.extra?.chainId ?? process.env.EXPO_PUBLIC_CHAIN_ID,

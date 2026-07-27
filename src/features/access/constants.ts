@@ -6,7 +6,7 @@
  */
 
 export const ACCESS_QR_TYPE = "guildpass.access-check";
-export const ACCESS_QR_VERSION = 1;
+export const ACCESS_QR_VERSION = 2;
 
 export type SupportedQrPayloadVersion = {
   readonly type: string;
@@ -25,12 +25,9 @@ export const SUPPORTED_QR_PAYLOAD_VERSIONS: readonly SupportedQrPayloadVersion[]
 ] as const;
 
 export const isSupportedQrPayloadType = (type: unknown): boolean =>
-  typeof type === "string" &&
-  SUPPORTED_QR_PAYLOAD_VERSIONS.some((entry) => entry.type === type);
+  typeof type === "string" && SUPPORTED_QR_PAYLOAD_VERSIONS.some((entry) => entry.type === type);
 
 export const isSupportedQrPayloadVersion = (type: unknown, version: unknown): boolean =>
   typeof type === "string" &&
   typeof version === "number" &&
-  SUPPORTED_QR_PAYLOAD_VERSIONS.some(
-    (entry) => entry.type === type && entry.version === version,
-  );
+  SUPPORTED_QR_PAYLOAD_VERSIONS.some((entry) => entry.type === type && entry.version === version);

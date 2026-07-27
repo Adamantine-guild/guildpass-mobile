@@ -25,8 +25,17 @@ import {
   type AttestationKeyRegistry,
   type SerializedAttestationKeyRegistry,
   ATTESTATION_STORAGE_KEYS,
-} from './types';
-import { migratingSecureStorage } from '../../lib/storage';
+} from "./types";
+import { migratingSecureStorage } from "../../lib/storage";
+import {
+  classifyRegistryFreshness,
+  type FreshnessPolicy,
+} from "../../lib/credentials/registryFreshness";
+import type {
+  CredentialIssuerRegistry,
+  IssuerKeyLookup,
+  IssuerKeyRef,
+} from "../../lib/credentials/credentialIssuer.types";
 
 // ──────────────────────────────────────────────
 //  In-memory revocation registry cache
@@ -43,6 +52,28 @@ export const ATTESTATION_REVOCATION_CACHE_TTL_MS = 15 * 60 * 1000;
  * whose key status it cannot confirm.
  */
 export const ATTESTATION_REVOCATION_OFFLINE_TRUST_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Freshness policies for the two cache tiers.
+ *
+ * The boundaries differ and that is deliberate: the in-memory tier has always
+ * treated the trust window as inclusive (`age <= window`), while the persisted
+ * tier has treated it as exclusive (`age < window`). The difference is one
+ * millisecond wide. It is preserved rather than unified because narrowing or
+ * widening when a verifier stops accepting attestations offline is a security
+ * behaviour change, not a refactor.
+ */
+const MEMORY_FRESHNESS_POLICY: FreshnessPolicy = {
+  ttlMs: ATTESTATION_REVOCATION_CACHE_TTL_MS,
+  offlineTrustWindowMs: ATTESTATION_REVOCATION_OFFLINE_TRUST_WINDOW_MS,
+  trustWindowBoundary: "inclusive",
+};
+
+const PERSISTED_FRESHNESS_POLICY: FreshnessPolicy = {
+  ttlMs: ATTESTATION_REVOCATION_CACHE_TTL_MS,
+  offlineTrustWindowMs: ATTESTATION_REVOCATION_OFFLINE_TRUST_WINDOW_MS,
+  trustWindowBoundary: "exclusive",
+};
 
 /** Storage key prefix for cached revocation registries */
 const REVOCATION_STORAGE_PREFIX = ATTESTATION_STORAGE_KEYS.ATTESTATION_KEY_REGISTRY;
@@ -71,12 +102,13 @@ export async function checkIssuerKeyRevoked(
   issuerAddress: `0x${string}`,
   now: Date = new Date(),
 ): Promise<boolean | null> {
-  const registry = await getAttestationRevocationRegistry(guildId, now);
-  if (registry === null) {
-    // No revocation data available at all — fail closed.
-    return null;
-  }
-  return registry.revokedAddresses.has(issuerAddress.toLowerCase() as `0x${string}`);
+  // Calls the module-local registry object directly, never the global credential
+  // registry: this gates access, so it must not depend on bootstrap ordering.
+  return attestationIssuerRegistry.isRevoked(
+    guildId,
+    { kind: "address", address: issuerAddress },
+    now,
+  );
 }
 
 /**
@@ -118,6 +150,90 @@ export async function cacheAttestationRevocationRegistry(
   }
 }
 
+export type AttestationRevocationRegistryMetadata = {
+  guildId: string;
+  fetchedAt: number;
+  revokedAddressCount: number;
+};
+
+const ADDRESS_PATTERN = /^0x[a-fA-F0-9]{40}$/;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function normalizeRevokedAddressList(value: unknown): Set<string> | null {
+  if (!Array.isArray(value)) return null;
+
+  const addresses = new Set<string>();
+  for (const entry of value) {
+    if (typeof entry !== "string") continue;
+    const normalized = entry.trim().toLowerCase();
+    if (ADDRESS_PATTERN.test(normalized)) {
+      addresses.add(normalized);
+    }
+  }
+
+  return addresses;
+}
+
+function firstRevokedAddressList(record: Record<string, unknown>): Set<string> | null {
+  const directCandidates = [
+    record.revokedIssuerAddresses,
+    record.revokedAttestationIssuerAddresses,
+    record.attestationRevokedIssuerAddresses,
+    record.revokedAddresses,
+  ];
+
+  for (const candidate of directCandidates) {
+    const addresses = normalizeRevokedAddressList(candidate);
+    if (addresses !== null) return addresses;
+  }
+
+  const nestedCandidates = [
+    record.attestationRevocationRegistry,
+    record.attestationKeyRegistry,
+    record.attestationRevocations,
+  ];
+
+  for (const candidate of nestedCandidates) {
+    if (!isRecord(candidate)) continue;
+    const addresses =
+      normalizeRevokedAddressList(candidate.revokedIssuerAddresses) ??
+      normalizeRevokedAddressList(candidate.revokedAddresses) ??
+      normalizeRevokedAddressList(candidate.addresses);
+    if (addresses !== null) return addresses;
+  }
+
+  if (isRecord(record.issuerRevocations)) {
+    const addresses =
+      normalizeRevokedAddressList(record.issuerRevocations.attestations) ??
+      normalizeRevokedAddressList(record.issuerRevocations.eip712Attestations);
+    if (addresses !== null) return addresses;
+  }
+
+  return null;
+}
+
+export function extractRevokedAttestationIssuerAddresses(config: unknown): Set<string> | null {
+  return isRecord(config) ? firstRevokedAddressList(config) : null;
+}
+
+export async function cacheAttestationRevocationRegistryFromGuildConfig(
+  guildId: string,
+  config: unknown,
+  fetchedAt?: number,
+): Promise<boolean> {
+  if (!isRecord(config)) return false;
+  if (typeof config.guildId === "string" && config.guildId !== guildId) return false;
+
+  const revokedAddresses = extractRevokedAttestationIssuerAddresses(config);
+  if (revokedAddresses === null) return false;
+
+  await cacheAttestationRevocationRegistry(guildId, revokedAddresses, fetchedAt);
+  return true;
+}
+
 /**
  * Clear the revocation registry cache (both in-memory and persisted).
  */
@@ -130,7 +246,7 @@ export async function clearAttestationRevocationCache(): Promise<void> {
     keys.push(REVOCATION_INDEX_KEY);
     await Promise.all(keys.map((k) => migratingSecureStorage.removeItem(k)));
   } catch (error) {
-    console.warn('Failed to clear persisted revocation cache:', error);
+    console.warn("Failed to clear persisted revocation cache:", error);
   }
 }
 
@@ -151,15 +267,10 @@ async function getAttestationRevocationRegistry(
   // 1. Check in-memory cache first
   const cached = revocationRegistryCache.get(guildId);
   if (cached !== undefined) {
-    const age = nowMs - cached.fetchedAt;
-    if (age < ATTESTATION_REVOCATION_CACHE_TTL_MS) {
-      return cached;
-    }
-    // Cache TTL expired — check if still within offline trust window
-    if (age <= ATTESTATION_REVOCATION_OFFLINE_TRUST_WINDOW_MS) {
-      // Still within offline trust window — cached data is still usable.
-      // The caller (checkIssuerKeyRevoked) can use this data even if it's
-      // past the TTL; a fresh fetch is the caller's responsibility.
+    // Fresh, or past TTL but still inside the offline trust window — either way
+    // the cached data is usable. A fresh fetch is the caller's responsibility;
+    // this path never reaches the network.
+    if (classifyRegistryFreshness(cached.fetchedAt, nowMs, MEMORY_FRESHNESS_POLICY) !== "expired") {
       return cached;
     }
     // Past the offline trust window — cache is too stale to trust.
@@ -170,8 +281,10 @@ async function getAttestationRevocationRegistry(
   // 2. Try to hydrate from secure storage (persisted cache)
   const persisted = await loadPersistedRevocationRegistry(guildId);
   if (persisted !== null) {
-    const persistedAge = nowMs - persisted.fetchedAt;
-    if (persistedAge < ATTESTATION_REVOCATION_OFFLINE_TRUST_WINDOW_MS) {
+    if (
+      classifyRegistryFreshness(persisted.fetchedAt, nowMs, PERSISTED_FRESHNESS_POLICY) !==
+      "expired"
+    ) {
       // Persisted data is within trust window — hydrate in-memory and return
       revocationRegistryCache.set(guildId, persisted);
       return persisted;
@@ -182,6 +295,20 @@ async function getAttestationRevocationRegistry(
 
   // 3. No usable cached data at all — fail closed
   return null;
+}
+
+export async function getTrustedAttestationRevocationRegistryMetadata(
+  guildId: string,
+  now: Date = new Date(),
+): Promise<AttestationRevocationRegistryMetadata | null> {
+  const registry = await getAttestationRevocationRegistry(guildId, now);
+  if (registry === null) return null;
+
+  return {
+    guildId: registry.guildId,
+    fetchedAt: registry.fetchedAt,
+    revokedAddressCount: registry.revokedAddresses.size,
+  };
 }
 
 /**
@@ -219,7 +346,7 @@ async function loadPersistedRevocationRegistry(
  */
 export async function getCachedIssuerKey(
   guildId: string,
-  maxCacheAgeDays: number = 7
+  maxCacheAgeDays: number = 7,
 ): Promise<GuildIssuerKey | null> {
   try {
     const key = `${ATTESTATION_STORAGE_KEYS.ISSUER_KEYS}${guildId}`;
@@ -264,7 +391,7 @@ export async function cacheIssuerKey(issuerKey: GuildIssuerKey): Promise<void> {
       guildIds.push(issuerKey.guildId);
       await migratingSecureStorage.setItem(
         ATTESTATION_STORAGE_KEYS.ISSUER_KEYS_INDEX,
-        JSON.stringify(guildIds)
+        JSON.stringify(guildIds),
       );
     }
   } catch (error) {
@@ -310,10 +437,122 @@ export async function getAllCachedIssuerKeys(): Promise<GuildIssuerKey[]> {
 
     return issuerKeys;
   } catch (error) {
-    console.warn('Failed to retrieve all cached issuer keys:', error);
+    console.warn("Failed to retrieve all cached issuer keys:", error);
     return [];
   }
 }
+
+// ══════════════════════════════════════════════
+//  CredentialIssuerRegistry implementation
+// ══════════════════════════════════════════════
+
+/**
+ * The EIP-712 attestation credential path as a `CredentialIssuerRegistry`.
+ *
+ * Registered for discovery by `registerBuiltInIssuers()`. `checkIssuerKeyRevoked()`
+ * above calls `isRevoked` on this object directly — the live verification path
+ * never resolves it through the global registry, so a compromised bootstrap
+ * ordering cannot turn a fail-closed rejection into a thrown error.
+ *
+ * This implementation performs no network I/O, by design. Revocation data arrives
+ * via `cacheAttestationRevocationRegistry()` during online verification, which is
+ * why `verifySignature.validateAttestation()` can run the revocation check ahead
+ * of the far more expensive signature check.
+ */
+export const attestationIssuerRegistry: CredentialIssuerRegistry = {
+  credentialKind: "eip712_attestation",
+
+  async lookupIssuerKey(
+    guildId: string,
+    ref: IssuerKeyRef | null,
+    now: Date = new Date(),
+  ): Promise<IssuerKeyLookup> {
+    // Revocation is checked against the *supplied* reference first, mirroring the
+    // QR path's ordering. A revoked address must report as revoked even when it is
+    // not the guild's currently cached key — "unknown" would understate it.
+    if (ref !== null && ref.kind === "address") {
+      const refRevoked = await this.isRevoked(guildId, ref, now);
+
+      if (refRevoked === null) {
+        // Indeterminate — fail closed rather than hand back a key that may since
+        // have been compromised.
+        return {
+          status: "unavailable",
+          reason: "no_registry_data",
+          detail: "Revocation data unavailable for this guild.",
+        };
+      }
+
+      if (refRevoked) {
+        return { status: "revoked", ref };
+      }
+    }
+
+    // NOTE: the issuer-key cache carries its own 7-day staleness policy inside
+    // getCachedIssuerKey() and measures it against Date.now() rather than `now`.
+    // That is a third policy, left as-is; only the revocation tiers were unified.
+    const cachedKey = await getCachedIssuerKey(guildId);
+
+    if (cachedKey === null) {
+      return {
+        status: "unavailable",
+        reason: "no_registry_data",
+        detail: "Issuer key not cached - requires online fetch",
+      };
+    }
+
+    if (
+      ref !== null &&
+      ref.kind === "address" &&
+      ref.address.toLowerCase() !== cachedKey.issuerAddress.toLowerCase()
+    ) {
+      return { status: "unknown", ref };
+    }
+
+    if (ref === null) {
+      // No reference supplied — the cached key is the only candidate, so its own
+      // revocation status still has to be confirmed before handing it back.
+      const cachedRevoked = await this.isRevoked(
+        guildId,
+        { kind: "address", address: cachedKey.issuerAddress },
+        now,
+      );
+
+      if (cachedRevoked === null) {
+        return {
+          status: "unavailable",
+          reason: "no_registry_data",
+          detail: "Revocation data unavailable for this guild.",
+        };
+      }
+
+      if (cachedRevoked) {
+        return { status: "revoked", ref: { kind: "address", address: cachedKey.issuerAddress } };
+      }
+    }
+
+    return { status: "active", keyMaterial: cachedKey.issuerAddress };
+  },
+
+  async isRevoked(
+    guildId: string,
+    ref: IssuerKeyRef,
+    now: Date = new Date(),
+  ): Promise<boolean | null> {
+    if (ref.kind !== "address") {
+      // This path revokes by issuer address; a kid reference is not answerable.
+      return null;
+    }
+
+    const registry = await getAttestationRevocationRegistry(guildId, now);
+    if (registry === null) {
+      // No revocation data available at all — fail closed.
+      return null;
+    }
+
+    return registry.revokedAddresses.has(ref.address.toLowerCase() as `0x${string}`);
+  },
+};
 
 /**
  * Clear all issuer key cache
@@ -328,7 +567,7 @@ export async function clearIssuerKeyCache(): Promise<void> {
 
     await Promise.all(keys.map((key) => migratingSecureStorage.removeItem(key)));
   } catch (error) {
-    console.error('Failed to clear issuer key cache:', error);
+    console.error("Failed to clear issuer key cache:", error);
     throw error;
   }
 }

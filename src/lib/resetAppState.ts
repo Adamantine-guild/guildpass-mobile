@@ -10,6 +10,14 @@ import { clearIssuerKeyCache } from "../features/attestation/issuerKeyRegistry";
 
 export async function resetAppState(): Promise<void> {
   useWalletStore.getState().disconnect();
+  // End the Privy session if the user was on an embedded wallet. Dynamic import
+  // keeps @privy-io/expo out of the module graph when the SDK is not configured.
+  try {
+    const { privyLogout } = await import("../features/wallet/privySession");
+    await privyLogout();
+  } catch {
+    // Privy not configured — acceptable.
+  }
   await useSessionStore.getState().endSession();
   useAccessHistoryStore.getState().clearHistory();
   useSyncStore.getState().clearSyncState();

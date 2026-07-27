@@ -3,12 +3,17 @@
  * Integrates attestation logic with React Query for data fetching and caching
  */
 
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { useCallback } from 'react';
-import { type RoleAttestation, type AttestationValidationResult } from './types';
-import { type AttestationService } from './attestationService';
-import { validateAttestation, getAttestationValidityStatus } from './verifySignature';
-import { getCachedIssuerKey } from './issuerKeyRegistry';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import type { RoleAttestation } from "./types";
+import type { AttestationService } from "./attestationService";
+import { validateAttestation, getAttestationValidityStatus } from "./verifySignature";
+import { getCachedIssuerKey } from "./issuerKeyRegistry";
+import {
+  attestationQueryKeys,
+  invalidateAttestationQueriesForGuild,
+  writeIssuerKeyToCache,
+  writeVerifiedAttestationToCache,
+} from "./attestationQueryCache";
 
 /**
  * Hook to fetch and verify an attestation
@@ -24,19 +29,19 @@ export function useAttestationVerification(
   service: AttestationService | null,
   walletAddress: string | null,
   guildId: string | null,
-  roleId: string | null
+  roleId: string | null,
 ) {
   return useQuery({
-    queryKey: ['attestation', walletAddress, guildId, roleId],
+    queryKey: attestationQueryKeys.verification(walletAddress, guildId, roleId),
     queryFn: async () => {
       if (!service || !walletAddress || !guildId || !roleId) {
-        throw new Error('Missing required parameters');
+        throw new Error("Missing required parameters");
       }
 
       return service.fetchAndVerifyAttestation(walletAddress, guildId, roleId);
     },
     enabled: !!service && !!walletAddress && !!guildId && !!roleId,
-    networkMode: 'offlineFirst',
+    networkMode: "offlineFirst",
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }
@@ -55,19 +60,19 @@ export function useLocalAttestationVerification(
   service: AttestationService | null,
   walletAddress: string | null,
   guildId: string | null,
-  roleId: string | null
+  roleId: string | null,
 ) {
   return useQuery({
-    queryKey: ['local-attestation-verification', walletAddress, guildId, roleId],
+    queryKey: attestationQueryKeys.localVerification(walletAddress, guildId, roleId),
     queryFn: async () => {
       if (!service || !walletAddress || !guildId || !roleId) {
-        throw new Error('Missing required parameters');
+        throw new Error("Missing required parameters");
       }
 
       return service.verifyLocalAttestation(walletAddress, guildId, roleId);
     },
     enabled: !!service && !!walletAddress && !!guildId && !!roleId,
-    networkMode: 'always', // This can work offline once cached
+    networkMode: "always", // This can work offline once cached
     staleTime: Infinity, // Validation result doesn't change until expiry
   });
 }
@@ -85,10 +90,10 @@ export function useCachedAttestationExists(
   service: AttestationService | null,
   walletAddress: string | null,
   guildId: string | null,
-  roleId: string | null
+  roleId: string | null,
 ) {
   return useQuery({
-    queryKey: ['cached-attestation-exists', walletAddress, guildId, roleId],
+    queryKey: attestationQueryKeys.cachedExists(walletAddress, guildId, roleId),
     queryFn: async () => {
       if (!service || !walletAddress || !guildId || !roleId) {
         return false;
@@ -97,7 +102,7 @@ export function useCachedAttestationExists(
       return service.hasCachedAttestation(walletAddress, guildId, roleId);
     },
     enabled: !!service && !!walletAddress && !!guildId && !!roleId,
-    networkMode: 'always', // Can work completely offline
+    networkMode: "always", // Can work completely offline
     staleTime: Infinity,
   });
 }
@@ -113,10 +118,10 @@ export function useCachedAttestationExists(
 export function useCachedAttestationsForGuild(
   service: AttestationService | null,
   walletAddress: string | null,
-  guildId: string | null
+  guildId: string | null,
 ) {
   return useQuery({
-    queryKey: ['cached-attestations-guild', walletAddress, guildId],
+    queryKey: attestationQueryKeys.cachedForGuild(walletAddress, guildId),
     queryFn: async () => {
       if (!service || !walletAddress || !guildId) {
         return [];
@@ -125,7 +130,7 @@ export function useCachedAttestationsForGuild(
       return service.getCachedAttestationsForGuild(walletAddress, guildId);
     },
     enabled: !!service && !!walletAddress && !!guildId,
-    networkMode: 'always', // Can work completely offline
+    networkMode: "always", // Can work completely offline
     staleTime: Infinity,
   });
 }
@@ -138,13 +143,20 @@ export function useCachedAttestationsForGuild(
  * @returns Mutation result
  */
 export function useRefreshIssuerKey(service: AttestationService | null) {
+  const queryClient = useQueryClient();
+
   return useMutation({
+    mutationKey: attestationQueryKeys.issuerKeyRefresh,
     mutationFn: async (guildId: string) => {
       if (!service) {
-        throw new Error('Service not initialized');
+        throw new Error("Service not initialized");
       }
 
       return service.refreshIssuerKey(guildId);
+    },
+    onSuccess: (issuerAddress, guildId) => {
+      writeIssuerKeyToCache(queryClient, guildId, issuerAddress);
+      void invalidateAttestationQueriesForGuild(queryClient, guildId);
     },
   });
 }
@@ -161,13 +173,13 @@ export function useRefreshIssuerKey(service: AttestationService | null) {
 export function useAttestationValidation(
   attestation: RoleAttestation | null,
   issuerAddress: `0x${string}` | null,
-  chainId: number
+  chainId: number,
 ) {
   return useQuery({
-    queryKey: ['validate-attestation', attestation?.signature, issuerAddress],
+    queryKey: ["validate-attestation", attestation?.signature, issuerAddress],
     queryFn: async () => {
       if (!attestation) {
-        throw new Error('No attestation provided');
+        throw new Error("No attestation provided");
       }
 
       let issuer = issuerAddress;
@@ -176,7 +188,7 @@ export function useAttestationValidation(
         // Try to get from cache
         const cachedKey = await getCachedIssuerKey(attestation.guildId);
         if (!cachedKey) {
-          throw new Error('Issuer key not provided and not cached');
+          throw new Error("Issuer key not provided and not cached");
         }
         issuer = cachedKey.issuerAddress;
       }
@@ -195,7 +207,7 @@ export function useAttestationValidation(
  * @returns Validity status string
  */
 export function useAttestationValidityStatus(attestation: RoleAttestation | null): string {
-  return attestation ? getAttestationValidityStatus(attestation) : '';
+  return attestation ? getAttestationValidityStatus(attestation) : "";
 }
 
 /**
@@ -206,21 +218,19 @@ export function useAttestationValidityStatus(attestation: RoleAttestation | null
  * @returns Mutation result
  */
 export function useFetchAttestationMutation(service: AttestationService | null) {
+  const queryClient = useQueryClient();
+
   return useMutation({
-    mutationFn: async (params: {
-      walletAddress: string;
-      guildId: string;
-      roleId: string;
-    }) => {
+    mutationKey: ["fetch-attestation"],
+    mutationFn: async (params: { walletAddress: string; guildId: string; roleId: string }) => {
       if (!service) {
-        throw new Error('Service not initialized');
+        throw new Error("Service not initialized");
       }
 
-      return service.fetchAndVerifyAttestation(
-        params.walletAddress,
-        params.guildId,
-        params.roleId
-      );
+      return service.fetchAndVerifyAttestation(params.walletAddress, params.guildId, params.roleId);
+    },
+    onSuccess: (result, params) => {
+      writeVerifiedAttestationToCache(queryClient, params, result);
     },
   });
 }

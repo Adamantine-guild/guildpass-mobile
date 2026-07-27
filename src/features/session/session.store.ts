@@ -72,7 +72,9 @@ export const useSessionStore = create<SessionStore>()(
 
       restoreSession(partial) {
         const status: SessionStatus =
-          partial.token && !isExpired(partial.expiresAt ?? null) ? "authenticated" : "unauthenticated";
+          partial.token && !isExpired(partial.expiresAt ?? null)
+            ? "authenticated"
+            : "unauthenticated";
         set({ ...partial, status });
       },
     }),
@@ -88,8 +90,8 @@ export const useSessionStore = create<SessionStore>()(
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true);
       },
-    }
-  )
+    },
+  ),
 );
 
 /** Convenience selector — current session status */

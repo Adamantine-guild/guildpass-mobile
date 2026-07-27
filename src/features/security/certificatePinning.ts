@@ -29,10 +29,7 @@
 
 import { Platform } from "react-native";
 import type { PinningConfig, PinningKey } from "./security.types";
-import {
-  GUILDPASS_API_DOMAIN,
-  GUILDPASS_STAGING_DOMAIN,
-} from "./security.types";
+import { GUILDPASS_API_DOMAIN, GUILDPASS_STAGING_DOMAIN } from "./security.types";
 import { appConfig } from "../../config/appConfig";
 
 // ---------------------------------------------------------------------------
@@ -109,9 +106,7 @@ export function validatePinConfiguration(): {
     errors.push("No pins configured — pinning is effectively disabled.");
   }
 
-  const placeholderPin = PINNING_CONFIG.pins.find((p) =>
-    p.hash.startsWith("REPLACE_"),
-  );
+  const placeholderPin = PINNING_CONFIG.pins.find((p) => p.hash.startsWith("REPLACE_"));
   if (placeholderPin) {
     errors.push(
       `Pin "${placeholderPin.label}" is a placeholder. Replace with an actual SPKI SHA-256 hash.`,
@@ -139,9 +134,7 @@ export function validatePinConfiguration(): {
 export function isPinnedDomain(url: string): boolean {
   try {
     const hostname = new URL(url).hostname.toLowerCase();
-    return PINNING_CONFIG.domains.some(
-      (d) => hostname === d || hostname.endsWith(`.${d}`),
-    );
+    return PINNING_CONFIG.domains.some((d) => hostname === d || hostname.endsWith(`.${d}`));
   } catch {
     return false;
   }
@@ -165,10 +158,7 @@ export function generateAndroidNetworkSecurityConfig(): string {
   const domainConfigs = PINNING_CONFIG.domains
     .map((domain) => {
       const pinSet = pins
-        .map(
-          (p) =>
-            `                <pin digest="SHA-256">${p.hash}</pin>`,
-        )
+        .map((p) => `                <pin digest="SHA-256">${p.hash}</pin>`)
         .join("\n");
       return `        <domain-config cleartextTrafficPermitted="false">
             <domain includeSubdomains="true">${domain}</domain>
@@ -201,10 +191,7 @@ ${domainConfigs}
 export function logPinningStatus(): void {
   const { valid, errors } = validatePinConfiguration();
   if (!valid) {
-    console.warn(
-      "[GuildPass Security] Certificate pinning misconfigured:",
-      errors.join("; "),
-    );
+    console.warn("[GuildPass Security] Certificate pinning misconfigured:", errors.join("; "));
   } else {
     console.log(
       `[GuildPass Security] Certificate pinning ACTIVE for ${PINNING_CONFIG.domains.length} domain(s) with ${PINNING_CONFIG.pins.length} pin(s).`,

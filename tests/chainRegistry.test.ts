@@ -110,12 +110,12 @@ describe("chainRegistry – getChainDisplayName", () => {
     expect(name).toBe("Base");
   });
 
-  it("returns \"Unsupported network\" for an unrecognised chain ID – does not throw", () => {
+  it('returns "Unsupported network" for an unrecognised chain ID – does not throw', () => {
     expect(() => getChainDisplayName(UNRECOGNISED_CHAIN_ID)).not.toThrow();
     expect(getChainDisplayName(UNRECOGNISED_CHAIN_ID)).toBe("Unsupported network");
   });
 
-  it("returns \"Unsupported network\" for chain ID 0", () => {
+  it('returns "Unsupported network" for chain ID 0', () => {
     expect(getChainDisplayName(0)).toBe("Unsupported network");
   });
 });

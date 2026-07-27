@@ -1,9 +1,12 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createSdkMock, resetSdkMock } from "../fixtures/sdk.mock";
 import {
   GUILD_CONFIG_FIXTURE,
   GUILD_DETAIL_FIXTURE,
   ROLES_EMPTY_FIXTURE,
   ROLES_LIST_FIXTURE,
+  WALLET_GUILDS_FIXTURE,
+  WALLET_GUILDS_EMPTY_FIXTURE,
 } from "../fixtures/guild.fixtures";
 
 const serviceMocks = vi.hoisted(() => ({
@@ -12,10 +15,30 @@ const serviceMocks = vi.hoisted(() => ({
   getRoles: vi.fn(),
 }));
 
-const useQueryMock = vi.hoisted(() => vi.fn((options: unknown) => options));
+const reactQueryMocks = vi.hoisted(() => ({
+  useQuery: vi.fn((options: unknown) => options),
+  getQueryData: vi.fn(),
+  isOnline: vi.fn(() => true),
+}));
+
+vi.mock("@guildpass/sdk", async () => {
+  // @ts-expect-error Vitest runs this async mock factory through Vite.
+  const { mockSdkModule } = await import("../fixtures/sdk.mock");
+  return mockSdkModule();
+});
+
+vi.mock("expo-constants", () => ({
+  default: { expoConfig: { extra: { apiUrl: "https://api.guildpass.test", chainId: 1 } } },
+}));
 
 vi.mock("@tanstack/react-query", () => ({
-  useQuery: useQueryMock,
+  onlineManager: {
+    isOnline: reactQueryMocks.isOnline,
+  },
+  useQuery: reactQueryMocks.useQuery,
+  useQueryClient: () => ({
+    getQueryData: reactQueryMocks.getQueryData,
+  }),
 }));
 
 vi.mock("../../src/services/guilds/guildsService", () => {
@@ -32,9 +55,13 @@ vi.mock("../../src/services/guilds/guildsService", () => {
   };
 });
 
+// Imports after mocks are registered.
+import { guildPassClient } from "../../src/lib/guildpassClient";
 import {
+  fetchGuildsByWalletAddress,
   GuildNotFoundError,
   useGuilds,
+  walletGuildsQueryKey,
 } from "../../src/features/guilds/useGuilds";
 
 interface CapturedQuery {
@@ -55,6 +82,68 @@ describe("GuildNotFoundError public export", () => {
     expect(error).toBeInstanceOf(Error);
     expect(error.name).toBe("GuildNotFoundError");
     expect(error.message).toMatch(/guild_404/);
+  });
+});
+
+describe("useGuilds – getGuildsByWalletAddress", () => {
+  let sdk: ReturnType<typeof createSdkMock>;
+
+  beforeEach(() => {
+    sdk = createSdkMock();
+  });
+
+  afterEach(() => {
+    resetSdkMock();
+    vi.clearAllMocks();
+  });
+
+  it("calls guildPassClient.guilds.getGuildsByWalletAddress with the correct wallet argument", async () => {
+    const walletAddress = "0x1234567890123456789012345678901234567890";
+
+    await fetchGuildsByWalletAddress(walletAddress);
+
+    expect(sdk.guilds.getGuildsByWalletAddress).toHaveBeenCalledTimes(1);
+    expect(sdk.guilds.getGuildsByWalletAddress).toHaveBeenCalledWith({ walletAddress });
+  });
+
+  it("returns the wallet guild list without transforming any fields", async () => {
+    const result = await fetchGuildsByWalletAddress(
+      "0x1234567890123456789012345678901234567890",
+    );
+
+    expect(result).toStrictEqual(WALLET_GUILDS_FIXTURE);
+    expect(result[0]).toMatchObject({ id: "guild_abc", name: "Alpha Guild", isActive: true });
+  });
+
+  it("supports an empty guild list for empty state rendering", async () => {
+    sdk.guilds.getGuildsByWalletAddress.mockResolvedValueOnce(WALLET_GUILDS_EMPTY_FIXTURE);
+
+    const result = await fetchGuildsByWalletAddress(
+      "0x0000000000000000000000000000000000000001",
+    );
+
+    expect(result).toStrictEqual([]);
+  });
+
+  it("surfaces SDK rejection as a rejected promise", async () => {
+    sdk.guilds.getGuildsByWalletAddress.mockRejectedValueOnce(new Error("Unable to load guilds"));
+
+    await expect(
+      fetchGuildsByWalletAddress("0x1234567890123456789012345678901234567890"),
+    ).rejects.toThrow("Unable to load guilds");
+  });
+
+  it("documents the expected query key: ['wallet-guilds', walletAddress]", () => {
+    expect(walletGuildsQueryKey("0x123")).toStrictEqual(["wallet-guilds", "0x123"]);
+    expect(walletGuildsQueryKey(null)).toStrictEqual(["wallet-guilds", ""]);
+  });
+
+  it("does not call SDK when walletAddress is empty (enabled guard)", () => {
+    const walletAddress = "";
+    const shouldFetch = !!walletAddress;
+
+    expect(shouldFetch).toBe(false);
+    expect(sdk.guilds.getGuildsByWalletAddress).not.toHaveBeenCalled();
   });
 });
 

@@ -227,10 +227,7 @@ export function createEncryptedAsyncStoragePersister({
     }
     const prunedClient = evictUnboundedData(client, maxAge, maxSize);
     const plaintext = JSON.stringify(prunedClient);
-    const { encrypted, nonce, authTag } = await encryptionService.encrypt(
-      plaintext,
-      keyBuffer,
-    );
+    const { encrypted, nonce, authTag } = await encryptionService.encrypt(plaintext, keyBuffer);
     const envelope: EncryptedEnvelope = {
       v: ENVELOPE_MAGIC,
       n: bytesToBase64(nonce),
@@ -290,10 +287,7 @@ export function createEncryptedAsyncStoragePersister({
         await safeClearStoredValue();
         onMigration?.({
           status: "cleared",
-          reason:
-            migrationError instanceof Error
-              ? migrationError.message
-              : "unknown-error",
+          reason: migrationError instanceof Error ? migrationError.message : "unknown-error",
         });
       }
       // When migration succeeded we hydrate from the legacy data so users
@@ -307,18 +301,13 @@ export function createEncryptedAsyncStoragePersister({
     return undefined;
   }
 
-  async function migrateLegacyClient(
-    legacyClient: PersistedClient,
-  ): Promise<boolean> {
+  async function migrateLegacyClient(legacyClient: PersistedClient): Promise<boolean> {
     const keyBuffer = await loadKey();
     if (!keyBuffer) {
       return false;
     }
     const plaintext = JSON.stringify(legacyClient);
-    const { encrypted, nonce, authTag } = await encryptionService.encrypt(
-      plaintext,
-      keyBuffer,
-    );
+    const { encrypted, nonce, authTag } = await encryptionService.encrypt(plaintext, keyBuffer);
     const envelope: EncryptedEnvelope = {
       v: ENVELOPE_MAGIC,
       n: bytesToBase64(nonce),
@@ -377,8 +366,7 @@ export function createEncryptedAsyncStoragePersister({
     } catch (error) {
       if (error instanceof EncryptionError) {
         const isTamper =
-          error.code === "AUTHENTICATION_FAILED" ||
-          error.code === "DECRYPTION_FAILED";
+          error.code === "AUTHENTICATION_FAILED" || error.code === "DECRYPTION_FAILED";
         if (isTamper) {
           // Tampered / corrupted ciphertext: clear the entry so a clean
           // copy is persisted on the next successful fetch.
@@ -395,12 +383,11 @@ export function createEncryptedAsyncStoragePersister({
     }
   }
 
- 
   return createAsyncStoragePersister({
-  storage,
-  key,
-  throttleTime,
-  serialize,
-  deserialize: deserialize as (cachedString: string) => MaybePromise<PersistedClient>,
-});
+    storage,
+    key,
+    throttleTime,
+    serialize,
+    deserialize: deserialize as (cachedString: string) => MaybePromise<PersistedClient>,
+  });
 }
