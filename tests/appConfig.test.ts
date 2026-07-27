@@ -1,120 +1,97 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
-import { z } from "zod";
-
-/**
- * appConfig unit tests
- *
- * We cannot import appConfig directly because it runs loadConfig() at module
- * level, which requires expo-constants. Instead we replicate the schema and
- * loadConfig logic here so we can test validation rules in isolation without
- * needing the Expo runtime.
- */
-
-const AppEnvSchema = z.enum(["development", "preview", "production"]).default("development");
-
-const ConfigSchema = z.object({
-  apiUrl: z.string().url("EXPO_PUBLIC_API_URL must be a valid URL"),
-  chainId: z.coerce.number().finite("EXPO_PUBLIC_CHAIN_ID must be a finite number"),
-  appEnv: AppEnvSchema,
-  walletConnectProjectId: z.string().optional(),
-});
-
-type AppConfig = z.infer<typeof ConfigSchema>;
-
-function loadConfig(raw: Record<string, unknown>): AppConfig {
-  const parsed = ConfigSchema.safeParse(raw);
-
-  if (!parsed.success) {
-    const errorMessages = parsed.error.issues
-      .map((i) => `${i.path.join(".")}: ${i.message}`)
-      .join("\n");
-    throw new Error(`Invalid application configuration:\n${errorMessages}`);
-  }
-
-  return parsed.data;
-}
+import { describe, expect, it, beforeEach } from "vitest";
+import Constants from "expo-constants";
+import { loadConfig } from "../src/config/appConfig";
 
 describe("appConfig validation", () => {
-  const validConfig = {
-    apiUrl: "http://localhost:3000",
-    chainId: "11155111",
-    appEnv: "development",
-  };
+  beforeEach(() => {
+    delete process.env.EXPO_PUBLIC_API_URL;
+    delete process.env.EXPO_PUBLIC_CHAIN_ID;
+    delete process.env.EXPO_PUBLIC_APP_ENV;
 
-  it("parses a valid configuration", () => {
-    const config = loadConfig(validConfig);
-
-    expect(config.apiUrl).toBe("http://localhost:3000");
-    expect(config.chainId).toBe(11155111);
-    expect(config.appEnv).toBe("development");
+    Constants.expoConfig = {
+      extra: {},
+    };
   });
 
-  it("coerces chainId from string to number", () => {
-    const config = loadConfig({ ...validConfig, chainId: "8453" });
+  describe("valid config", () => {
+    it("passes valid config through unchanged", () => {
+      Constants.expoConfig!.extra.apiUrl = "https://api.guildpass.xyz";
+      Constants.expoConfig!.extra.chainId = "11155111";
 
-    expect(config.chainId).toBe(8453);
-    expect(typeof config.chainId).toBe("number");
+      const config = loadConfig();
+
+      expect(config.apiUrl).toBe("https://api.guildpass.xyz");
+      expect(config.chainId).toBe(11155111);
+      expect(config.appEnv).toBe("development");
+    });
+
+    it("reads apiUrl from process.env when Constants.expoConfig.extra is empty", () => {
+      process.env.EXPO_PUBLIC_API_URL = "https://env.guildpass.xyz";
+      Constants.expoConfig!.extra.chainId = "1";
+
+      const config = loadConfig();
+
+      expect(config.apiUrl).toBe("https://env.guildpass.xyz");
+    });
+
+    it("coerces chainId from string to number", () => {
+      Constants.expoConfig!.extra.apiUrl = "https://api.guildpass.xyz";
+      Constants.expoConfig!.extra.chainId = "8453";
+
+      const config = loadConfig();
+
+      expect(config.chainId).toBe(8453);
+      expect(typeof config.chainId).toBe("number");
+    });
   });
 
-  it("defaults appEnv to development when omitted", () => {
-    const { appEnv, ...withoutEnv } = validConfig;
-    const config = loadConfig(withoutEnv);
+  describe("missing variables", () => {
+    it("throws when apiUrl is missing from both Constants.expoConfig and process.env", () => {
+      Constants.expoConfig!.extra.chainId = "1";
 
-    expect(config.appEnv).toBe("development");
+      expect(() => loadConfig()).toThrow("Invalid application configuration");
+    });
+
+    it("throws when chainId is missing from both Constants.expoConfig and process.env", () => {
+      Constants.expoConfig!.extra.apiUrl = "https://api.guildpass.xyz";
+
+      expect(() => loadConfig()).toThrow("Invalid application configuration");
+    });
   });
 
-  it("accepts all valid appEnv values", () => {
-    for (const env of ["development", "preview", "production"] as const) {
-      const config = loadConfig({ ...validConfig, appEnv: env });
-      expect(config.appEnv).toBe(env);
-    }
+  describe("malformed values", () => {
+    it("throws when apiUrl is not a valid URL", () => {
+      Constants.expoConfig!.extra.apiUrl = "not-a-url";
+      Constants.expoConfig!.extra.chainId = "1";
+
+      expect(() => loadConfig()).toThrow("EXPO_PUBLIC_API_URL must be a valid URL");
+    });
+
+    it("throws when chainId is non-numeric", () => {
+      Constants.expoConfig!.extra.apiUrl = "https://api.guildpass.xyz";
+      Constants.expoConfig!.extra.chainId = "abc";
+
+      expect(() => loadConfig()).toThrow("Invalid application configuration");
+    });
+
+    it("throws when chainId is Infinity", () => {
+      Constants.expoConfig!.extra.apiUrl = "https://api.guildpass.xyz";
+      Constants.expoConfig!.extra.chainId = Infinity;
+
+      expect(() => loadConfig()).toThrow("EXPO_PUBLIC_CHAIN_ID must be a finite number");
+    });
   });
 
-  it("rejects missing apiUrl", () => {
-    const { apiUrl, ...withoutUrl } = validConfig;
+  describe("fallback safety", () => {
+    it("throws rather than silently defaulting to a production URL when apiUrl is missing", () => {
+      Constants.expoConfig!.extra.chainId = "1";
 
-    expect(() => loadConfig(withoutUrl)).toThrow("Invalid application configuration");
-  });
-
-  it("rejects invalid apiUrl format", () => {
-    expect(() => loadConfig({ ...validConfig, apiUrl: "not-a-url" })).toThrow(
-      "EXPO_PUBLIC_API_URL must be a valid URL",
-    );
-  });
-
-  it("rejects missing chainId", () => {
-    const { chainId, ...withoutChain } = validConfig;
-
-    expect(() => loadConfig(withoutChain)).toThrow("Invalid application configuration");
-  });
-
-  it("rejects non-numeric chainId", () => {
-    expect(() => loadConfig({ ...validConfig, chainId: "abc" })).toThrow(
-      "Invalid application configuration",
-    );
-  });
-
-  it("rejects Infinity as chainId", () => {
-    expect(() => loadConfig({ ...validConfig, chainId: Infinity })).toThrow(
-      "EXPO_PUBLIC_CHAIN_ID must be a finite number",
-    );
-  });
-
-  it("rejects invalid appEnv values", () => {
-    expect(() => loadConfig({ ...validConfig, appEnv: "staging" })).toThrow(
-      "Invalid application configuration",
-    );
-  });
-
-  it("accepts optional walletConnectProjectId", () => {
-    const config = loadConfig({ ...validConfig, walletConnectProjectId: "test-project-id" });
-
-    expect(config.walletConnectProjectId).toBe("test-project-id");
-  });
-
-  it("allows walletConnectProjectId to be omitted", () => {
-    const config = loadConfig(validConfig);
-
-    expect(config.walletConnectProjectId).toBeUndefined();
+      expect(() => loadConfig()).toThrow();
+      try {
+        loadConfig();
+      } catch (e) {
+        expect((e as Error).message).not.toContain("api.guildpass.xyz");
+      }
+    });
   });
 });
