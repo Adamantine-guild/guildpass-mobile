@@ -9,6 +9,7 @@ export const QUERY_ROOTS = {
   GUILD_CONFIG: "guild-config",
   GUILD_ROLES: "guild-roles",
   ACCESS_CHECK: "access-check",
+  PREFERENCES: "preferences",
   PROFILE: "profile",
   USER_PROFILE: "user-profile",
 } as const;
@@ -48,6 +49,12 @@ export const queryKeys = {
   },
   accessCheck: {
     all: ["access-check"] as const,
+    byParams: (walletAddress: string, guildId: string, resourceId: string) =>
+      ["access-check", walletAddress, guildId, resourceId] as const,
+  },
+  preferences: {
+    all: ["preferences"] as const,
+    current: ["preferences", "current"] as const,
   },
   profile: {
     all: ["profile"] as const,
@@ -66,6 +73,7 @@ export const PERSISTABLE_QUERY_ROOTS: readonly QueryRoot[] = [
   QUERY_ROOTS.GUILD_CONFIG,
   QUERY_ROOTS.GUILD_ROLES,
   QUERY_ROOTS.ACCESS_CHECK,
+  QUERY_ROOTS.PREFERENCES,
 ];
 
 export function isPersistableQuery(queryKey: readonly unknown[]): boolean {
