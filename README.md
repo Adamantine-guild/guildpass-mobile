@@ -87,6 +87,7 @@ The application is built on a robust, feature-driven foundation designed for lon
 | `app/`                   | Expo Router file-based pages and layouts     |
 | `app/access-scanner.tsx` | QR code scanner screen using expo-camera     |
 | `src/features/access/`   | Access check hooks and QR payload validation |
+| `src/features/wallet/`   | Wallet connectors, embedded wallet (Privy), stores |
 | `src/`                   | Feature modules, hooks, stores, and services |
 | `docs/`                  | Architecture and integration guides          |
 | `tests/`                 | Vitest unit tests                            |
@@ -252,7 +253,7 @@ Deep links work when the app is cold-started (not already running). The app will
 ## 🗺️ Roadmap
 
 - [ ] **Native Wallet Integration**: Support for WalletConnect, MetaMask, and Coinbase Wallet.
-- [ ] **Smart Onboarding**: Social login and embedded wallets for non-crypto native users.
+- [x] **Smart Onboarding**: Social login and embedded wallets for non-crypto native users.
 - [x] **Push Notifications**: Real-time alerts for role updates and access grants.
 - [x] **QR Access Verification**: Scan GuildPass QR codes to verify token-gated resource access from the mobile app.
 - [ ] **Offline Resilience**: Advanced caching layer for viewing memberships without connectivity.

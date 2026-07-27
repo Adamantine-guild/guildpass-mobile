@@ -87,6 +87,16 @@ export const useWallet = (): {
         await wcProvider.disconnect().catch(() => {});
       }
     }
+    // If connected via embedded wallet, end the Privy session so the
+    // provider doesn't think the user is still authenticated on relaunch.
+    if (connectionKind === "embedded") {
+      try {
+        const { privyLogout } = await import("./privySession");
+        await privyLogout();
+      } catch {
+        // Privy not configured or already logged out — acceptable.
+      }
+    }
     // Clear this feature's own state before the cross-feature teardown, so a
     // screen re-rendering mid-disconnect cannot refetch for the outgoing wallet.
     storeDisconnect();
