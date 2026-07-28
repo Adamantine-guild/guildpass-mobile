@@ -9,7 +9,10 @@ import { resetAppState } from "../src/lib/resetAppState";
 import { useBiometricStore } from "../src/features/security/biometric.store";
 import { usePushNotifications } from "../src/features/notifications";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { keyManager } from "../src/lib/keyManager";
+import type { KeyInfo } from "../src/lib/keyManager";
+import { asyncStoragePersister } from "../src/lib/queryPersister";
 
 export default function Settings() {
   const router = useRouter();
@@ -17,6 +20,11 @@ export default function Settings() {
   const [isResetting, setIsResetting] = useState(false);
   const biometricRequired = useBiometricStore((s) => s.biometricRequired);
   const setBiometricRequired = useBiometricStore((s) => s.setBiometricRequired);
+  const [keyInfo, setKeyInfo] = useState<KeyInfo | null>(null);
+
+  useEffect(() => {
+    keyManager.getKeyInfo().then(setKeyInfo);
+  }, []);
 
   const {
     enabled: pushEnabled,
@@ -54,6 +62,40 @@ export default function Settings() {
     } finally {
       setIsResetting(false);
     }
+  };
+
+  const handleRotateKey = () => {
+    Alert.alert(
+      "Rotate Encryption Key",
+      "Are you sure you want to rotate the encryption key now? This will clear your currently downloaded offline data.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Rotate Key",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await keyManager.rotateKey({
+                reencrypt: async () => {
+                  await asyncStoragePersister.removeClient();
+                },
+              });
+              const newInfo = await keyManager.getKeyInfo();
+              setKeyInfo(newInfo);
+            } catch (error) {
+              Alert.alert("Error", "Failed to rotate encryption key.");
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const getRelativeTimeString = (timestamp: number) => {
+    const days = Math.floor((Date.now() - timestamp) / (1000 * 60 * 60 * 24));
+    if (days === 0) return "Created today";
+    if (days === 1) return "Created 1 day ago";
+    return `Created ${days} days ago`;
   };
 
   const apiUrl = appConfig.apiUrl;
@@ -114,6 +156,30 @@ export default function Settings() {
                 />
               </View>
             </TouchableOpacity>
+          </Card>
+
+          <Text className="text-lg font-bold text-text dark:text-slate-100 mb-3">Offline Data & Security</Text>
+          <Card className="mb-6">
+            <View className="mb-4">
+              <Text className="text-text dark:text-slate-100 font-medium mb-1">Local Encryption Key</Text>
+              {keyInfo ? (
+                <>
+                  <Text className="text-text-muted dark:text-slate-400 text-sm mb-1">
+                    {getRelativeTimeString(keyInfo.createdAt)}
+                  </Text>
+                  <Text className="text-text-muted dark:text-slate-400 text-sm mb-3">
+                    Status: {keyInfo.needsRotation ? "Rotation Due" : "Healthy"}
+                  </Text>
+                </>
+              ) : (
+                <Text className="text-text-muted dark:text-slate-400 text-sm mb-3">Loading...</Text>
+              )}
+              <Button
+                title="Rotate encryption key now"
+                onPress={handleRotateKey}
+                variant="outline"
+              />
+            </View>
           </Card>
 
           <Text className="text-lg font-bold text-text dark:text-slate-100 mb-3">Notifications</Text>
