@@ -39,6 +39,21 @@ export interface KeyInfo {
   needsRotation: boolean;
 }
 
+export interface KeyRotationContext {
+  /** The currently stored key, used to decrypt existing ciphertext. */
+  oldKey: string;
+  /** The candidate replacement key, used to re-encrypt existing ciphertext. */
+  newKey: string;
+}
+
+export interface KeyRotationOptions {
+  /**
+   * Re-encrypt persisted data before the stored key is overwritten.
+   * If this callback fails, rotation is deferred and the old key remains active.
+   */
+  reencrypt?: (context: KeyRotationContext) => Promise<void>;
+}
+
 export class KeyManagerError extends Error {
   constructor(
     message: string,
@@ -92,10 +107,11 @@ export class KeyManager {
       if (!existingKey) {
         await this.generateAndStoreKey();
       } else {
-        // Check if key needs rotation
+        // Check if key needs rotation. Actual rotation is coordinated by
+        // EncryptedPersister so existing encrypted cache can be migrated first.
         const keyInfo = await this.getKeyInfo();
         if (keyInfo?.needsRotation) {
-          await this.rotateKey();
+          console.warn("[KeyManager] Key rotation deferred until encrypted cache migration");
         }
       }
     } catch (error) {
@@ -285,12 +301,27 @@ export class KeyManager {
    * Rotate the encryption key (generate a new one)
    * This should be called when the key is due for rotation
    */
-  async rotateKey(): Promise<string> {
-    // Generate and store new key
-    const newKey = await this.generateAndStoreKey();
+  async rotateKey(options: KeyRotationOptions = {}): Promise<string> {
+    const oldKey = await this.getKey();
+    const newKey = this.generateKey();
 
-    // Note: Old encrypted data should be re-encrypted with the new key
-    // This is handled by the EncryptedPersister during migration
+    if (oldKey && options.reencrypt) {
+      try {
+        await options.reencrypt({ oldKey, newKey });
+      } catch (error) {
+        console.warn(
+          "[KeyManager] Key rotation deferred because cache re-encryption failed:",
+          error instanceof Error ? error.message : String(error),
+        );
+        return oldKey;
+      }
+    } else if (oldKey) {
+      console.warn("[KeyManager] Key rotation deferred because no re-encryption callback was provided");
+      return oldKey;
+    }
+
+    await this.storeKey(newKey);
+    this.memoryFallbackKey = newKey;
 
     console.log("[KeyManager] Key rotated successfully");
     return newKey;

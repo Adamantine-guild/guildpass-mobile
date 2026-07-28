@@ -34,6 +34,20 @@ The app uses a **three-layer state architecture** to avoid denormalization and s
 - **Staleness:** 5-minute staleTime; foreground refetch on app resume
 - **Sync:** On reconnect, the Sync Engine refetches and overwrites cache with server-authoritative data
 
+#### Encrypted cache key rotation
+
+React Query persistence is encrypted through `createEncryptedAsyncStoragePersister`.
+`KeyManager.initialize()` only ensures a key exists and reports stale keys; it does
+not overwrite an existing key by itself. Rotation is coordinated by the encrypted
+persister because that layer owns the serialized cache envelope.
+
+When a key is older than the rotation interval, the persister decrypts the current
+`gp1:` envelope with the old key, re-encrypts the same `PersistedClient` under the
+new key, writes the rotated envelope back to storage, and only then lets
+`KeyManager.rotateKey()` commit the new key. If re-encryption fails or the cache is
+unreadable, rotation is deferred and the old key remains active so normal cache
+reads are not turned into a silent data-loss event.
+
 ### 2. SQLite (DAL) — Normalized Offline Store
 
 - **Owns:** Relational tables for guilds, roles, memberships, user_roles, guild_configs, access_checks

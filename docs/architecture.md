@@ -28,6 +28,12 @@ We use **Expo Router**, which provides file-system based routing similar to Next
 factory, and cache-coherence mechanisms. This section covers store ownership and the
 rules contributors need when adding state.
 
+Encrypted React Query persistence owns key-rotation migration. `KeyManager` does
+not overwrite an existing stale key during standalone initialization; the encrypted
+persister first re-encrypts the stored `gp1:` cache envelope with the candidate key,
+then commits that key. If re-encryption cannot complete, rotation is deferred and
+the existing cache remains readable.
+
 ### Golden rule
 
 Server entity data (guilds, roles, memberships) never goes into Zustand. Zustand holds

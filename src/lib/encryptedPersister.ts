@@ -186,6 +186,7 @@ export function createEncryptedAsyncStoragePersister({
   // Set to true if the device-bound key cannot be retrieved; once set we
   // stop attempting to persist so reads/writes degrade to in-memory only.
   let memoryOnlyMode = false;
+  let rotationAttempted = false;
 
   async function loadKey(): Promise<ArrayBuffer | null> {
     if (memoryOnlyMode) {
@@ -199,7 +200,18 @@ export function createEncryptedAsyncStoragePersister({
     }
     keyLoadingPromise = (async () => {
       try {
-        const hexKey = await keyManager.getOrCreateKey();
+        let hexKey = await keyManager.getOrCreateKey();
+        if (!rotationAttempted && storage) {
+          rotationAttempted = true;
+          const keyInfo = await keyManager.getKeyInfo();
+          if (keyInfo?.needsRotation) {
+            hexKey = await keyManager.rotateKey({
+              reencrypt: async ({ oldKey, newKey }) => {
+                await rotateStoredEnvelope(oldKey, newKey);
+              },
+            });
+          }
+        }
         cachedKeyBuffer = hexKeyToArrayBuffer(hexKey);
         return cachedKeyBuffer;
       } catch (error) {
@@ -216,6 +228,38 @@ export function createEncryptedAsyncStoragePersister({
     return keyLoadingPromise;
   }
 
+  async function rotateStoredEnvelope(oldKey: string, newKey: string): Promise<void> {
+    if (!storage) {
+      return;
+    }
+
+    const storedString = await storage.getItem(key);
+    if (!storedString) {
+      return;
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(storedString);
+    } catch {
+      throw new Error("stored cache is not valid JSON");
+    }
+
+    if (
+      typeof parsed !== "object" ||
+      parsed === null ||
+      (parsed as Partial<EncryptedEnvelope>).v !== ENVELOPE_MAGIC
+    ) {
+      return;
+    }
+
+    const oldKeyBuffer = hexKeyToArrayBuffer(oldKey);
+    const newKeyBuffer = hexKeyToArrayBuffer(newKey);
+    const restored = await decryptEnvelope(parsed as EncryptedEnvelope, oldKeyBuffer);
+    const rotatedEnvelope = await encryptClient(restored, newKeyBuffer);
+    await storage.setItem(key, JSON.stringify(rotatedEnvelope));
+  }
+
   async function serialize(client: PersistedClient): Promise<string> {
     const keyBuffer = await loadKey();
     if (!keyBuffer) {
@@ -226,15 +270,7 @@ export function createEncryptedAsyncStoragePersister({
       return "";
     }
     const prunedClient = evictUnboundedData(client, maxAge, maxSize);
-    const plaintext = JSON.stringify(prunedClient);
-    const { encrypted, nonce, authTag } = await encryptionService.encrypt(plaintext, keyBuffer);
-    const envelope: EncryptedEnvelope = {
-      v: ENVELOPE_MAGIC,
-      n: bytesToBase64(nonce),
-      t: bytesToBase64(authTag),
-      c: bytesToBase64(new Uint8Array(encrypted)),
-    };
-    return JSON.stringify(envelope);
+    return JSON.stringify(await encryptClient(prunedClient, keyBuffer));
   }
 
   async function deserialize(storedString: string): Promise<PersistedClient | undefined> {
@@ -308,16 +344,30 @@ export function createEncryptedAsyncStoragePersister({
     }
     const plaintext = JSON.stringify(legacyClient);
     const { encrypted, nonce, authTag } = await encryptionService.encrypt(plaintext, keyBuffer);
-    const envelope: EncryptedEnvelope = {
+    const envelope = createEnvelope(encrypted, nonce, authTag);
+    if (storage) {
+      await storage.setItem(key, JSON.stringify(envelope));
+    }
+    return true;
+  }
+
+  async function encryptClient(client: PersistedClient, keyBuffer: ArrayBuffer): Promise<EncryptedEnvelope> {
+    const plaintext = JSON.stringify(client);
+    const { encrypted, nonce, authTag } = await encryptionService.encrypt(plaintext, keyBuffer);
+    return createEnvelope(encrypted, nonce, authTag);
+  }
+
+  function createEnvelope(
+    encrypted: ArrayBuffer,
+    nonce: Uint8Array,
+    authTag: Uint8Array,
+  ): EncryptedEnvelope {
+    return {
       v: ENVELOPE_MAGIC,
       n: bytesToBase64(nonce),
       t: bytesToBase64(authTag),
       c: bytesToBase64(new Uint8Array(encrypted)),
     };
-    if (storage) {
-      await storage.setItem(key, JSON.stringify(envelope));
-    }
-    return true;
   }
 
   async function safeClearStoredValue(): Promise<void> {
@@ -345,19 +395,8 @@ export function createEncryptedAsyncStoragePersister({
       return undefined;
     }
 
-    const nonce = base64ToBytes(envelope.n);
-    const authTag = base64ToBytes(envelope.t);
-    const cipherBytes = base64ToBytes(envelope.c);
-    const cipherBuffer = new ArrayBuffer(cipherBytes.length);
-    new Uint8Array(cipherBuffer).set(cipherBytes);
-
     try {
-      const { decrypted } = await encryptionService.decrypt<PersistedClient>(
-        cipherBuffer,
-        nonce,
-        authTag,
-        keyBuffer,
-      );
+      const decrypted = await decryptEnvelope(envelope, keyBuffer);
       if (decrypted && maxAge > 0 && Date.now() - decrypted.timestamp > maxAge) {
         await safeClearStoredValue();
         return undefined;
@@ -381,6 +420,25 @@ export function createEncryptedAsyncStoragePersister({
       );
       return undefined;
     }
+  }
+
+  async function decryptEnvelope(
+    envelope: EncryptedEnvelope,
+    keyBuffer: ArrayBuffer,
+  ): Promise<PersistedClient> {
+    const nonce = base64ToBytes(envelope.n);
+    const authTag = base64ToBytes(envelope.t);
+    const cipherBytes = base64ToBytes(envelope.c);
+    const cipherBuffer = new ArrayBuffer(cipherBytes.length);
+    new Uint8Array(cipherBuffer).set(cipherBytes);
+
+    const { decrypted } = await encryptionService.decrypt<PersistedClient>(
+      cipherBuffer,
+      nonce,
+      authTag,
+      keyBuffer,
+    );
+    return decrypted;
   }
 
   return createAsyncStoragePersister({
