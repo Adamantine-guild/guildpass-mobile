@@ -141,13 +141,33 @@ describe("KeyManager", () => {
   });
 
   describe("rotateKey", () => {
-    it("should generate a new key different from the previous one", async () => {
+    it("should defer rotation when no re-encryption callback is provided", async () => {
       vi.mocked(SecureStore.getItemAsync).mockResolvedValue("f".repeat(64));
       vi.mocked(SecureStore.setItemAsync).mockResolvedValue();
 
       const km = new KeyManager({ keyId: "test_rotate_1" });
       const newKey = await km.rotateKey();
+      expect(newKey).toBe("f".repeat(64));
+      expect(SecureStore.setItemAsync).not.toHaveBeenCalled();
+    });
+
+    it("should generate and store a new key after re-encryption succeeds", async () => {
+      vi.mocked(SecureStore.getItemAsync).mockResolvedValue("f".repeat(64));
+      vi.mocked(SecureStore.setItemAsync).mockResolvedValue();
+      const reencrypt = vi.fn().mockResolvedValue(undefined);
+
+      const km = new KeyManager({ keyId: "test_rotate_2" });
+      const newKey = await km.rotateKey({ reencrypt });
       expect(newKey).not.toBe("f".repeat(64));
+      expect(reencrypt).toHaveBeenCalledWith({
+        oldKey: "f".repeat(64),
+        newKey,
+      });
+      expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
+        "test_rotate_2",
+        newKey,
+        expect.any(Object),
+      );
     });
   });
 
