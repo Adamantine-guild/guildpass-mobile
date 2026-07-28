@@ -26,14 +26,18 @@ const SENSITIVE_LEGACY_KEYS = new Set([
   "wallet-storage",
   "session-storage",
   "sync-storage",
+  "biometric-storage",
   "guildpass:reconciliation:v1",
+  "guildpass:push-notifications:v1",
   "guildpass:issuer-keys-index",
+  "guildpass:attestation-key-registry-index",
 ]);
 
 const SENSITIVE_LEGACY_KEY_PREFIXES = [
   "guildpass:attestations:",
   "guildpass:attestation-index",
   "guildpass:issuer-keys:",
+  "guildpass:attestation-key-registry:",
 ];
 
 function getLegacyEncodedSecureStorageKey(name: string): string {
@@ -330,13 +334,16 @@ export const migratingSecureStorage: StateStorage = {
   },
 
   setItem: async (name: string, value: string): Promise<void> => {
+    let writeError: unknown;
     try {
       await rawSecureStorage.setItem(name, value);
     } catch (error) {
       console.error(`Error writing sensitive data to SecureStore: ${name}`, error);
+      writeError = error;
     }
     // Never retain a fallback or stale plaintext copy.
     await clearLegacyOrFailClosed(name);
+    if (writeError) throw writeError;
   },
 
   removeItem: async (name: string): Promise<void> => {

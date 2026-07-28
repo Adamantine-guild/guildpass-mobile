@@ -346,6 +346,15 @@ describe("Persistence and Rehydration", () => {
       ],
       ["guildpass:issuer-keys:guild-1", JSON.stringify({ issuerAddress: walletAddress })],
       ["guildpass:issuer-keys-index", JSON.stringify(["guild-1"])],
+      [
+        "guildpass:push-notifications:v1",
+        JSON.stringify({ state: { pushToken: "ExponentPushToken[legacy-secret]" } }),
+      ],
+      [
+        "guildpass:attestation-key-registry:guild-1",
+        JSON.stringify({ guildId: "guild-1", revokedAddresses: [walletAddress] }),
+      ],
+      ["guildpass:attestation-key-registry-index", JSON.stringify(["guild-1"])],
     ]);
     const asyncGet = vi.mocked(AsyncStorage.getItem);
     const asyncRemove = vi.mocked(AsyncStorage.removeItem);
@@ -380,7 +389,7 @@ describe("Persistence and Rehydration", () => {
       const report = await migrateLegacySensitiveStorage();
 
       expect(report.failedKeys).toEqual([]);
-      expect(report.migratedKeys).toHaveLength(8);
+      expect(report.migratedKeys).toHaveLength(11);
       expect(legacyEntries.size).toBe(0);
       for (const [key] of vi.mocked(SecureStore.setItemAsync).mock.calls) {
         expect(key).toMatch(/^[\w.-]+$/);
@@ -400,6 +409,22 @@ describe("Persistence and Rehydration", () => {
       secureDelete.mockImplementation(async (key) => {
         validateSecureKey(key);
       });
+    }
+  });
+
+  it("reports secure write failures after removing any plaintext fallback", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.mocked(SecureStore.getItemAsync).mockResolvedValueOnce(null);
+    vi.mocked(SecureStore.setItemAsync).mockRejectedValueOnce(new Error("Keystore unavailable"));
+    vi.mocked(AsyncStorage.getItem).mockResolvedValueOnce(null);
+
+    try {
+      await expect(
+        migratingSecureStorage.setItem("session-storage", "sensitive-session"),
+      ).rejects.toThrow("Keystore unavailable");
+      expect(AsyncStorage.removeItem).toHaveBeenCalledWith("session-storage");
+    } finally {
+      consoleError.mockRestore();
     }
   });
 
