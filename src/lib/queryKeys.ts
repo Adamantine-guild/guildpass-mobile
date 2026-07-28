@@ -3,11 +3,13 @@ import { walletScopedQueryRoots } from "./walletScopedCache";
 export const QUERY_ROOTS = {
   MEMBERSHIP: "membership",
   MEMBERSHIPS: "memberships",
+  WALLET_GUILDS: "wallet-guilds",
   USER_ROLES: "user-roles",
   GUILD: "guild",
   GUILD_CONFIG: "guild-config",
   GUILD_ROLES: "guild-roles",
   ACCESS_CHECK: "access-check",
+  PREFERENCES: "preferences",
   PROFILE: "profile",
   USER_PROFILE: "user-profile",
 } as const;
@@ -36,6 +38,10 @@ export const queryKeys = {
     all: ["memberships"] as const,
     byWallet: (walletAddress: string) => ["memberships", walletAddress] as const,
   },
+  walletGuilds: {
+    all: ["wallet-guilds"] as const,
+    byWallet: (walletAddress: string) => ["wallet-guilds", walletAddress] as const,
+  },
   userRoles: {
     all: ["user-roles"] as const,
     byWalletAndGuild: (walletAddress: string, guildId: string) =>
@@ -43,6 +49,12 @@ export const queryKeys = {
   },
   accessCheck: {
     all: ["access-check"] as const,
+    byParams: (walletAddress: string, guildId: string, resourceId: string) =>
+      ["access-check", walletAddress, guildId, resourceId] as const,
+  },
+  preferences: {
+    all: ["preferences"] as const,
+    current: ["preferences", "current"] as const,
   },
   profile: {
     all: ["profile"] as const,
@@ -55,10 +67,13 @@ export const queryKeys = {
 export const PERSISTABLE_QUERY_ROOTS: readonly QueryRoot[] = [
   QUERY_ROOTS.MEMBERSHIP,
   QUERY_ROOTS.MEMBERSHIPS,
+  QUERY_ROOTS.WALLET_GUILDS,
   QUERY_ROOTS.USER_ROLES,
   QUERY_ROOTS.GUILD,
   QUERY_ROOTS.GUILD_CONFIG,
   QUERY_ROOTS.GUILD_ROLES,
+  QUERY_ROOTS.ACCESS_CHECK,
+  QUERY_ROOTS.PREFERENCES,
 ];
 
 export function isPersistableQuery(queryKey: readonly unknown[]): boolean {

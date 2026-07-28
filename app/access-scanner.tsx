@@ -7,6 +7,9 @@ import * as Linking from "expo-linking";
 import { AppHeader } from "../src/components/AppHeader";
 import { Button } from "../src/components/Button";
 import { Card } from "../src/components/Card";
+import { verifyAndParseAccessQrPayload, QrValidationResult } from "../src/features/access/verifyQrPayload";
+import { describeQrSignatureError, QR_SIGNATURE_ERROR_CODES, QrSignatureErrorCode, QrSignatureError } from "../src/features/access/qrSignature";
+import { describeQrPayloadError, QR_PAYLOAD_ERROR_CODES, QrPayloadErrorCode, QrPayloadError } from "../src/features/access/qrPayload";
 import { verifyAndParseAccessQrPayload } from "../src/features/access/verifyQrPayload";
 import { describeQrSignatureError, QrSignatureError, QR_SIGNATURE_ERROR_CODES } from "../src/features/access/qrSignature";
 import {
@@ -76,6 +79,7 @@ const isRecoverableError = (error: unknown): boolean => {
 export default function AccessScanner() {
   const router = useRouter();
   const [permission, requestPermission] = useCameraPermissions();
+  const [scanError, setScanError] = useState<{ message: string; isUntrusted: boolean } | null>(null);
   const [scanError, setScanError] = useState<{ message: string; isUntrusted: boolean } | null>(
     null,
   );
@@ -140,6 +144,19 @@ export default function AccessScanner() {
     setScanError(null);
     AccessibilityInfo.announceForAccessibility("Processing access QR code.");
 
+    const result = await verifyAndParseAccessQrPayload(data);
+
+    try {
+      AccessibilityInfo.announceForAccessibility("Processing access QR code.");
+      await verifyAndParseAccessQrPayload(data);
+      setVerificationSuccess(true);
+      AccessibilityInfo.announceForAccessibility("Signature verified. Opening access check.");
+      
+      setTimeout(() => {
+        setVerificationSuccess(false);
+        router.replace({ pathname: "/access-check", params: { qrPayload: data } });
+      }, 1500);
+      return;
     try {
       AccessibilityInfo.announceForAccessibility("Processing access QR code.");
       const result = await verifyAndParseAccessQrPayload(data);
@@ -194,6 +211,7 @@ export default function AccessScanner() {
 
       if (error instanceof QrSignatureError) {
         errorMessage = describeQrSignatureError(error.code);
+        isUntrusted = true;
         isUntrusted = !isRecoverableError(error);
       } else if (error instanceof QrPayloadError) {
         if (
@@ -208,6 +226,8 @@ export default function AccessScanner() {
         } else {
           errorMessage = error.message;
         }
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
         errorMessage = describeQrPayloadError(error.code);
         isUntrusted = !isRecoverableError(error);
       }
@@ -244,6 +264,7 @@ export default function AccessScanner() {
         <AppHeader title="Scan Access QR" showBack />
         <View className="flex-1 px-4 py-6">
           <Card>
+            <Text accessibilityLiveRegion="polite" className="text-text-muted dark:text-slate-400">Checking camera permission...</Text>
             <Text accessibilityLiveRegion="polite" className="text-text-muted dark:text-slate-400">
               Checking camera permission...
             </Text>
@@ -266,6 +287,9 @@ export default function AccessScanner() {
         <AppHeader title="Scan Access QR" showBack />
         <View className="flex-1 px-4 py-6">
           <Card>
+            <Text accessibilityRole="header" className="text-xl font-bold text-text dark:text-slate-100 mb-2">Camera access needed</Text>
+            <Text accessibilityLiveRegion="polite" className="text-text-muted dark:text-slate-400 mb-6">
+              GuildPass needs camera permission to scan access check QR codes.
             <Text
               accessibilityRole="header"
               className="text-xl font-bold text-text dark:text-slate-100 mb-2"
@@ -291,6 +315,20 @@ export default function AccessScanner() {
                 onPress={requestPermission}
               />
             ) : (
+              <>
+                <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" className="text-error dark:text-red-400">
+                  Camera permission was denied. Enable camera access in your device settings to scan
+                  QR codes.
+                </Text>
+                <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" className="text-error dark:text-red-400 mb-6">
+                  Camera permission was denied. Open Settings to enable camera access for GuildPass.
+                </Text>
+                <Button
+                  title="Open Settings"
+                  onPress={() => Linking.openSettings()}
+                  variant="outline"
+                />
+              </>
               <Button
                 title="Open Settings"
                 onPress={() => Linking.openSettings()}
@@ -305,6 +343,10 @@ export default function AccessScanner() {
 
   if (isProcessingScan) {
     return (
+      <View accessibilityLabel="Processing access QR code" accessibilityState={{ busy: true }} className="flex-1 bg-background dark:bg-slate-900 justify-center items-center">
+        <AppHeader title="Scan Access QR" showBack />
+        <ActivityIndicator size="large" accessibilityLabel="Processing access QR code" accessibilityLiveRegion="polite" />
+        <Text accessibilityLiveRegion="polite" className="mt-4 text-text dark:text-slate-100">Processing...</Text>
       <View
         accessibilityLabel="Verifying access QR code"
         accessibilityState={{ busy: true }}
@@ -334,6 +376,15 @@ export default function AccessScanner() {
 
   if (verificationSuccess) {
     return (
+      <View accessibilityLabel="Signature verified" accessibilityState={{ busy: true }} className="flex-1 bg-background dark:bg-slate-900 justify-center items-center">
+        <AppHeader title="Scan Access QR" showBack />
+        <View className="flex-1 px-4 py-6 justify-center w-full">
+          <Card className="border-success dark:border-green-600 bg-success/5 dark:bg-green-900/30 items-center py-8">
+            <Text className="text-success dark:text-green-400 text-4xl mb-4 font-bold">✓</Text>
+            <Text className="text-success dark:text-green-400 font-bold text-xl">Signature verified</Text>
+            <Text className="text-success/80 dark:text-green-400/80 mt-2 text-center">Redirecting to access check...</Text>
+          </Card>
+        </View>
       <View
         accessibilityLabel="QR code verified successfully"
         className="flex-1 bg-background dark:bg-slate-900 justify-center items-center"
@@ -375,6 +426,15 @@ export default function AccessScanner() {
       <View className="flex-1 bg-background dark:bg-slate-900">
         <AppHeader title="Scan Access QR" showBack />
         <View className="flex-1 px-4 py-6">
+          <Card className={isUntrusted ? "border-amber-500 bg-amber-500/10 dark:border-amber-600 dark:bg-amber-900/30" : "border-error bg-error/5 dark:border-red-600 dark:bg-red-900/30"}>
+            <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" className={isUntrusted ? "text-amber-600 dark:text-amber-400 font-bold text-lg" : "text-error dark:text-red-400 font-bold text-lg"}>
+              {isUntrusted ? "Untrusted QR code" : "QR code rejected"}
+            </Text>
+            <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" className={isUntrusted ? "text-amber-700/80 dark:text-amber-300/80 text-sm mt-1 mb-4" : "text-error/80 dark:text-red-300/80 text-sm mt-1 mb-4"}>
+              {scanError.message}
+            </Text>
+            <Button title="Scan Again" onPress={handleScanAgain} variant="outline" />
+          </Card>
           <Animated.View
             style={{
               transform: [{ translateY: errorSlide }],
@@ -457,6 +517,7 @@ export default function AccessScanner() {
         />
         <View className="absolute left-4 right-4 bottom-4">
           <Card className="mb-4">
+            <Text accessibilityLiveRegion="polite" className="text-text dark:text-slate-100 font-medium text-center">
             <Text
               accessibilityLiveRegion="polite"
               className="text-text dark:text-slate-100 font-medium text-center"
@@ -488,6 +549,9 @@ export default function AccessScanner() {
             <Button
               title="Test: Malformed QR"
               onPress={() => {
+                setScanError({ message: "This QR code has expired.", isUntrusted: false });
+                setIsProcessingScan(false);
+                scanInProgressRef.current = true;
                 void handleScanData(TEST_QR_PAYLOADS.malformedJson);
               }}
               className="py-2 px-3"

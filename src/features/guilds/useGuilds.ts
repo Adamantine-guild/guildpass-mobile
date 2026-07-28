@@ -1,18 +1,26 @@
-import { useQuery } from "@tanstack/react-query";
+import { onlineManager, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { guildPassClient } from "../../lib/guildpassClient";
 import { appConfig } from "../../config/appConfig";
+import { queryKeys } from "../../lib/queryKeys";
+import {
+  GuildNotFoundError,
+  guildsService,
+} from "../../services/guilds/guildsService";
+import { getCachedMembershipSummaries, type GuildPassStatus } from "../passes/passCache";
 
 export type GuildListItem = {
   id: string;
   name: string;
   isActive: boolean;
   roleCount?: number;
+  status?: GuildPassStatus;
+  lastSyncedAt?: number;
 };
 
-export const walletGuildsQueryKey = (walletAddress: string | null | undefined) => [
-  "wallet-guilds",
-  walletAddress ?? "",
-];
+export { GuildNotFoundError };
+
+export const walletGuildsQueryKey = (walletAddress: string | null | undefined) =>
+  queryKeys.walletGuilds.byWallet(walletAddress ?? "");
 
 export const fetchGuildsByWalletAddress = async (
   walletAddress: string,
@@ -34,52 +42,113 @@ export const fetchGuildsByWalletAddress = async (
   }
 
   const data = (await response.json()) as GuildListItem[] | { guilds?: GuildListItem[] };
-  return Array.isArray(data) ? data : data.guilds ?? [];
+  return Array.isArray(data) ? data : (data.guilds ?? []);
 };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function cachedGuildName(queryClient: QueryClient, guildId: string): string {
+  const guild = queryClient.getQueryData(queryKeys.guild.byId(guildId));
+  return isRecord(guild) && typeof guild.name === "string" ? guild.name : guildId;
+}
+
+function getCachedWalletGuilds(
+  queryClient: QueryClient,
+  walletAddress: string,
+): GuildListItem[] | undefined {
+  const summaries = getCachedMembershipSummaries(queryClient, walletAddress);
+  if (!summaries) return undefined;
+
+  return summaries.map((summary) => ({
+    id: summary.guildId,
+    name: cachedGuildName(queryClient, summary.guildId),
+    isActive: summary.isActive,
+    roleCount: summary.roleCount,
+    status: summary.status,
+    lastSyncedAt: summary.lastSyncedAt,
+  }));
+}
+
 export const useGuilds = () => {
+  const queryClient = useQueryClient();
+
   const useWalletGuilds = (walletAddress: string | null | undefined) => {
-    return useQuery({
-      queryKey: walletGuildsQueryKey(walletAddress),
-      queryFn: () => fetchGuildsByWalletAddress(walletAddress ?? ""),
+    const queryKey = walletGuildsQueryKey(walletAddress);
+
+    return useQuery<GuildListItem[]>({
+      queryKey,
+      queryFn: async () => {
+        if (!walletAddress) return [];
+
+        const cached = queryClient.getQueryData<GuildListItem[]>(queryKey);
+        if (!onlineManager.isOnline()) {
+          return cached ?? getCachedWalletGuilds(queryClient, walletAddress) ?? [];
+        }
+
+        return fetchGuildsByWalletAddress(walletAddress);
+      },
       enabled: !!walletAddress,
       networkMode: "offlineFirst",
+      refetchOnReconnect: "always",
     });
   };
 
   const useGuild = (guildId: string) => {
-    return useQuery({
-      queryKey: queryKeys.guild.byId(guildId),
+    const queryKey = queryKeys.guild.byId(guildId);
+
+    return useQuery<any>({
+      queryKey,
       queryFn: async () => {
-        try {
-          return await guildPassClient.guilds.getGuild({ guildId });
-        } catch (error) {
-          if (error instanceof Error && /not found/i.test(error.message)) {
-            throw new GuildNotFoundError(guildId);
-          }
-          throw error;
+        const cached = queryClient.getQueryData(queryKey);
+        if (!onlineManager.isOnline() && cached !== undefined) {
+          return cached as any;
         }
+
+        return guildsService.getGuild(guildId);
       },
       enabled: !!guildId,
       networkMode: "offlineFirst",
+      refetchOnReconnect: "always",
     });
   };
 
   const useGuildConfig = (guildId: string) => {
-    return useQuery({
-      queryKey: queryKeys.guildConfig.byId(guildId),
-      queryFn: () => guildPassClient.guilds.getGuildConfig({ guildId }),
+    const queryKey = queryKeys.guildConfig.byId(guildId);
+
+    return useQuery<any>({
+      queryKey,
+      queryFn: async () => {
+        const cached = queryClient.getQueryData(queryKey);
+        if (!onlineManager.isOnline() && cached !== undefined) {
+          return cached as any;
+        }
+
+        return guildsService.getGuildConfig(guildId);
+      },
       enabled: !!guildId,
       networkMode: "offlineFirst",
+      refetchOnReconnect: "always",
     });
   };
 
   const useRoles = (guildId: string) => {
-    return useQuery({
-      queryKey: queryKeys.guildRoles.byId(guildId),
-      queryFn: () => guildPassClient.roles.getRoles({ guildId }),
+    const queryKey = queryKeys.guildRoles.byId(guildId);
+
+    return useQuery<any>({
+      queryKey,
+      queryFn: async () => {
+        const cached = queryClient.getQueryData(queryKey);
+        if (!onlineManager.isOnline() && cached !== undefined) {
+          return cached as any;
+        }
+
+        return guildsService.getRoles(guildId);
+      },
       enabled: !!guildId,
       networkMode: "offlineFirst",
+      refetchOnReconnect: "always",
     });
   };
 

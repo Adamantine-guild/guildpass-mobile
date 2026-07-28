@@ -2,42 +2,98 @@ import { View, Text, TouchableOpacity } from "react-native";
 import React from "react";
 import { Card } from "./Card";
 import { RoleBadge } from "./RoleBadge";
+import type { GuildPassStatus } from "../features/passes/passCache";
 
 type GuildCardProps = {
   name: string;
   id: string;
   isActive: boolean;
   roleCount: number;
+  status?: GuildPassStatus;
+  offlineCached?: boolean;
   onPress: () => void;
 };
 
-export const GuildCard = ({ name, id, isActive, roleCount, onPress }: GuildCardProps) => {
+const STATUS_STYLES: Record<
+  GuildPassStatus,
+  { label: string; pill: string; text: string; roleTier: "default" | "premium" | "restricted" }
+> = {
+  active: {
+    label: "ACTIVE",
+    pill: "bg-success/10",
+    text: "text-success",
+    roleTier: "premium",
+  },
+  inactive: {
+    label: "INACTIVE",
+    pill: "bg-text-muted/10",
+    text: "text-text-muted",
+    roleTier: "default",
+  },
+  expired: {
+    label: "EXPIRED",
+    pill: "bg-secondary/10",
+    text: "text-secondary",
+    roleTier: "default",
+  },
+  revoked: {
+    label: "REVOKED",
+    pill: "bg-error/10",
+    text: "text-error",
+    roleTier: "restricted",
+  },
+  unknown: {
+    label: "UNKNOWN",
+    pill: "bg-text-muted/10",
+    text: "text-text-muted",
+    roleTier: "default",
+  },
+};
+
+export const GuildCard = ({
+  name,
+  id,
+  isActive,
+  roleCount,
+  status,
+  offlineCached = false,
+  onPress,
+}: GuildCardProps) => {
+  const resolvedStatus = status ?? (isActive ? "active" : "inactive");
+  const statusStyle = STATUS_STYLES[resolvedStatus];
+
   return (
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.7}
       accessibilityRole="button"
-      accessibilityLabel={`${name}, ${isActive ? "Active" : "Inactive"}, ${roleCount} roles`}
+      accessibilityLabel={`${name}, ${statusStyle.label.toLowerCase()}, ${roleCount} roles${
+        offlineCached ? ", cached offline" : ""
+      }`}
     >
       <Card className="mb-4">
         <View className="flex-row justify-between items-center mb-2">
           <Text className="text-xl font-bold text-text">{name}</Text>
-          <View
-            className={`px-3 py-1 rounded-full ${isActive ? "bg-success/10" : "bg-text-muted/10"}`}
-          >
-            <Text className={`text-xs font-bold ${isActive ? "text-success" : "text-text-muted"}`}>
-              {isActive ? "ACTIVE" : "INACTIVE"}
-            </Text>
+          <View className={`px-3 py-1 rounded-full ${statusStyle.pill}`}>
+            <Text className={`text-xs font-bold ${statusStyle.text}`}>{statusStyle.label}</Text>
           </View>
         </View>
         <Text className="text-text-muted text-sm mb-4">ID: {id}</Text>
         <View className="flex-row items-center flex-wrap">
           <RoleBadge
             name={`${roleCount} ${roleCount === 1 ? "Role" : "Roles"}`}
-            tier={isActive ? "premium" : "default"}
+            tier={statusStyle.roleTier}
           />
           <Text className="text-text-muted mx-2">•</Text>
           <Text className="text-text-muted">Tap to view details</Text>
+          {offlineCached ? (
+            <>
+              <Text className="text-text-muted mx-2">•</Text>
+              <Text className="text-secondary font-semibold" testID="guild-card-offline-cache">
+                Cached offline
+              </Text>
+            </>
+          ) : null}
         </View>
       </Card>
     </TouchableOpacity>

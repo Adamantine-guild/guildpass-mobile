@@ -5,14 +5,12 @@ import { guildPassClient } from "../../lib/guildpassClient";
 import { useMultiChainRoleEligibility } from "./useMultiChainRoleEligibility";
 import type { PerChainRoleEligibilityResolution } from "./roleEligibilityResolver";
 import { useNetworkStatus } from "../offline/useNetworkStatus";
-import {
-  resolveAccessDecision,
-  type AccessDecisionConfidence,
-} from "./accessDecisionPipeline";
+import { resolveAccessDecision, type AccessDecisionConfidence } from "./accessDecisionPipeline";
 import {
   getCachedOfflineVerificationInputs,
   verifyOfflineCredentialAccess,
 } from "./offlineCredentialVerifier";
+import { queryKeys } from "../../lib/queryKeys";
 
 type AccessCheckMutateOptions = MutateOptions<AccessCheckResult, Error, AccessCheckParams, unknown>;
 
@@ -103,7 +101,7 @@ export const useAccessCheck = () => {
   );
 
   const mutation = useMutation<AccessCheckResult, Error, AccessCheckParams>({
-    mutationKey: ["access-check"],
+    mutationKey: queryKeys.accessCheck.all,
     mutationFn: async (params) => {
       const decision = await resolveAccessDecision({
         walletAddress: params.walletAddress,
@@ -151,22 +149,22 @@ export const useAccessCheck = () => {
         discrepancy: decision.discrepancy,
       };
     },
-    onSuccess: (result) => {
+    onSuccess: (result, variables) => {
+      queryClient.setQueryData(
+        queryKeys.accessCheck.byParams(
+          variables.walletAddress,
+          variables.guildId,
+          variables.resourceId,
+        ),
+        result,
+      );
       dispatch({ type: "SUBMIT_SUCCESS", result });
     },
     onError: (error: Error) => {
       dispatch({ type: "SUBMIT_ERROR", error: error.message });
     },
   });
-  const {
-    data,
-    error,
-    isPending,
-    isError,
-    mutate,
-    mutateAsync,
-    reset: resetMutation,
-  } = mutation;
+  const { data, error, isPending, isError, mutate, mutateAsync, reset: resetMutation } = mutation;
 
   const startScan = useCallback(() => {
     dispatch({ type: "START_SCAN" });

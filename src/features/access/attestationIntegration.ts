@@ -3,10 +3,12 @@
  * Augments access check results with cryptographic proof validation
  */
 
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { guildPassClient } from "../../lib/guildpassClient";
+import { queryKeys } from "../../lib/queryKeys";
 import type { AccessCheckParams, AccessCheckResult } from "./useAccessCheck";
 import type { AttestationService } from "../attestation/attestationService";
+import { writeVerifiedAttestationToCache } from "../attestation/attestationQueryCache";
 
 /**
  * Enhanced access check result with attestation verification
@@ -27,6 +29,8 @@ export interface AttestationAugmentedAccessCheck extends AccessCheckResult {
  * @returns Mutation function for access checking
  */
 export function useAccessCheckWithAttestations(attestationService: AttestationService | null) {
+  const queryClient = useQueryClient();
+
   return useMutation<AttestationAugmentedAccessCheck, Error, AccessCheckParams>({
     mutationKey: ["access-check-with-attestations"],
     mutationFn: async (params: AccessCheckParams) => {
@@ -59,6 +63,12 @@ export function useAccessCheckWithAttestations(attestationService: AttestationSe
       };
     },
     networkMode: "offlineFirst",
+    onSuccess: (result, params) => {
+      queryClient.setQueryData(
+        queryKeys.accessCheck.byParams(params.walletAddress, params.guildId, params.resourceId),
+        result,
+      );
+    },
   });
 }
 
@@ -70,7 +80,10 @@ export function useAccessCheckWithAttestations(attestationService: AttestationSe
  * @returns Mutation function
  */
 export function useCacheAccessAttestationsMutation(attestationService: AttestationService | null) {
+  const queryClient = useQueryClient();
+
   return useMutation({
+    mutationKey: ["cache-access-attestations"],
     mutationFn: async (params: {
       walletAddress: string;
       guildId: string;
@@ -100,6 +113,19 @@ export function useCacheAccessAttestationsMutation(attestationService: Attestati
       }
 
       return results;
+    },
+    onSuccess: (results, params) => {
+      for (const result of results) {
+        writeVerifiedAttestationToCache(
+          queryClient,
+          {
+            walletAddress: params.walletAddress,
+            guildId: params.guildId,
+            roleId: "access-" + result.resourceId,
+          },
+          result,
+        );
+      }
     },
   });
 }

@@ -1,10 +1,13 @@
 import { SessionAdapter } from "./session.types";
 
 /**
- * No-op adapter — wallet connected state is treated as authenticated.
- * Replace with a real SIWE or backend adapter when backend support is ready.
+ * Lightweight adapter that keeps the app's current behavior while exposing the
+ * contract required by the centralized API client.
  */
 export const noopSessionAdapter: SessionAdapter = {
+  async getAccessToken() {
+    return null;
+  },
   async signIn(walletAddress) {
     return { token: `noop:${walletAddress}`, expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000 };
   },
@@ -13,5 +16,11 @@ export const noopSessionAdapter: SessionAdapter = {
   },
   async signOut(_token) {
     // nothing to do
+  },
+  async invalidateSession() {
+    // nothing to do
+  },
+  isAuthenticated() {
+    return false;
   },
 };
