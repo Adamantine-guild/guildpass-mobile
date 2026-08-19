@@ -94,6 +94,9 @@ class MutationQueueManager {
 
       const envelope = JSON.parse(stored) as Partial<EncryptedQueueEnvelope>;
       if (envelope.v !== ENVELOPE_MAGIC || !envelope.n || !envelope.t || !envelope.c) {
+        // Older releases could leave queue payloads as plaintext JSON. Never
+        // hydrate or retain an unrecognised value containing mutation payloads.
+        await AsyncStorage.removeItem(MUTATION_QUEUE_STORAGE_KEY);
         this.queueCache = [];
         this.notifyListeners();
         return this.queueCache;
@@ -123,6 +126,9 @@ class MutationQueueManager {
       this.queueCache = Array.isArray(decrypted) ? decrypted : [];
     } catch (e) {
       console.error("[MutationQueue] Error loading queue", e);
+      // A malformed legacy/corrupt entry may contain plaintext. Encrypted
+      // envelopes are authenticated, so removing either form is fail-closed.
+      await AsyncStorage.removeItem(MUTATION_QUEUE_STORAGE_KEY).catch(() => {});
       this.queueCache = [];
     }
     

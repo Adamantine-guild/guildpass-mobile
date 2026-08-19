@@ -153,7 +153,8 @@ externally connected wallet.
 
 Wallet-linked state and authentication state are never persisted in plaintext AsyncStorage.
 The `wallet-storage`, `session-storage`, `sync-storage`, and
-`guildpass:reconciliation:v1` Zustand slices use
+`guildpass:reconciliation:v1` Zustand slices, push tokens, and cached
+attestation revocation registries use
 `expo-secure-store`, backed by the iOS Keychain and Android Keystore, with the
 iOS accessibility level set to `WHEN_UNLOCKED_THIS_DEVICE_ONLY`. This includes:
 
@@ -161,7 +162,33 @@ iOS accessibility level set to `WHEN_UNLOCKED_THIS_DEVICE_ONLY`. This includes:
 - the connector kind (manual entry, WalletConnect, or another provider); and
 - session tokens, expiry timestamps, and their associated wallet address;
 - wallet-scoped sync metadata and reconciliation sequence numbers; and
-- cached wallet role attestations, issuer verification keys, and their indexes.
+- cached wallet role attestations, issuer verification keys, and their indexes;
+- push-notification delivery tokens and cached issuer revocation registries.
+
+Secure persistence errors are surfaced to callers after any stale AsyncStorage
+copy has been removed. Feature code must not treat a failed secure write as a
+successful save.
+
+### Approved storage practices
+
+Classify a value before persisting it:
+
+- **Sensitive:** authentication/session state, provider tokens, wallet-linked
+  identifiers, signed credentials or attestations, access decisions, sync
+  metadata, and security settings. Use `migratingSecureStorage` from
+  `src/lib/storage` for small state. Large offline datasets must use the
+  AES-GCM encrypted persister with its device-bound key.
+- **Non-sensitive:** presentation-only preferences that cannot identify a user
+  or affect authentication or authorization. These may use `asyncStorage` from
+  `src/lib/storage`.
+- **Ephemeral:** private keys, seed phrases, raw signing material, one-time
+  challenges, and transient access scans. Keep these in provider/native custody
+  or memory; do not persist them in application storage.
+
+Feature modules must not import `AsyncStorage` or `expo-secure-store` directly.
+Native storage access belongs in the centralized storage/encrypted-persister
+modules. New legacy key families must also be registered in the startup
+migration and covered by a plaintext-removal test.
 
 ### Upgrade migration
 

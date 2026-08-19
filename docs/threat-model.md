@@ -44,9 +44,9 @@ The hardening layer consists of two controls:
 
 | Asset                                  | Sensitivity  | Storage                                       |
 | -------------------------------------- | ------------ | --------------------------------------------- |
-| Wallet address / identifier            | Medium       | AsyncStorage (public data)                    |
+| Wallet address / identifier            | Medium       | `expo-secure-store`                           |
 | Access-control decisions (QR payloads) | High         | In-memory only                                |
-| Signed attestations / proofs           | High         | Transient; not persisted                      |
+| Signed attestations / proofs           | High         | `expo-secure-store` when cached for offline use |
 | Future: embedded private keys          | **Critical** | Planned: `expo-secure-store` / Secure Enclave |
 | Session / auth tokens                  | High         | `expo-secure-store`                           |
 

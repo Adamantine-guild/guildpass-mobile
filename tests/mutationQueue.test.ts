@@ -32,6 +32,26 @@ describe("MutationQueue", () => {
     expect(queue).toHaveLength(0);
   });
 
+  it("fails closed and removes a legacy plaintext mutation queue", async () => {
+    vi.mocked(AsyncStorage.getItem).mockResolvedValueOnce(
+      JSON.stringify([
+        {
+          id: "legacy",
+          type: MutationType.UPDATE_PROFILE,
+          payload: { email: "sensitive@example.com" },
+          createdAt: 1,
+          status: "PENDING",
+          retryCount: 0,
+        },
+      ]),
+    );
+
+    const queue = await mutationQueue.getQueue();
+
+    expect(queue).toEqual([]);
+    expect(AsyncStorage.removeItem).toHaveBeenCalledWith("GUILDPASS_MUTATION_QUEUE");
+  });
+
   it("dequeues successfully", async () => {
     const item = await mutationQueue.enqueue(MutationType.UPDATE_PROFILE, { name: "Test" });
     let queue = await mutationQueue.getQueue();
