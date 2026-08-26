@@ -31,12 +31,6 @@ const statusClassName: Record<PerChainRoleEligibilityResolution["status"], strin
   resolved: "bg-success/10 text-success border-success/30 dark:bg-green-900/30 dark:text-green-400 dark:border-green-600/50",
   "timed-out": "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-600/50",
   error: "bg-error/10 text-error border-error/30 dark:bg-red-900/30 dark:text-red-400 dark:border-red-600/50",
-  resolved:
-    "bg-success/10 text-success border-success/30 dark:bg-green-900/30 dark:text-green-400 dark:border-green-600/50",
-  "timed-out":
-    "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-600/50",
-  error:
-    "bg-error/10 text-error border-error/30 dark:bg-red-900/30 dark:text-red-400 dark:border-red-600/50",
 };
 
 const firstParam = (value?: string | string[]) => (Array.isArray(value) ? value[0] : value);
@@ -77,7 +71,6 @@ function PerChainEligibilityList({
       </View>
 
       {roleEligibilityError ? (
-        <Text className="text-error dark:text-red-400 text-sm mb-3" testID="per-chain-eligibility-error">
         <Text
           className="text-error dark:text-red-400 text-sm mb-3"
           testID="per-chain-eligibility-error"
@@ -552,15 +545,6 @@ export default function AccessCheck() {
             <View className="flex-row justify-between py-1">
               <Text className="text-text-muted dark:text-slate-400">Resource ID</Text>
               <Text className="text-text dark:text-slate-100 font-medium">{scannedPayload.resourceId}</Text>
-              <Text className="text-text dark:text-slate-100 font-medium">
-                {scannedPayload.guildId}
-              </Text>
-            </View>
-            <View className="flex-row justify-between py-1">
-              <Text className="text-text-muted dark:text-slate-400">Resource ID</Text>
-              <Text className="text-text dark:text-slate-100 font-medium">
-                {scannedPayload.resourceId}
-              </Text>
             </View>
             {scannedPayload.expiresAt && (
               <View
@@ -596,7 +580,6 @@ export default function AccessCheck() {
             }}
           >
             {countdown.isExpired && scannedPayload?.expiresAt && (
-              <Card className="mb-12 border-2 border-error bg-error/5 dark:border-red-600 dark:bg-red-900/30" accessibilityRole="alert">
               <Card
                 className="mb-12 border-2 border-error bg-error/5 dark:border-red-600 dark:bg-red-900/30"
                 accessibilityRole="alert"
