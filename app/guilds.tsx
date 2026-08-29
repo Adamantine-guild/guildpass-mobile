@@ -1,12 +1,12 @@
 import {
   View,
-  FlatList,
   TextInput,
   TouchableOpacity,
   Text,
   RefreshControl,
   useColorScheme,
 } from "react-native";
+import { FlashList } from "@shopify/flash-list";
 import { useRouter } from "expo-router";
 import { useWallet } from "../src/features/wallet/useWallet";
 import { useGuilds, type GuildListItem } from "../src/features/guilds/useGuilds";
@@ -32,6 +32,32 @@ type GuildListRow = {
   roleCount: number;
   status?: EnrichedMembership["status"];
 };
+
+const GuildCardListItem = React.memo(function GuildCardListItem({
+  item,
+  offlineCached,
+  onPress,
+}: {
+  item: GuildListRow;
+  offlineCached: boolean;
+  onPress: (guildId: string) => void;
+}) {
+  const handlePress = useCallback(() => {
+    onPress(item.guildId);
+  }, [item.guildId, onPress]);
+
+  return (
+    <GuildCard
+      name={item.guildName}
+      id={item.guildId}
+      isActive={item.isActive}
+      roleCount={item.roleCount}
+      status={item.status}
+      offlineCached={offlineCached}
+      onPress={handlePress}
+    />
+  );
+});
 
 function rowsFromWalletGuilds(
   guilds: GuildListItem[],
@@ -113,6 +139,28 @@ export default function Guilds() {
       setIsRefetching(false);
     }
   }, [guildsQuery, membershipsQuery, queryClient, walletAddress]);
+
+  const handleGuildPress = useCallback(
+    (guildId: string) => {
+      router.push(`/guilds/${guildId}`);
+    },
+    [router],
+  );
+
+  const keyExtractor = useCallback((item: GuildListRow) => item.guildId, []);
+
+  const isShowingOfflineCache = staleState.isOffline && filteredGuilds.length > 0;
+
+  const renderItem = useCallback(
+    ({ item }: { item: GuildListRow }) => (
+      <GuildCardListItem
+        item={item}
+        offlineCached={isShowingOfflineCache}
+        onPress={handleGuildPress}
+      />
+    ),
+    [handleGuildPress, isShowingOfflineCache],
+  );
 
   if (!walletAddress) {
     return (
@@ -215,30 +263,20 @@ export default function Guilds() {
   );
 
   const isRefreshing = isRefetching || guildsQuery.isRefetching || membershipsQuery.isRefetching;
-  const isShowingOfflineCache = staleState.isOffline && filteredGuilds.length > 0;
 
   return (
     <WalletRequired>
       <View className="flex-1 bg-background dark:bg-slate-900" testID="guilds-screen">
         <AppHeader title="My Guilds" showBack />
-        <FlatList
+        <FlashList
           data={filteredGuilds}
-          keyExtractor={(item) => item.guildId}
+          keyExtractor={keyExtractor}
           contentContainerStyle={{ padding: 16 }}
+          estimatedItemSize={96}
           testID="guilds-list"
           ListHeaderComponent={searchHeader}
           refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />}
-          renderItem={({ item }) => (
-            <GuildCard
-              name={item.guildName}
-              id={item.guildId}
-              isActive={item.isActive}
-              roleCount={item.roleCount}
-              status={item.status}
-              offlineCached={isShowingOfflineCache}
-              onPress={() => router.push(`/guilds/${item.guildId}`)}
-            />
-          )}
+          renderItem={renderItem}
           ListEmptyComponent={
             <EmptyState
               title="No Guilds Found"
