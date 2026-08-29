@@ -1,5 +1,5 @@
 import { View, Text, TouchableOpacity } from "react-native";
-import React from "react";
+import React, { memo } from "react";
 import { Card } from "./Card";
 import { RoleBadge } from "./RoleBadge";
 import type { GuildPassStatus } from "../features/passes/passCache";
@@ -11,7 +11,7 @@ type GuildCardProps = {
   roleCount: number;
   status?: GuildPassStatus;
   offlineCached?: boolean;
-  onPress: () => void;
+  onPress: (id: string) => void;
 };
 
 const STATUS_STYLES: Record<
@@ -50,7 +50,7 @@ const STATUS_STYLES: Record<
   },
 };
 
-export const GuildCard = ({
+const GuildCard = memo(({
   name,
   id,
   isActive,
@@ -64,12 +64,12 @@ export const GuildCard = ({
 
   return (
     <TouchableOpacity
-      onPress={onPress}
+      onPress={() => onPress(id)}
       activeOpacity={0.7}
       accessibilityRole="button"
       accessibilityLabel={`${name}, ${statusStyle.label.toLowerCase()}, ${roleCount} roles${
         offlineCached ? ", cached offline" : ""
-      }`}
+      }}
     >
       <Card className="mb-4">
         <View className="flex-row justify-between items-center mb-2">
@@ -98,4 +98,7 @@ export const GuildCard = ({
       </Card>
     </TouchableOpacity>
   );
-};
+});
+
+export { GuildCard };
+export default GuildCard;
