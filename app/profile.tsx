@@ -1,5 +1,5 @@
-import { View, Text, ScrollView, TouchableOpacity, RefreshControl } from "react-native";
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import { View, Text, FlatList, TouchableOpacity, RefreshControl } from "react-native";
+import React, { memo, useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "expo-router";
 import { useWallet } from "../src/features/wallet/useWallet";
 import { useWalletConnectModal } from "../src/features/wallet/WalletConnectProvider";
@@ -22,6 +22,73 @@ const CONNECTION_LABELS: Record<string, string> = {
   metamask: "MetaMask",
   embedded: "Embedded Wallet",
 };
+
+type DashboardNavItem = {
+  id: string;
+  title: string;
+  subtitle: string;
+  route: string;
+  testID: string;
+};
+
+const NAV_ITEMS: DashboardNavItem[] = [
+  {
+    id: "guilds",
+    title: "My Guilds",
+    subtitle: "View your memberships and roles",
+    route: "/guilds",
+    testID: "navigate-guilds-button",
+  },
+  {
+    id: "access-check",
+    title: "Access Check",
+    subtitle: "Verify resource access status",
+    route: "/access-check",
+    testID: "navigate-access-check-button",
+  },
+  {
+    id: "settings",
+    title: "App Settings",
+    subtitle: "Configuration and info",
+    route: "/settings",
+    testID: "navigate-settings-button",
+  },
+];
+
+const NAV_ITEM_HEIGHT = 96;
+const getNavItemLayout = (_: unknown, index: number) => ({
+  length: NAV_ITEM_HEIGHT,
+  offset: NAV_ITEM_HEIGHT * index,
+  index,
+});
+
+const NavigationCard = memo(function NavigationCard({
+  item,
+  onPress,
+}: {
+  item: DashboardNavItem;
+  onPress: (route: string) => void;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={() => onPress(item.route)}
+      activeOpacity={0.7}
+      className="mb-4"
+      accessibilityRole="link"
+      accessibilityLabel={item.title}
+      accessibilityHint={item.subtitle}
+      testID={item.testID}
+    >
+      <Card className="flex-row justify-between items-center">
+        <View>
+          <Text className="text-xl font-bold text-text dark:text-slate-100">{item.title}</Text>
+          <Text className="text-text-muted dark:text-slate-400">{item.subtitle}</Text>
+        </View>
+        <Text className="text-primary text-2xl">→</Text>
+      </Card>
+    </TouchableOpacity>
+  );
+});
 
 export default function Profile() {
   const router = useRouter();
@@ -145,16 +212,35 @@ export default function Profile() {
 
   const isRefreshing = isConnected && (isManuallyRefreshing || membershipsQuery.isRefetching);
 
+  const handleNavPress = useCallback((route: string) => {
+    router.push(route as never);
+  }, [router]);
+
+  const renderNavItem = useCallback(
+    ({ item }: { item: DashboardNavItem }) => (
+      <NavigationCard item={item} onPress={handleNavPress} />
+    ),
+    [handleNavPress],
+  );
+
+  const keyExtractor = useCallback((item: DashboardNavItem) => item.id, []);
+
   return (
     <View className="flex-1 bg-background dark:bg-slate-900" testID="profile-screen">
       <AppHeader title="Profile" />
-      <ScrollView
+      <FlatList
         className="flex-1 px-4 py-6"
         testID="profile-scroll-view"
-        refreshControl={
-          <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} testID="profile-refresh-control" />
-        }
-      >
+        data={isConnected ? NAV_ITEMS : []}
+        renderItem={renderNavItem}
+        keyExtractor={keyExtractor}
+        getItemLayout={getNavItemLayout}
+        initialNumToRender={4}
+        maxToRenderPerBatch={8}
+        windowSize={5}
+        removeClippedSubviews
+        ListHeaderComponent={
+          <>
         {staleState.isOffline ? (
           <StaleDataBanner reason="offline" lastSyncedAt={staleState.lastSyncedAt} />
         ) : staleState.isStale && staleState.reason ? (
@@ -348,7 +434,12 @@ export default function Profile() {
             </View>
           </View>
         )}
-      </ScrollView>
+          </>
+        }
+        refreshControl={
+          <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} testID="profile-refresh-control" />
+        }
+      />
     </View>
   );
 }
