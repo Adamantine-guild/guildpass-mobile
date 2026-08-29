@@ -10,8 +10,8 @@ export default function Index() {
   }
 
   if (!isConnected) {
-    return <Redirect href="/onboarding" />;
+    return <Redirect href="/onboarding" />>;
   }
 
-  return <Redirect href="/profile" />;
+  return <Redirect href="/profile" />
 }
