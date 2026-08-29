@@ -1,0 +1,69 @@
+# 16-wallet-connect-cancel.yaml
+#
+# Maestro E2E flow: Wallet connection — user cancels in the wallet app
+#
+# Scenario:
+#   The user starts a wallet connection, is deep-linked out to the (mocked)
+#   wallet app, and cancels the connection request. The app should return to
+#   the connection screen in a non-connected state and surface a clear,
+#   dismissible "connection cancelled" message. No session/address should be
+#   persisted.
+#
+# Deterministic local runs:
+#   Real wallet apps cannot be driven reliably in CI, so this flow assumes the
+#   app is launched with the wallet interaction stubbed. Set the launch
+#   argument `MOCK_WALLET=cancel` (see .maestro/README.md) so the mock wallet
+#   provider immediately resolves the deep-link callback with a user-rejected
+#   result instead of opening an external app.
+#
+# End state asserted (distinct to this flow):
+#   - "Connection cancelled" message is visible
+#   - The primary CTA reads "Connect Wallet" again (i.e. still disconnected)
+#   - No connected address / guild content is shown
+
+appId: ${APP_ID}
+env:
+  APP_ID: com.example.app
+  MOCK_WALLET: cancel
+---
+- launchApp:
+    appId: ${APP_ID}
+    clearState: true
+    arguments:
+      MOCK_WALLET: ${MOCK_WALLET}
+
+# Reach the wallet connection entry point.
+- assertVisible:
+    id: "connect-wallet-button"
+- tapOn:
+    id: "connect-wallet-button"
+
+# The mock wallet provider stands in for the external wallet app. When
+# MOCK_WALLET=cancel it resolves the callback as a user rejection.
+- assertVisible:
+    id: "wallet-provider-list"
+- tapOn:
+    id: "wallet-provider-metamask"
+
+# Simulate the user cancelling inside the (mocked) wallet app.
+- assertVisible:
+    id: "mock-wallet-cancel-button"
+- tapOn:
+    id: "mock-wallet-cancel-button"
+
+# Distinct end state: cancellation surfaced, still disconnected.
+- assertVisible:
+    id: "connection-cancelled-message"
+    text: ".*[Cc]ancel.*"
+- assertVisible:
+    id: "connect-wallet-button"
+- assertNotVisible:
+    id: "connected-address"
+- assertNotVisible:
+    id: "guild-list"
+
+# The cancellation message can be dismissed and the flow retried.
+- tapOn:
+    id: "connection-cancelled-dismiss"
+- assertNotVisible:
+    id: "connection-cancelled-message"

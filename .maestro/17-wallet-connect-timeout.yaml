@@ -1,0 +1,82 @@
+# 17-wallet-connect-timeout.yaml
+#
+# E2E flow: Wallet connection times out.
+#
+# Scenario:
+#   The user initiates a wallet connection, gets deep-linked out to the wallet
+#   app (mocked/stubbed for deterministic local runs — see .maestro/README.md),
+#   but the wallet never returns an approval within the allotted window. The app
+#   must surface a timeout error and offer a retry affordance, leaving the user
+#   in a disconnected-but-recoverable state.
+#
+# Determinism note:
+#   Relies on the wallet-mock harness documented in .maestro/README.md. Launch
+#   with WALLET_MOCK_MODE=timeout so the stubbed wallet bridge never resolves
+#   the connection request, forcing the app-side timeout to fire.
+#
+appId: ${APP_ID}
+env:
+  WALLET_MOCK_MODE: "timeout"
+  # Keep this comfortably above the app's connection timeout so the UI has
+  # settled into its error state before we assert on it.
+  TIMEOUT_ASSERT_MS: "45000"
+tags:
+  - wallet
+  - error-path
+  - regression
+---
+- runFlow: subflows/reset-app-state.yaml
+
+- launchApp:
+    clearState: true
+    arguments:
+      walletMockMode: ${WALLET_MOCK_MODE}
+
+# --- Arrive at the wallet connection entry point ----------------------------
+- assertVisible:
+    id: "onboarding-connect-wallet-cta"
+- tapOn:
+    id: "onboarding-connect-wallet-cta"
+
+- assertVisible:
+    id: "wallet-select-list"
+- tapOn:
+    id: "wallet-option-mock"
+
+# --- Deep link out to the (stubbed) wallet app -----------------------------
+# The mock harness intercepts the outbound deep link and, in "timeout" mode,
+# deliberately does NOT dispatch a return deep link. Control returns to the app
+# with the connection request left pending.
+- assertVisible:
+    id: "wallet-connect-pending-indicator"
+- assertVisible:
+    text: "Waiting for wallet.*"
+
+# --- Wait for the app-side connection timeout to fire -----------------------
+- extendedWaitUntil:
+    visible:
+      id: "wallet-connect-timeout-error"
+    timeout: ${TIMEOUT_ASSERT_MS}
+
+# --- Assert the specific, distinct end state --------------------------------
+- assertVisible:
+    id: "wallet-connect-timeout-error"
+- assertVisible:
+    text: "Connection timed out.*"
+- assertVisible:
+    id: "wallet-connect-retry-button"
+
+# The pending spinner must be gone: we are in a settled error state, not limbo.
+- assertNotVisible:
+    id: "wallet-connect-pending-indicator"
+
+# User is NOT connected — no wallet address chip should be shown.
+- assertNotVisible:
+    id: "connected-wallet-address"
+
+# Retry must return the user to a re-attemptable connection entry point rather
+# than a dead end.
+- tapOn:
+    id: "wallet-connect-retry-button"
+- assertVisible:
+    id: "wallet-select-list"

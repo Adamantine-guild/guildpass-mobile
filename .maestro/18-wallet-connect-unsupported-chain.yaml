@@ -1,0 +1,61 @@
+# 18-wallet-connect-unsupported-chain.yaml
+#
+# E2E flow: Wallet connection succeeds but returns an UNSUPPORTED CHAIN.
+#
+# Scenario:
+#   The user initiates a wallet connection, approves it in the (mocked) wallet
+#   app, but the returned account is on a chain the app does not support.
+#   The app must reject the session and surface an "unsupported network" error
+#   while remaining in a disconnected state.
+#
+# Deterministic mocking:
+#   Wallet deep-link round-trips are non-deterministic in CI, so this flow
+#   relies on the app's E2E wallet mock (enabled via the launch arguments
+#   below). The mock intercepts the WalletConnect/deep-link handshake and
+#   returns a canned response.
+#     - MAESTRO_E2E=true                     -> enables the mock wallet layer
+#     - MOCK_WALLET_RESULT=unsupported_chain -> mock returns a connected
+#                                             account on an unsupported chain
+#                                             (chainId 999 by default)
+#   See .maestro/README.md for how to build a local dev build with the mock
+#   wallet layer compiled in.
+#
+# Distinct end state asserted by this flow:
+#   - An "unsupported network" / "unsupported chain" error is visible.
+#   - The wallet remains DISCONNECTED (a "Connect Wallet" affordance is still
+#     present and no connected address is shown).
+
+appId: ${MAESTRO_APP_ID}
+env:
+  MAESTRO_E2E: "true"
+  MOCK_WALLET_RESULT: "unsupported_chain"
+  MOCK_WALLET_CHAIN_ID: "999"
+tags:
+  - wallet
+  - wallet-error-paths
+---
+- launchApp:
+    clearState: true
+    arguments:
+      e2e: ${MAESTRO_E2E}
+      mockWalletResult: ${MOCK_WALLET_RESULT}
+      mockWalletChainId: ${MOCK_WALLET_CHAIN_ID}
+
+# Reach the wallet connection entry point.
+- assertVisible: "Connect Wallet"
+- tapOn: "Connect Wallet"
+
+# The mock wallet auto-approves and returns to the app with an
+# account on an unsupported chain. Wait for the app to process the callback.
+- extendedWaitUntil:
+    visible:
+      text: "Unsupported network|Unsupported chain|Network not supported"
+    timeout: 20000
+
+# End state: an explicit, distinct unsupported-network error is shown.
+- assertVisible:
+    text: "Unsupported network|Unsupported chain|Network not supported"
+
+# End state: the app did NOT establish a session - it stays disconnected.
+- assertVisible: "Connect Wallet"
+- assertNotVisible: "Disconnect"
