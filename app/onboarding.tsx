@@ -13,16 +13,36 @@ export default function Onboarding() {
     <SafeAreaView className="flex-1 bg-white dark:bg-slate-900" testID="onboarding-screen">
       <View className="flex-1 px-6 justify-between py-12">
         <View className="items-center mt-12">
-          <View className="w-24 h-24 bg-primary rounded-3xl items-center justify-center mb-8 shadow-lg">
-            <Text className="text-white text-4xl font-bold">GP</Text>
+          <View
+            className="w-24 h-24 bg-primary rounded-3xl items-center justify-center mb-8 shadow-lg"
+            accessibilityLabel="GuildPass logo"
+            accessibilityRole="image"
+          >
+            <Text
+              className="text-white text-4xl font-bold"
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+            >
+              GP
+            </Text>
           </View>
-          <Text className="text-3xl font-bold text-text dark:text-slate-100 text-center mb-4" testID="onboarding-title">
+          <Text
+            className="text-3xl font-bold text-text dark:text-slate-100 text-center mb-4"
+            accessibilityRole="header"
+            testID="onboarding-title"
+          >
             Welcome to GuildPass
           </Text>
-          <Text className="text-lg text-text-muted dark:text-slate-400 text-center px-4" testID="onboarding-subtitle">
+          <Text
+            className="text-lg text-text-muted dark:text-slate-400 text-center px-4"
+            testID="onboarding-subtitle"
+          >
             The decentralized gateway to your favorite Web3 communities and gated content.
           </Text>
-          <Text className="text-sm text-text-muted dark:text-slate-400 text-center px-4 mt-4" testID="onboarding-attestation-warning">
+          <Text
+            className="text-sm text-text-muted dark:text-slate-400 text-center px-4 mt-4"
+            testID="onboarding-attestation-warning"
+          >
             Offline role attestations are stored only on this device. If the app or device is lost, reset, or replaced, those local proofs cannot currently be restored and must be reissued by the guild when connectivity is available.
           </Text>
         </View>
@@ -42,6 +62,7 @@ export default function Onboarding() {
                 <Button
                   title="Get started without a wallet"
                   onPress={() => setShowEmbeddedWallet(true)}
+                  accessibilityHint="Creates an embedded wallet managed by GuildPass"
                   testID="onboarding-embedded-wallet-button"
                 />
               ) : null}
@@ -49,6 +70,7 @@ export default function Onboarding() {
                 title="I have a wallet"
                 variant={isEmbeddedWalletEnabled ? "outline" : "primary"}
                 onPress={() => router.push("/profile")}
+                accessibilityHint="Connect an existing wallet or enter an address manually"
                 testID="onboarding-get-started-button"
               />
               {!isEmbeddedWalletEnabled ? (

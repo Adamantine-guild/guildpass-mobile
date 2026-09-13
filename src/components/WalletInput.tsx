@@ -21,23 +21,37 @@ export const WalletInput = ({
 }: WalletInputProps) => {
   return (
     <View className="w-full">
-      <Text className="text-text-muted mb-2 font-medium">Wallet Address</Text>
+      <Text
+        className="text-text-muted dark:text-slate-400 mb-2 font-medium"
+        nativeID={testID ? `${testID}-label` : undefined}
+      >
+        Wallet Address
+      </Text>
       <TextInput
         value={value}
         onChangeText={onChangeText}
         onBlur={onBlur}
         placeholder={placeholder}
         accessibilityLabel="Wallet Address"
-        accessibilityHint="Enter your wallet address starting with 0x"
+        accessibilityHint="Enter your Ethereum wallet address starting with 0x"
+        accessibilityState={{ disabled: false }}
         testID={testID}
-        className={`bg-white border ${
-          error ? "border-error" : "border-border"
-        } rounded-xl p-4 text-text text-lg`}
+        className={`bg-white dark:bg-slate-800 border ${
+          error ? "border-error" : "border-border dark:border-slate-700"
+        } rounded-xl p-4 text-text dark:text-slate-100 text-lg`}
         autoCapitalize="none"
         autoCorrect={false}
+        keyboardType="default"
+        returnKeyType="done"
+        clearButtonMode="while-editing"
       />
       {error && (
-        <Text className="text-error mt-2 text-sm" accessibilityRole="alert">
+        <Text
+          className="text-error mt-2 text-sm"
+          accessibilityRole="alert"
+          accessibilityLiveRegion="assertive"
+          testID={testID ? `${testID}-error` : undefined}
+        >
           {error}
         </Text>
       )}
