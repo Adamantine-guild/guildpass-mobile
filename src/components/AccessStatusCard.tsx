@@ -136,7 +136,7 @@ export const AccessStatusCard = ({
     >
       {/* Discrepancy Warning Banner */}
       {discrepancy && (
-        <View className="bg-error/10 border-b border-error/30 p-4" accessibilityRole="alert">
+        <View className="bg-error/10 border-b border-error/30 p-4" accessibilityRole="alert" accessibilityLiveRegion="assertive">
           <Text className="text-error font-bold mb-1">Verification Discrepancy Detected</Text>
           <Text className="text-error/80 text-sm">
             Server {discrepancy.backendDecision ? "granted" : "denied"} access but{" "}
@@ -148,27 +148,37 @@ export const AccessStatusCard = ({
 
       {/* Offline Indicator */}
       {confidenceDisplay?.isOfflineCase && (
-        <View className="bg-amber-50 border-b border-amber-200 p-3">
-          <Text className="text-amber-700 text-sm font-medium">Offline Mode</Text>
-          <Text className="text-amber-600 text-xs mt-1">
+        <View className="bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-700 p-3" accessibilityRole="status">
+          <Text className="text-amber-700 dark:text-amber-300 text-sm font-medium">Offline Mode</Text>
+          <Text className="text-amber-600 dark:text-amber-400 text-xs mt-1">
             Access verified using cached data. Server confirmation pending.
           </Text>
         </View>
       )}
 
-      <View className="items-center mb-6" accessibilityLiveRegion="polite">
+      <View
+        className="items-center mb-6"
+        accessibilityLiveRegion="polite"
+        accessible
+        accessibilityLabel={
+          hasAccess
+            ? `Access Granted${reason ? `. ${reason}` : ""}`
+            : `Access Denied${reason ? `. ${reason}` : ""}`
+        }
+      >
         <View
           className={`w-16 h-16 rounded-full items-center justify-center mb-4 ${
             hasAccess ? "bg-success" : "bg-error"
           }`}
-          accessibilityLabel={hasAccess ? "Access granted" : "Access denied"}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
         >
           <Text className="text-white text-3xl">{hasAccess ? "✓" : "✕"}</Text>
         </View>
-        <Text className={`text-2xl font-bold ${hasAccess ? "text-success" : "text-error"}`}>
+        <Text className={`text-2xl font-bold ${hasAccess ? "text-success" : "text-error"}`} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
           {hasAccess ? "Access Granted" : "Access Denied"}
         </Text>
-        {reason && <Text className="text-text-muted mt-2 text-center">{reason}</Text>}
+        {reason && <Text className="text-text-muted dark:text-slate-400 mt-2 text-center" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">{reason}</Text>}
 
         {/* Confidence Level Display */}
         {confidenceDisplay && (
@@ -209,20 +219,20 @@ export const AccessStatusCard = ({
         )}
       </View>
 
-      <View className="border-t border-border pt-4">
-        <Text className="text-text font-bold mb-3">Requirements</Text>
-        <View className="flex-row flex-wrap">
+      <View className="border-t border-border dark:border-slate-700 pt-4">
+        <Text className="text-text dark:text-slate-100 font-bold mb-3">Requirements</Text>
+        <View className="flex-row flex-wrap" accessibilityLabel={`Required roles: ${requiredRoles.length > 0 ? requiredRoles.join(", ") : "none"}`}>
           {requiredRoles.length > 0 ? (
             requiredRoles.map((role) => <RoleBadge key={role} name={role} />)
           ) : (
-            <Text className="text-text-muted italic">No role requirements specified</Text>
+            <Text className="text-text-muted dark:text-slate-400 italic">No role requirements specified</Text>
           )}
         </View>
 
         {hasAccess && matchedRoles.length > 0 && (
           <View className="mt-4">
             <Text className="text-success font-bold mb-3">Matched Roles</Text>
-            <View className="flex-row flex-wrap">
+            <View className="flex-row flex-wrap" accessibilityLabel={`Matched roles: ${matchedRoles.join(", ")}`}>
               {matchedRoles.map((role) => (
                 <RoleBadge key={role} name={role} />
               ))}

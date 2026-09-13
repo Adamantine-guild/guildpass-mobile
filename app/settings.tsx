@@ -106,7 +106,7 @@ export default function Settings() {
       <View className="flex-1 bg-background dark:bg-slate-900" testID="settings-screen">
         <AppHeader title="Settings" showBack />
         <ScrollView className="flex-1 px-4 py-6">
-          <Text className="text-lg font-bold text-text dark:text-slate-100 mb-3">Protocol Configuration</Text>
+          <Text className="text-lg font-bold text-text dark:text-slate-100 mb-3" accessibilityRole="header">Protocol Configuration</Text>
           <Card className="mb-6">
             <View className="flex-row justify-between py-2 border-b border-border dark:border-slate-700">
               <Text className="text-text-muted dark:text-slate-400">API URL</Text>
@@ -128,13 +128,15 @@ export default function Settings() {
             </View>
           </Card>
 
-          <Text className="text-lg font-bold text-text dark:text-slate-100 mb-3">Security</Text>
+          <Text className="text-lg font-bold text-text dark:text-slate-100 mb-3" accessibilityRole="header">Security</Text>
           <Card className="mb-6">
             <TouchableOpacity
               className="flex-row justify-between items-center py-2"
               onPress={() => setBiometricRequired(!biometricRequired)}
               testID="settings-biometric-toggle"
               accessibilityRole="switch"
+              accessibilityLabel="Require Biometrics for Access Checks"
+              accessibilityHint="When enabled, Face ID, Touch ID, or device passcode is required before scanning access QR codes"
               accessibilityState={{ checked: biometricRequired }}
             >
               <View className="flex-1">
@@ -148,6 +150,8 @@ export default function Settings() {
                 className={`w-12 h-7 rounded-full ml-3 justify-center ${
                   biometricRequired ? "bg-success dark:bg-green-600" : "bg-border dark:bg-slate-700"
                 }`}
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
               >
                 <View
                   className={`w-5 h-5 rounded-full bg-white mx-0.5 ${
@@ -158,7 +162,7 @@ export default function Settings() {
             </TouchableOpacity>
           </Card>
 
-          <Text className="text-lg font-bold text-text dark:text-slate-100 mb-3">Offline Data & Security</Text>
+          <Text className="text-lg font-bold text-text dark:text-slate-100 mb-3" accessibilityRole="header">Offline Data &amp; Security</Text>
           <Card className="mb-6">
             <View className="mb-4">
               <Text className="text-text dark:text-slate-100 font-medium mb-1">Local Encryption Key</Text>
@@ -178,11 +182,12 @@ export default function Settings() {
                 title="Rotate encryption key now"
                 onPress={handleRotateKey}
                 variant="outline"
+                accessibilityHint="Clears offline data and generates a new local encryption key"
               />
             </View>
           </Card>
 
-          <Text className="text-lg font-bold text-text dark:text-slate-100 mb-3">Notifications</Text>
+          <Text className="text-lg font-bold text-text dark:text-slate-100 mb-3" accessibilityRole="header">Notifications</Text>
           <Card className="mb-6">
             {isPushSupported ? (
               <TouchableOpacity
@@ -190,6 +195,8 @@ export default function Settings() {
                 onPress={handlePushNotificationToggle}
                 testID="settings-push-notifications-toggle"
                 accessibilityRole="switch"
+                accessibilityLabel="Push Notifications"
+                accessibilityHint={pushEnabled ? "Tap to disable push notifications" : "Tap to enable push notifications for role updates and access grants"}
                 accessibilityState={{ checked: pushEnabled }}
               >
                 <View className="flex-1">
@@ -202,6 +209,8 @@ export default function Settings() {
                   className={`w-12 h-7 rounded-full ml-3 justify-center ${
                     pushEnabled ? "bg-success dark:bg-green-600" : "bg-border dark:bg-slate-700"
                   }`}
+                  accessibilityElementsHidden
+                  importantForAccessibility="no-hide-descendants"
                 >
                   <View
                     className={`w-5 h-5 rounded-full bg-white mx-0.5 ${
@@ -219,7 +228,7 @@ export default function Settings() {
             )}
           </Card>
 
-          <Text className="text-lg font-bold text-text dark:text-slate-100 mb-3">Account</Text>
+          <Text className="text-lg font-bold text-text dark:text-slate-100 mb-3" accessibilityRole="header">Account</Text>
           <Card className="mb-8">
             <WalletRequired redirect={false}>
               <Text className="text-text-muted dark:text-slate-400 mb-4">
@@ -231,6 +240,8 @@ export default function Settings() {
                 variant="danger"
                 loading={isResetting}
                 disabled={isResetting}
+                accessibilityLabel={isResetting ? "Resetting app state, please wait" : "Reset App State"}
+                accessibilityHint="Disconnects your wallet and clears all local data. This action cannot be undone."
               />
             </WalletRequired>
           </Card>

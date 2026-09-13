@@ -80,11 +80,17 @@ const NavigationCard = memo(function NavigationCard({
       testID={item.testID}
     >
       <Card className="flex-row justify-between items-center">
-        <View>
+        <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
           <Text className="text-xl font-bold text-text dark:text-slate-100">{item.title}</Text>
           <Text className="text-text-muted dark:text-slate-400">{item.subtitle}</Text>
         </View>
-        <Text className="text-primary text-2xl">→</Text>
+        <Text
+          className="text-primary text-2xl"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
+          →
+        </Text>
       </Card>
     </TouchableOpacity>
   );
@@ -256,13 +262,17 @@ export default function Profile() {
             {/* ── WalletConnect primary CTA ── */}
             <Card className="mb-6">
               <View className="flex-row items-center mb-4">
-                <View className="w-10 h-10 bg-primary/10 dark:bg-primary/20 rounded-full items-center justify-center mr-3">
+                <View
+                  className="w-10 h-10 bg-primary/10 dark:bg-primary/20 rounded-full items-center justify-center mr-3"
+                  accessibilityElementsHidden
+                  importantForAccessibility="no-hide-descendants"
+                >
                   <Text className="text-primary text-lg">🔗</Text>
                 </View>
                 <View className="flex-1">
                   <Text className="text-lg font-bold text-text dark:text-slate-100">WalletConnect</Text>
                   <Text className="text-text-muted dark:text-slate-400 text-sm">
-                    Connect with MetaMask, Trust Wallet, Rainbow & more
+                    Connect with MetaMask, Trust Wallet, Rainbow &amp; more
                   </Text>
                 </View>
               </View>
@@ -270,6 +280,7 @@ export default function Profile() {
                 title={wcConnecting ? "Opening WalletConnect…" : "Connect with WalletConnect"}
                 onPress={handleWalletConnect}
                 loading={wcConnecting}
+                accessibilityHint="Opens the WalletConnect QR modal to connect a crypto wallet"
                 testID="walletconnect-connect-button"
               />
             </Card>
@@ -306,6 +317,8 @@ export default function Profile() {
                   onPress={handleConnect}
                   disabled={!isAddressValid}
                   className="mt-6"
+                  accessibilityLabel="Continue with entered wallet address"
+                  accessibilityHint={!isAddressValid ? "Enter a valid wallet address to continue" : "Connects this wallet address and navigates to your guilds"}
                   testID="wallet-connect-button"
                 />
                 <TouchableOpacity
@@ -317,6 +330,8 @@ export default function Profile() {
                     if (debounceRef.current) clearTimeout(debounceRef.current);
                   }}
                   className="items-center mt-4 py-2"
+                  accessibilityRole="button"
+                  accessibilityLabel="Cancel manual address entry"
                   testID="hide-manual-entry-button"
                 >
                   <Text className="text-text-muted dark:text-slate-400 text-sm">Cancel</Text>
@@ -333,16 +348,33 @@ export default function Profile() {
               </Text>
               <View className="mb-4">
                 {walletAddress ? (
-                  <WalletAddress address={walletAddress} testID="connected-wallet-address" />
                   <View className="flex-row items-center justify-between">
                     <WalletAddress address={walletAddress} testID="connected-wallet-address" />
                     {isVerified ? (
-                      <View className="bg-green-100 dark:bg-green-900/30 px-2 py-1 rounded">
-                        <Text className="text-green-700 dark:text-green-400 text-xs font-bold">✓ Verified</Text>
+                      <View
+                        className="bg-green-100 dark:bg-green-900/30 px-2 py-1 rounded"
+                        accessibilityLabel="Wallet ownership verified"
+                      >
+                        <Text
+                          className="text-green-700 dark:text-green-400 text-xs font-bold"
+                          accessibilityElementsHidden
+                          importantForAccessibility="no-hide-descendants"
+                        >
+                          ✓ Verified
+                        </Text>
                       </View>
                     ) : connectionKind === "manual" ? (
-                      <View className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">
-                        <Text className="text-slate-500 dark:text-slate-400 text-xs font-bold">Unverified</Text>
+                      <View
+                        className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded"
+                        accessibilityLabel="Wallet ownership not verified"
+                      >
+                        <Text
+                          className="text-slate-500 dark:text-slate-400 text-xs font-bold"
+                          accessibilityElementsHidden
+                          importantForAccessibility="no-hide-descendants"
+                        >
+                          Unverified
+                        </Text>
                       </View>
                     ) : null}
                   </View>
@@ -358,12 +390,20 @@ export default function Profile() {
                     Sign a message to verify you control this wallet and unlock full access.
                   </Text>
                   {verifyError ? (
-                    <Text className="text-red-500 text-xs mb-3">{verifyError}</Text>
+                    <Text
+                      className="text-red-500 text-xs mb-3"
+                      accessibilityRole="alert"
+                      accessibilityLiveRegion="assertive"
+                    >
+                      {verifyError}
+                    </Text>
                   ) : null}
                   <Button
                     title={isVerifying ? "Verifying..." : "Verify Wallet"}
                     onPress={handleVerifyOwnership}
                     loading={isVerifying}
+                    accessibilityLabel={isVerifying ? "Verifying wallet ownership, please wait" : "Verify Wallet"}
+                    accessibilityHint="Signs a message to prove you control this wallet"
                     testID="verify-ownership-button"
                   />
                 </View>
@@ -373,65 +413,11 @@ export default function Profile() {
                 title="Disconnect"
                 onPress={handleDisconnect}
                 variant="outline"
+                accessibilityLabel="Disconnect wallet"
+                accessibilityHint="Removes your connected wallet and returns to the connect screen"
                 testID="wallet-disconnect-button"
               />
             </Card>
-
-            <View>
-              <TouchableOpacity
-                onPress={() => router.push("/guilds")}
-                activeOpacity={0.7}
-                className="mb-4"
-                accessibilityRole="link"
-                accessibilityLabel="My Guilds"
-                accessibilityHint="View your memberships and roles"
-                testID="navigate-guilds-button"
-              >
-                <Card className="flex-row justify-between items-center">
-                  <View>
-                    <Text className="text-xl font-bold text-text dark:text-slate-100">My Guilds</Text>
-                    <Text className="text-text-muted dark:text-slate-400">View your memberships and roles</Text>
-                  </View>
-                  <Text className="text-primary text-2xl">→</Text>
-                </Card>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => router.push("/access-check")}
-                activeOpacity={0.7}
-                className="mb-4"
-                accessibilityRole="link"
-                accessibilityLabel="Access Check"
-                accessibilityHint="Verify resource access status"
-                testID="navigate-access-check-button"
-              >
-                <Card className="flex-row justify-between items-center">
-                  <View>
-                    <Text className="text-xl font-bold text-text dark:text-slate-100">Access Check</Text>
-                    <Text className="text-text-muted dark:text-slate-400">Verify resource access status</Text>
-                  </View>
-                  <Text className="text-primary text-2xl">→</Text>
-                </Card>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => router.push("/settings")}
-                activeOpacity={0.7}
-                className="mb-4"
-                accessibilityRole="link"
-                accessibilityLabel="App Settings"
-                accessibilityHint="Configuration and info"
-                testID="navigate-settings-button"
-              >
-                <Card className="flex-row justify-between items-center">
-                  <View>
-                    <Text className="text-xl font-bold text-text dark:text-slate-100">App Settings</Text>
-                    <Text className="text-text-muted dark:text-slate-400">Configuration and info</Text>
-                  </View>
-                  <Text className="text-primary text-2xl">→</Text>
-                </Card>
-              </TouchableOpacity>
-            </View>
           </View>
         )}
           </>

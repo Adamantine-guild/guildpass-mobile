@@ -232,33 +232,48 @@ export default function Guilds() {
   const searchHeader = (
     <View>
       {staleBanner}
-      <View className="px-4 pt-2 pb-1">
-        <View className="flex-row items-center bg-white dark:bg-slate-800 rounded-xl px-4 py-3 border border-border dark:border-slate-700">
-          <Text className="text-text-muted dark:text-slate-400 mr-2">🔍</Text>
-          <TextInput
-            className="flex-1 text-text dark:text-slate-100 text-base"
-            placeholder="Search guilds..."
-            placeholderTextColor={colorScheme === "dark" ? "#94a3b8" : "#9ca3af"}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            autoCapitalize="none"
-            autoCorrect={false}
-            clearButtonMode="while-editing"
-            testID="guild-search-input"
-            accessibilityLabel="Search guilds by name"
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity
-              onPress={() => setSearchQuery("")}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              testID="guild-search-clear"
-              accessibilityLabel="Clear search"
+        <View className="px-4 pt-2 pb-1">
+          <View className="flex-row items-center bg-white dark:bg-slate-800 rounded-xl px-4 py-3 border border-border dark:border-slate-700">
+            <Text
+              className="text-text-muted dark:text-slate-400 mr-2"
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
             >
-              <Text className="text-text-muted dark:text-slate-400 text-lg ml-2">✕</Text>
-            </TouchableOpacity>
-          )}
+              🔍
+            </Text>
+            <TextInput
+              className="flex-1 text-text dark:text-slate-100 text-base"
+              placeholder="Search guilds..."
+              placeholderTextColor={colorScheme === "dark" ? "#94a3b8" : "#9ca3af"}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              autoCapitalize="none"
+              autoCorrect={false}
+              clearButtonMode="while-editing"
+              returnKeyType="search"
+              testID="guild-search-input"
+              accessibilityLabel="Search guilds by name"
+              accessibilityHint="Filters the guild list as you type"
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity
+                onPress={() => setSearchQuery("")}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                testID="guild-search-clear"
+                accessibilityRole="button"
+                accessibilityLabel="Clear search"
+              >
+                <Text
+                  className="text-text-muted dark:text-slate-400 text-lg ml-2"
+                  accessibilityElementsHidden
+                  importantForAccessibility="no-hide-descendants"
+                >
+                  ✕
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
-      </View>
     </View>
   );
 
@@ -274,8 +289,15 @@ export default function Guilds() {
           contentContainerStyle={{ padding: 16 }}
           estimatedItemSize={96}
           testID="guilds-list"
+          accessibilityLabel="Guild memberships list"
           ListHeaderComponent={searchHeader}
-          refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              accessibilityLabel={isRefreshing ? "Refreshing guild list" : "Pull to refresh guild list"}
+            />
+          }
           renderItem={renderItem}
           ListEmptyComponent={
             <EmptyState

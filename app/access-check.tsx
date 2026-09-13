@@ -415,6 +415,8 @@ export default function AccessCheck() {
             onPress={() => router.push("/access-scanner")}
             variant="outline"
             className="mt-4"
+            accessibilityLabel="Scan QR Code"
+            accessibilityHint="Opens the camera to scan a GuildPass access QR code"
             testID="scan-qr-button"
             disabled={isOffline}
           />
@@ -430,13 +432,14 @@ export default function AccessCheck() {
               accessibilityHint="Enter the guild identifier"
               testID="access-check-guild-id-input"
             />
-            {guildIdError && <Text className="text-error dark:text-red-400 text-sm mt-1">{guildIdError}</Text>}
-          </View>
-
-          <View className="mt-4">
-            <Text className="text-text-muted dark:text-slate-400 mb-2 font-medium">Resource ID</Text>
             {guildIdError && (
-              <Text className="text-error dark:text-red-400 text-sm mt-1">{guildIdError}</Text>
+              <Text
+                className="text-error dark:text-red-400 text-sm mt-1"
+                accessibilityRole="alert"
+                accessibilityLiveRegion="assertive"
+              >
+                {guildIdError}
+              </Text>
             )}
           </View>
 
@@ -453,9 +456,14 @@ export default function AccessCheck() {
               accessibilityHint="Enter the resource identifier"
               testID="access-check-resource-id-input"
             />
-            {resourceIdError && <Text className="text-error dark:text-red-400 text-sm mt-1">{resourceIdError}</Text>}
             {resourceIdError && (
-              <Text className="text-error dark:text-red-400 text-sm mt-1">{resourceIdError}</Text>
+              <Text
+                className="text-error dark:text-red-400 text-sm mt-1"
+                accessibilityRole="alert"
+                accessibilityLiveRegion="assertive"
+              >
+                {resourceIdError}
+              </Text>
             )}
           </View>
 
@@ -473,6 +481,8 @@ export default function AccessCheck() {
               !!resourceIdError ||
               countdown.isExpired
             }
+            accessibilityLabel={isPending ? "Checking access, please wait" : "Check Access"}
+            accessibilityHint="Verifies whether the entered wallet address has access to the specified resource"
           />
           {isOffline ? (
             <Text className="text-amber-700 dark:text-amber-400 mt-3 text-center text-sm font-bold">
@@ -482,7 +492,11 @@ export default function AccessCheck() {
         </Card>
 
         {scanError && (
-          <Card className="mb-6 border-error bg-error/5 dark:border-red-600 dark:bg-red-900/30">
+          <Card
+            className="mb-6 border-error bg-error/5 dark:border-red-600 dark:bg-red-900/30"
+            accessibilityRole="alert"
+            accessibilityLiveRegion="assertive"
+          >
             <Text className="text-error dark:text-red-400 font-bold">QR code rejected</Text>
             <Text className="text-error/80 dark:text-red-300/80 text-sm mt-1">{scanError}</Text>
           </Card>
