@@ -310,3 +310,4 @@ export class AttestationService {
     return this.getIssuerKey(guildId);
   }
 }
+import { checkRevocationStatus } from "./revocationListCache";
