@@ -37,6 +37,7 @@ import {
   ATTESTATION_REVOCATION_REASONS,
 } from "./types";
 import { checkIssuerKeyRevoked } from "./issuerKeyRegistry";
+import { checkRevocationStatus } from "./revocationListCache";
 
 /**
  * Verifies an attestation signature against a known issuer public key
@@ -110,6 +111,10 @@ export function checkAttestationExpiry(attestation: RoleAttestation): {
 /**
  * Checks whether the attestation's issuer key has been revoked.
  *
+ * Uses dual revocation checking:
+ *   1. Legacy issuer key registry (for backward compatibility)
+ *   2. New revocation list distribution (for enhanced offline support)
+ *
  * Returns one of three outcomes via the result object:
  *  - `{ revoked: false }`  — key is definitively NOT revoked
  *  - `{ revoked: true }`   — key IS revoked, attestation should be rejected
@@ -122,19 +127,64 @@ export function checkAttestationExpiry(attestation: RoleAttestation): {
  *
  * @param guildId       Guild to check against.
  * @param issuerAddress Issuer address that signed the attestation.
+ * @param kid           Optional key ID for multi-key scenarios.
  */
 export async function checkAttestationRevocation(
   guildId: string,
   issuerAddress: `0x${string}`,
-): Promise<{ revoked: boolean; unavailable?: boolean }> {
-  const isRevoked = await checkIssuerKeyRevoked(guildId, issuerAddress);
-
-  if (isRevoked === null) {
-    // Revocation data unavailable — fail closed
-    return { revoked: true, unavailable: true };
+  kid?: string,
+): Promise<{ revoked: boolean; unavailable?: boolean; source?: 'legacy' | 'revocation_list' }> {
+  // Check legacy issuer key registry first (existing system)
+  const legacyResult = await checkIssuerKeyRevoked(guildId, issuerAddress);
+  
+  if (legacyResult === true) {
+    return { revoked: true, source: 'legacy' };
   }
 
-  return { revoked: isRevoked };
+  // Check new revocation list system
+  try {
+    const revocationResult = await checkRevocationStatus(
+      guildId,
+      issuerAddress,
+      kid,
+      true // assume network available for now
+    );
+
+    switch (revocationResult.status) {
+      case 'revoked':
+        return { revoked: true, source: 'revocation_list' };
+      
+      case 'valid':
+        // Both systems agree key is valid
+        return { revoked: false };
+      
+      case 'unavailable':
+        // New system unavailable, fall back to legacy result
+        if (legacyResult === null) {
+          // Both systems unavailable — fail closed
+          return { revoked: true, unavailable: true };
+        }
+        // Legacy system has data
+        return { revoked: legacyResult };
+      
+      case 'unknown':
+      default:
+        // Key not found in revocation list, rely on legacy result
+        if (legacyResult === null) {
+          // No data from either system — fail closed
+          return { revoked: true, unavailable: true };
+        }
+        return { revoked: legacyResult };
+    }
+  } catch (error) {
+    console.warn(`Revocation list check failed for ${guildId}:`, error);
+    
+    // Fall back to legacy system on error
+    if (legacyResult === null) {
+      return { revoked: true, unavailable: true };
+    }
+    return { revoked: legacyResult };
+  }
 }
 
 /**
@@ -164,7 +214,11 @@ export async function validateAttestation(
   }
 
   // ── 2. Revocation check (in-memory lookup) ──
-  const revocationResult = await checkAttestationRevocation(attestation.guildId, issuerAddress);
+  const revocationResult = await checkAttestationRevocation(
+    attestation.guildId, 
+    issuerAddress,
+    (attestation as any).kid // Support optional kid field
+  );
 
   if (revocationResult.revoked) {
     if (revocationResult.unavailable) {
