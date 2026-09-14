@@ -1,5 +1,6 @@
 import { getRpcsForChain, rpcConfig } from "../../config/rpcConfig";
 import type { RpcConfig } from "../../config/rpcConfig";
+import { validateRpcDomain } from "./rpcDomainGuard";
 
 // Keep local to the app: @guildpass/sdk typings are currently loose.
 export type AccessRequirement = {
@@ -78,7 +79,10 @@ function toChainErrorResolution(
   };
 }
 
-function buildRoleRequirementCallData(requirement: AccessRequirement, walletAddress: string): {
+function buildRoleRequirementCallData(
+  requirement: AccessRequirement,
+  walletAddress: string,
+): {
   to: string;
   data: string;
 } {
@@ -132,7 +136,14 @@ function buildRoleRequirementCallData(requirement: AccessRequirement, walletAddr
   return { to, data };
 }
 
-async function rpcEthCall(rpcUrl: string, to: string, data: string): Promise<boolean> {
+async function rpcEthCall(
+  rpcUrl: string,
+  to: string,
+  data: string,
+  chainId: number,
+): Promise<boolean> {
+  validateRpcDomain(rpcUrl, chainId);
+
   const payload = {
     jsonrpc: "2.0",
     id: 1,
@@ -191,7 +202,7 @@ async function resolveChainRoleEligibility(params: {
       const roleChecks = supportedRequirements.map(async (req) => {
         const { to, data } = buildRoleRequirementCallData(req, walletAddress);
         const hasRole = await withTimeout(
-          rpcEthCall(rpcUrl, to, data),
+          rpcEthCall(rpcUrl, to, data, chainId),
           timeouts.roleResolverRpcAttemptTimeoutMs,
         );
         return { id: req.id ?? "", hasRole };

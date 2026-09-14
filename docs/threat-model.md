@@ -8,12 +8,13 @@
 
 This document scopes the security hardening implemented in GuildPass Mobile v1.0.x. It describes **what the hardening protects against**, **what it does NOT protect against**, and the assumptions underlying each control.
 
-The hardening layer consists of two controls:
+The hardening layer consists of three controls:
 
-| Control                                         | Mechanism                                                         | Scope                                  |
-| ----------------------------------------------- | ----------------------------------------------------------------- | -------------------------------------- |
-| **Device Integrity** (Root/Jailbreak Detection) | JS heuristic checks + native config plugin                        | Detect compromised device environments |
-| **Certificate Pinning**                         | Native TLS pinning (Android NSC / iOS ATS) + JS domain validation | Prevent MITM attacks on API traffic    |
+| Control                                         | Mechanism                                                         | Scope                                                                  |
+| ----------------------------------------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| **Device Integrity** (Root/Jailbreak Detection) | JS heuristic checks + native config plugin                        | Detect compromised device environments                                 |
+| **Certificate Pinning**                         | Native TLS pinning (Android NSC / iOS ATS) + JS domain validation | Prevent MITM attacks on API traffic                                    |
+| **RPC Endpoint Domain Validation**              | JS allowlist check + distinct logging on every RPC request        | Flag unexpected third-party RPC endpoints carrying wallet-address data |
 
 ---
 
@@ -40,15 +41,17 @@ The hardening layer consists of two controls:
 └──────────────────────────────┘
 ```
 
+On-chain RPC traffic from the role-eligibility resolver is **not** pinned — providers are third-party — so the app additionally validates it against an app-configured allowlist (Control 3, §6).
+
 ### Assets Under Protection
 
-| Asset                                  | Sensitivity  | Storage                                       |
-| -------------------------------------- | ------------ | --------------------------------------------- |
-| Wallet address / identifier            | Medium       | `expo-secure-store`                           |
-| Access-control decisions (QR payloads) | High         | In-memory only                                |
+| Asset                                  | Sensitivity  | Storage                                         |
+| -------------------------------------- | ------------ | ----------------------------------------------- |
+| Wallet address / identifier            | Medium       | `expo-secure-store`                             |
+| Access-control decisions (QR payloads) | High         | In-memory only                                  |
 | Signed attestations / proofs           | High         | `expo-secure-store` when cached for offline use |
-| Future: embedded private keys          | **Critical** | Planned: `expo-secure-store` / Secure Enclave |
-| Session / auth tokens                  | High         | `expo-secure-store`                           |
+| Future: embedded private keys          | **Critical** | Planned: `expo-secure-store` / Secure Enclave   |
+| Session / auth tokens                  | High         | `expo-secure-store`                             |
 
 ---
 
@@ -113,14 +116,14 @@ The hardening layer consists of two controls:
 
 ### 5.2 What It Does NOT Protect Against
 
-| Threat                                                       | Rationale                                                             |
-| ------------------------------------------------------------ | --------------------------------------------------------------------- |
-| Compromise of the GuildPass API server private key           | Pinning trusts that specific key; if stolen, attacker can impersonate |
-| Traffic to non-pinned domains (CDNs, analytics, third-party) | Pinning only covers `api.guildpass.xyz` and `staging.guildpass.xyz`   |
-| IP-level redirection that bypasses TLS entirely              | Pinning operates at the TLS handshake, not the network layer          |
-| BGP hijacking with a server that has the pinned private key  | Requires physical server key compromise                               |
-| App binary modification to remove pinning                    | Requires root + binary patching (raised bar via Control 1)            |
-| Certificate transparency log poisoning                       | Out of scope; CT is a server-side concern                             |
+| Threat                                                       | Rationale                                                                                                                                           |
+| ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Compromise of the GuildPass API server private key           | Pinning trusts that specific key; if stolen, attacker can impersonate                                                                               |
+| Traffic to non-pinned domains (CDNs, analytics, third-party) | Pinning only covers `api.guildpass.xyz` and `staging.guildpass.xyz`; RPC traffic to third-party providers is additionally covered by Control 3 (§6) |
+| IP-level redirection that bypasses TLS entirely              | Pinning operates at the TLS handshake, not the network layer                                                                                        |
+| BGP hijacking with a server that has the pinned private key  | Requires physical server key compromise                                                                                                             |
+| App binary modification to remove pinning                    | Requires root + binary patching (raised bar via Control 1)                                                                                          |
+| Certificate transparency log poisoning                       | Out of scope; CT is a server-side concern                                                                                                           |
 
 ### 5.3 Implementation Details
 
@@ -139,9 +142,45 @@ The hardening layer consists of two controls:
 
 ---
 
-## 6. Attack Trees
+## 6. Control 3: RPC Endpoint Domain Validation
 
-### 6.1 Intercept API Traffic
+The on-chain role-eligibility resolver (`src/features/access/roleEligibilityResolver.ts`) sends an `eth_call` containing the **connected wallet address** to third-party RPC providers. These endpoints are never on the pinned-domain set (Control 2), so they get their own domain-consistency control.
+
+### 6.1 What It Protects Against
+
+| Threat                                                                                  | Mitigation                                                                                                               |
+| --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| RPC traffic (carrying the wallet address) sent to a surprise/unknown provider           | Every endpoint is validated before each `rpcEthCall` against the `rpcConfig` allowlist and flagged loudly on mismatch    |
+| Tampered/overridden app configuration pointing eligibility checks at a hostile endpoint | Unknown endpoints are flagged with a distinct warning; the allowlist comes from the same config the rest of the app uses |
+
+### 6.2 What It Does NOT Protect Against
+
+| Threat                                              | Rationale                                                                                                                             |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Compromise of an allowlisted RPC provider           | The allowlist is a domain-level control; it does not bind the provider's TLS identity or behavior                                     |
+| RPC URLs injected at runtime that are not in config | Observability-first by design: unknown endpoints are flagged, not blocked, to support user-configurable custom providers (see §6.4.2) |
+| TLS interception of RPC traffic (MITM)              | RPC providers are third-party and unpinnable here; TLS integrity relies on the provider's own certificate chain                       |
+
+### 6.3 Implementation Details
+
+- **Allowlist** (`src/config/rpcConfig.ts`): `getKnownRpcHostnames()` and `isKnownRpcUrl()` derive permitted hostnames from `rpcConfig.chainRpcUrls`; the check is chain-aware when `chainId` is supplied.
+- **Guard** (`src/features/access/rpcDomainGuard.ts`): `validateRpcDomain(url, chainId)` classifies the endpoint and logs:
+  - `known` → benign `[GuildPass Security][RPC] ... Endpoint allowed by rpcConfig` line;
+  - `unknown` → distinct `[GuildPass Security][RPC] ... Endpoint NOT in rpcConfig allowlist` warning.
+- **Wiring**: called at the top of every `rpcEthCall` attempt, so a provider mismatch cannot pass silently.
+- **Deliberately separate from Certificate Pinning**: this is a domain-consistency/observability check (see §5.2), not a TLS binding.
+
+### 6.4 Assumptions
+
+1. `rpcConfig` is the single source of truth for permitted RPC endpoints.
+2. The control is observability-first: it flags unexpected endpoints but does not block them, because RPC providers may be user-configurable and hardening must not break legitimate custom endpoints.
+3. Pinned GuildPass domains are never used as RPC providers, which is why the RPC allowlist is a distinct check rather than an extension of `isPinnedDomain`.
+
+---
+
+## 7. Attack Trees
+
+### 7.1 Intercept API Traffic
 
 ```
 Goal: Intercept API traffic between GuildPass Mobile and api.guildpass.xyz
@@ -158,7 +197,7 @@ Goal: Intercept API traffic between GuildPass Mobile and api.guildpass.xyz
     └── [OUT OF SCOPE — server-side security]
 ```
 
-### 6.2 Tamper with Wallet / Attestation Flow
+### 7.2 Tamper with Wallet / Attestation Flow
 
 ```
 Goal: Intercept or modify wallet attestations
@@ -175,21 +214,23 @@ Goal: Intercept or modify wallet attestations
 
 ---
 
-## 7. Residual Risk
+## 8. Residual Risk
 
 The following risks remain after hardening and should be tracked:
 
-| Risk                                           | Severity   | Mitigation Strategy                                             |
-| ---------------------------------------------- | ---------- | --------------------------------------------------------------- |
-| Sophisticated attacker bypasses root detection | Medium     | Accept; layer with server-side attestation validation (roadmap) |
-| Pin rotation mishap bricks connectivity        | High       | Pin rotation runbook + backup pin policy + phased rollout       |
-| Native config plugin not included in build     | High       | CI check that validates plugin presence                         |
-| Traffic to non-pinned third-party domains      | Low-Medium | Audit third-party dependencies; add pins for critical domains   |
-| Expo Go bypass in development                  | Low        | Detect Expo Go and warn (not block) during development          |
+| Risk                                           | Severity   | Mitigation Strategy                                                                                          |
+| ---------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------ |
+| Sophisticated attacker bypasses root detection | Medium     | Accept; layer with server-side attestation validation (roadmap)                                              |
+| Pin rotation mishap bricks connectivity        | High       | Pin rotation runbook + backup pin policy + phased rollout                                                    |
+| Native config plugin not included in build     | High       | CI check that validates plugin presence                                                                      |
+| Traffic to non-pinned third-party domains      | Low-Medium | Audit third-party dependencies; add pins for critical domains; RPC traffic domain-flagged via Control 3 (§6) |
+| RPC provider sees wallet addresses / queries   | Low        | Allowlist flagging (Control 3); future: privacy-RPC routing and server-side attestation                      |
+| Discovers provider list by scanning RPC config | Low        | Endpoints are logged with the allowlist check; treat as app configuration, not secrets                       |
+| Expo Go bypass in development                  | Low        | Detect Expo Go and warn (not block) during development                                                       |
 
 ---
 
-## 8. Future Improvements
+## 9. Future Improvements
 
 | Improvement                                   | Priority | Notes                                              |
 | --------------------------------------------- | -------- | -------------------------------------------------- |
@@ -201,7 +242,7 @@ The following risks remain after hardening and should be tracked:
 
 ---
 
-## 9. References
+## 10. References
 
 - [OWASP Mobile Top 10 (2024)](https://owasp.org/www-project-mobile-top-10/)
 - [OWASP Certificate Pinning Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Pinning_Cheat_Sheet.html)
