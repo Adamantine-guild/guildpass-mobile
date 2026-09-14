@@ -29,7 +29,10 @@ vi.mock("../../src/lib/guildpassClient", () => ({
 
 vi.mock("../../src/config/rpcConfig", () => ({
   getRpcsForChain: rpcConfigMock.getRpcsForChain,
+  getKnownRpcHostnames: vi.fn(() => new Set<string>()),
+  isKnownRpcUrl: vi.fn(() => false),
   rpcConfig: {
+    chainRpcUrls: {},
     timeouts: rpcConfigMock.timeouts,
   },
 }));
