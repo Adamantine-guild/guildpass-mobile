@@ -95,3 +95,59 @@ export function getRpcsForChain(chainId: number): string[] {
 export function hasAnyRpcsConfigured(): boolean {
   return Object.values(rpcConfig.chainRpcUrls).some((arr) => arr.length > 0);
 }
+
+// ---------------------------------------------------------------------------
+// RPC domain allowlist
+// ---------------------------------------------------------------------------
+// The on-chain eligibility resolver talks to third-party RPC providers (which
+// are never on the GuildPass pinned-domain set), so it validates every
+// endpoint against a dedicated allowlist derived from `chainRpcUrls`.
+// See docs/threat-model.md §6 (Control 3: RPC Endpoint Domain Validation).
+
+function getUrlHostname(url: string): string | null {
+  try {
+    return new URL(url).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Hostnames the app is configured to reach for on-chain RPC traffic, derived
+ * from `chainRpcUrls`. `chainRpcUrls` may be injected for tests.
+ */
+export function getKnownRpcHostnames(
+  chainRpcUrls: Record<number, string[]> = rpcConfig.chainRpcUrls,
+): Set<string> {
+  const hostnames = new Set<string>();
+  for (const urls of Object.values(chainRpcUrls)) {
+    for (const url of urls) {
+      const hostname = getUrlHostname(url);
+      if (hostname !== null) hostnames.add(hostname);
+    }
+  }
+  return hostnames;
+}
+
+/**
+ * Classify a URL against the RPC allowlist. When `chainId` is provided the
+ * check is chain-aware: the URL must belong to that chain's configured
+ * endpoints to count as known.
+ */
+export function isKnownRpcUrl(
+  url: string,
+  chainId?: number,
+  chainRpcUrls: Record<number, string[]> = rpcConfig.chainRpcUrls,
+): boolean {
+  const hostname = getUrlHostname(url);
+  if (hostname === null) return false;
+
+  if (chainId !== undefined) {
+    for (const configured of chainRpcUrls[chainId] ?? []) {
+      if (getUrlHostname(configured) === hostname) return true;
+    }
+    return false;
+  }
+
+  return getKnownRpcHostnames(chainRpcUrls).has(hostname);
+}

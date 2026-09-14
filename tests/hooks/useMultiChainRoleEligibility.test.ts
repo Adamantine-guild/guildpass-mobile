@@ -37,7 +37,10 @@ vi.mock("../../src/lib/guildpassClient", () => ({
 
 vi.mock("../../src/config/rpcConfig", () => ({
   getRpcsForChain: rpcConfigMock.getRpcsForChain,
+  getKnownRpcHostnames: vi.fn(() => new Set<string>()),
+  isKnownRpcUrl: vi.fn(() => false),
   rpcConfig: {
+    chainRpcUrls: {},
     timeouts: rpcConfigMock.timeouts,
   },
 }));
@@ -286,10 +289,7 @@ describe("useMultiChainRoleEligibility", () => {
     let resolution: Promise<void> | undefined;
 
     await act(async () => {
-      resolution = hook.current.resolve(
-        "guild-1",
-        WALLET_ADDRESS,
-      );
+      resolution = hook.current.resolve("guild-1", WALLET_ADDRESS);
       await flushMicrotasks();
     });
 
