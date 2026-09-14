@@ -275,7 +275,10 @@ export default function GuildDetail() {
               </Card>
 
               <View className="mb-6">
-                <Text className="text-lg font-bold text-text dark:text-slate-100 mb-3">
+                <Text
+                  className="text-lg font-bold text-text dark:text-slate-100 mb-3"
+                  accessibilityRole="header"
+                >
                   Your Membership
                 </Text>
                 <Card
@@ -310,7 +313,10 @@ export default function GuildDetail() {
               </View>
 
               <View className="mb-6">
-                <Text className="text-lg font-bold text-text dark:text-slate-100 mb-3">
+                <Text
+                  className="text-lg font-bold text-text dark:text-slate-100 mb-3"
+                  accessibilityRole="header"
+                >
                   Available Roles
                 </Text>
                 {groupedRequirements.length > 0 ? (

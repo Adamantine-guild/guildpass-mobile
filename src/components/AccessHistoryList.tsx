@@ -34,19 +34,34 @@ const statusClassName = (status: AccessHistoryEntry["status"]) => {
 
 const HistoryRow = ({ entry }: { entry: AccessHistoryEntry }) => {
   const guildName = useResolvedGuildName(entry.guildId);
+  const dateString = new Date(entry.checkedAt).toLocaleString();
+  const statusText = statusLabel(entry.status);
+
+  const a11yLabel = [
+    `${entry.resourceName}: ${statusText}`,
+    `Guild: ${guildName}`,
+    entry.reason ? `Reason: ${entry.reason}` : null,
+    `Checked ${dateString}`,
+  ]
+    .filter(Boolean)
+    .join(". ");
 
   return (
-    <View className="py-3 border-t border-border">
-      <View className="flex-row justify-between">
-        <Text className="text-text font-semibold">{entry.resourceName}</Text>
+    <View
+      className="py-3 border-t border-border dark:border-slate-700"
+      accessible
+      accessibilityLabel={a11yLabel}
+    >
+      <View className="flex-row justify-between" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+        <Text className="text-text dark:text-slate-100 font-semibold">{entry.resourceName}</Text>
         <Text className={`font-bold ${statusClassName(entry.status)}`}>
-          {statusLabel(entry.status)}
+          {statusText}
         </Text>
       </View>
-      <Text className="text-text-muted text-sm mt-1">{guildName}</Text>
-      {entry.reason ? <Text className="text-text-muted text-sm mt-1">{entry.reason}</Text> : null}
-      <Text className="text-text-muted text-xs mt-1">
-        {new Date(entry.checkedAt).toLocaleString()}
+      <Text className="text-text-muted dark:text-slate-400 text-sm mt-1" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">{guildName}</Text>
+      {entry.reason ? <Text className="text-text-muted dark:text-slate-400 text-sm mt-1" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">{entry.reason}</Text> : null}
+      <Text className="text-text-muted dark:text-slate-400 text-xs mt-1" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+        {dateString}
       </Text>
     </View>
   );

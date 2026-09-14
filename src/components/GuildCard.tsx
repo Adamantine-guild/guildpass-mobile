@@ -62,33 +62,61 @@ const GuildCard = memo(({
   const resolvedStatus = status ?? (isActive ? "active" : "inactive");
   const statusStyle = STATUS_STYLES[resolvedStatus];
 
+  const a11yLabel = [
+    name,
+    `${statusStyle.label.toLowerCase()} guild`,
+    `${roleCount} ${roleCount === 1 ? "role" : "roles"}`,
+    offlineCached ? "cached offline" : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
+
   return (
     <TouchableOpacity
       onPress={() => onPress(id)}
       activeOpacity={0.7}
       accessibilityRole="button"
-      accessibilityLabel={`${name}, ${statusStyle.label.toLowerCase()}, ${roleCount} roles${
-        offlineCached ? ", cached offline" : ""
-      }}
+      accessibilityLabel={a11yLabel}
+      accessibilityHint="Tap to view guild details"
     >
       <Card className="mb-4">
         <View className="flex-row justify-between items-center mb-2">
-          <Text className="text-xl font-bold text-text">{name}</Text>
-          <View className={`px-3 py-1 rounded-full ${statusStyle.pill}`}>
+          <Text
+            className="text-xl font-bold text-text dark:text-slate-100"
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          >
+            {name}
+          </Text>
+          <View
+            className={`px-3 py-1 rounded-full ${statusStyle.pill}`}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          >
             <Text className={`text-xs font-bold ${statusStyle.text}`}>{statusStyle.label}</Text>
           </View>
         </View>
-        <Text className="text-text-muted text-sm mb-4">ID: {id}</Text>
-        <View className="flex-row items-center flex-wrap">
+        <Text
+          className="text-text-muted dark:text-slate-400 text-sm mb-4"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
+          ID: {id}
+        </Text>
+        <View
+          className="flex-row items-center flex-wrap"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
           <RoleBadge
             name={`${roleCount} ${roleCount === 1 ? "Role" : "Roles"}`}
             tier={statusStyle.roleTier}
           />
-          <Text className="text-text-muted mx-2">•</Text>
-          <Text className="text-text-muted">Tap to view details</Text>
+          <Text className="text-text-muted dark:text-slate-400 mx-2">•</Text>
+          <Text className="text-text-muted dark:text-slate-400">Tap to view details</Text>
           {offlineCached ? (
             <>
-              <Text className="text-text-muted mx-2">•</Text>
+              <Text className="text-text-muted dark:text-slate-400 mx-2">•</Text>
               <Text className="text-secondary font-semibold" testID="guild-card-offline-cache">
                 Cached offline
               </Text>
