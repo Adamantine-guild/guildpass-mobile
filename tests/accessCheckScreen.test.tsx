@@ -304,10 +304,8 @@ describe("AccessCheck screen", () => {
       resourceId: "vip-door",
       walletAddress: walletState.walletAddress,
       expiresAt: "2099-01-01T00:00:00.000Z",
-      signature: "dummy-sig",
-      kid: "key-1",
-      kid: "test-kid",
       signature: "fake-signature",
+      kid: "test-kid",
       nonce: "fake-nonce",
     });
 
@@ -329,10 +327,8 @@ describe("AccessCheck screen", () => {
       resourceId: "vip-door",
       walletAddress: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       expiresAt: "2099-01-01T00:00:00.000Z",
-      signature: "dummy-sig",
-      kid: "key-1",
-      kid: "test-kid",
       signature: "fake-signature",
+      kid: "test-kid",
       nonce: "fake-nonce",
     });
 
@@ -383,7 +379,7 @@ describe("AccessCheck screen", () => {
     expect(outputText(screen!)).toContain("Error checking access");
 
     await act(async () => {
-      screen!.root.findByProps({ accessibilityLabel: "Try Again" }).props.onPress();
+      screen!.root.findByProps({ accessibilityLabel: "Try again" }).props.onPress();
       await flush();
     });
 
@@ -438,6 +434,9 @@ describe("AccessCheck screen", () => {
     expect(
       screen!.root.findByProps({ testID: "per-chain-eligibility-retry-137" }),
     ).toBeDefined();
+    expect(
+      screen!.root.findAllByProps({ testID: "per-chain-eligibility-retry-1" }),
+    ).toHaveLength(0);
     expect(screenText).toContain("Resolving");
     expect(screenText).toContain("Some chains could not be fully resolved.");
   });

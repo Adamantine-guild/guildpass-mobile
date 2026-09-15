@@ -208,25 +208,35 @@ export const useMultiChainRoleEligibility = () => {
       error: undefined,
     }));
 
-    const result = await resolveRoleEligibilityForChain({
-      walletAddress: context.walletAddress,
-      chainId,
-      requirements,
-      rpcs: context.rpcsByChain[chainId],
-      timeouts: rpcConfig.timeouts,
-    });
+    let result: PerChainRoleEligibilityResolution;
 
-    if (requestIdRef.current !== requestId) return;
-
-    setState((current) => {
-      const resolvingChainIds = removeResolvingChain(current.resolvingChainIds, chainId);
-      return {
-        ...current,
-        isResolving: resolvingChainIds.length > 0,
-        resolvingChainIds,
-        perChain: upsertPerChainResolution(current.perChain, result),
+    try {
+      result = await resolveRoleEligibilityForChain({
+        walletAddress: context.walletAddress,
+        chainId,
+        requirements,
+        rpcs: context.rpcsByChain[chainId],
+        timeouts: rpcConfig.timeouts,
+      });
+    } catch (e) {
+      result = {
+        chainId,
+        status: "error",
+        errorMessage: e instanceof Error ? e.message : String(e),
       };
-    });
+    } finally {
+      if (requestIdRef.current !== requestId) return;
+
+      setState((current) => {
+        const resolvingChainIds = removeResolvingChain(current.resolvingChainIds, chainId);
+        return {
+          ...current,
+          isResolving: resolvingChainIds.length > 0,
+          resolvingChainIds,
+          perChain: upsertPerChainResolution(current.perChain, result),
+        };
+      });
+    }
   }, []);
 
   return useMemo(
