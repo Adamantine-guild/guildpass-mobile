@@ -408,4 +408,60 @@ describe("useMultiChainRoleEligibility", () => {
     fetchSpy.mockRestore();
     hook.unmount();
   });
+
+  it("leaves successful siblings untouched when a chain retry fails again", async () => {
+    guildPassClientMock.getRoles.mockResolvedValue([
+      {
+        id: "role-eth",
+        name: "Ethereum Role",
+        chainId: 1,
+        requirements: [ROLE_REQUIREMENT],
+      },
+      {
+        id: "role-optimism",
+        name: "Optimism Role",
+        chainId: 10,
+        requirements: [ROLE_REQUIREMENT_2],
+      },
+    ]);
+    rpcConfigMock.getRpcsForChain.mockImplementation((chainId: number) =>
+      chainId === 1 ? ["https://rpc.ethereum.test"] : ["https://rpc.optimism.test"],
+    );
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((rpcUrl) => {
+      if (String(rpcUrl).includes("ethereum")) {
+        return Promise.resolve({
+          json: async () => ({ result: "0x1" }),
+        } as Response);
+      }
+
+      return Promise.reject(new Error("Optimism RPC provider error"));
+    });
+    const hook = await renderHook();
+
+    await act(async () => {
+      await hook.current.resolve("guild-1", WALLET_ADDRESS);
+    });
+
+    await act(async () => {
+      await hook.current.retryChain(10);
+    });
+
+    expect(hook.current.perChain).toEqual([
+      {
+        chainId: 1,
+        status: "resolved",
+        resolvedRoles: ["1"],
+      },
+      {
+        chainId: 10,
+        status: "error",
+        errorMessage: "Optimism RPC provider error",
+      },
+    ]);
+    expect(hook.current.isResolving).toBe(false);
+    expect(hook.current.resolvingChainIds).toEqual([]);
+
+    fetchSpy.mockRestore();
+    hook.unmount();
+  });
 });
