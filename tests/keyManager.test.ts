@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import * as SecureStore from "expo-secure-store";
-import { KeyManager, KeyManagerError, KeyManagerErrorCode } from "../src/lib/keyManager";
+import {
+  KeyManager,
+  KeyManagerError,
+  KeyManagerErrorCode,
+  DEFAULT_KEY_RETRIEVAL_TIMEOUT_MS,
+  MAX_KEY_RETRIEVAL_TIMEOUT_MS,
+} from "../src/lib/keyManager";
 
 vi.mock("expo-secure-store", () => ({
   getItemAsync: vi.fn(),
@@ -218,6 +224,61 @@ describe("KeyManager", () => {
       const err = new KeyManagerError("Custom text", KeyManagerErrorCode.INVALID_KEY_FORMAT);
       expect(err.code).toBe(KeyManagerErrorCode.INVALID_KEY_FORMAT);
       expect(err.message).toBe("Custom text");
+    });
+  });
+
+  describe("isSecureStoreAvailable caching", () => {
+    it("should cache availability and avoid redundant getItemAsync probes", async () => {
+      // Un-mock isSecureStoreAvailable for this specific test
+      vi.restoreAllMocks();
+      vi.mocked(SecureStore.getItemAsync).mockResolvedValue("test");
+
+      const km = new KeyManager({ keyId: "test_cache" });
+      const available1 = await km.isSecureStoreAvailable();
+      const available2 = await km.isSecureStoreAvailable();
+      const available3 = await km.isSecureStoreAvailable();
+
+      expect(available1).toBe(true);
+      expect(available2).toBe(true);
+      expect(available3).toBe(true);
+      expect(SecureStore.getItemAsync).toHaveBeenCalledTimes(1);
+      expect(SecureStore.getItemAsync).toHaveBeenCalledWith("__test_availability__");
+    });
+
+    it("should re-probe availability after explicit cache invalidation", async () => {
+      vi.restoreAllMocks();
+      vi.mocked(SecureStore.getItemAsync).mockResolvedValue("test");
+
+      const km = new KeyManager({ keyId: "test_inval" });
+      await km.isSecureStoreAvailable();
+      expect(SecureStore.getItemAsync).toHaveBeenCalledTimes(1);
+
+      km.invalidateAvailabilityCache();
+      await km.isSecureStoreAvailable();
+      expect(SecureStore.getItemAsync).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("adaptive timeout strategy", () => {
+    it("should use DEFAULT_KEY_RETRIEVAL_TIMEOUT_MS (500ms) by default", () => {
+      const km = new KeyManager({ keyId: "test_default_timeout" });
+      expect(km.getEffectiveTimeoutMs()).toBe(DEFAULT_KEY_RETRIEVAL_TIMEOUT_MS);
+      expect(km.getEffectiveTimeoutMs()).toBe(500);
+    });
+
+    it("should adapt timeout upwards when high latencies are recorded", () => {
+      const km = new KeyManager({ keyId: "test_adaptive", retrievalTimeoutMs: 500, adaptiveTimeout: true });
+      expect(km.getEffectiveTimeoutMs()).toBe(500);
+
+      // Record slow latencies (e.g. 300ms)
+      // @ts-expect-error - testing private helper
+      km.recordRetrievalLatency(300);
+      // @ts-expect-error - testing private helper
+      km.recordRetrievalLatency(320);
+
+      const adapted = km.getEffectiveTimeoutMs();
+      expect(adapted).toBeGreaterThan(500);
+      expect(adapted).toBeLessThanOrEqual(MAX_KEY_RETRIEVAL_TIMEOUT_MS);
     });
   });
 });

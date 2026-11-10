@@ -19,15 +19,25 @@ const KEY_ROTATION_INTERVAL_MS = KEY_ROTATION_INTERVAL_DAYS * 24 * 60 * 60 * 100
 
 // Exponential backoff delays in milliseconds
 const RETRY_DELAYS_MS = [100, 400, 900]; // 100ms, 400ms, 900ms (total ~1.4s for 3 retries)
-const KEY_RETRIEVAL_TIMEOUT_MS = 100;
+
+/**
+ * Baseline timeout for platform secure-storage retrieval (500ms).
+ * Replaces the overly aggressive 100ms timeout to avoid false-positive failures
+ * during platform Keystore/Keychain operations, HSM latency, or cold boot.
+ */
+export const DEFAULT_KEY_RETRIEVAL_TIMEOUT_MS = 500;
+export const MAX_KEY_RETRIEVAL_TIMEOUT_MS = 1500;
+export const KEY_RETRIEVAL_TIMEOUT_MS = DEFAULT_KEY_RETRIEVAL_TIMEOUT_MS;
 
 export interface KeyManagerConfig {
   /** Custom key identifier (useful for testing) */
   keyId?: string;
-  /** Custom timeout for key retrieval in milliseconds */
+  /** Custom baseline timeout for key retrieval in milliseconds */
   retrievalTimeoutMs?: number;
   /** Maximum number of retry attempts for key storage */
   maxRetries?: number;
+  /** Whether to adapt retrieval timeout dynamically based on observed latency (default: true) */
+  adaptiveTimeout?: boolean;
 }
 
 export interface KeyInfo {
@@ -89,12 +99,16 @@ export class KeyManager {
   private keyId: string;
   private retrievalTimeoutMs: number;
   private maxRetries: number;
+  private adaptiveTimeout: boolean;
   private memoryFallbackKey: string | null = null;
+  private secureStoreAvailableCache: boolean | null = null;
+  private observedLatencies: number[] = [];
 
   constructor(config?: KeyManagerConfig) {
     this.keyId = config?.keyId ?? ENCRYPTION_KEY_ID;
-    this.retrievalTimeoutMs = config?.retrievalTimeoutMs ?? KEY_RETRIEVAL_TIMEOUT_MS;
+    this.retrievalTimeoutMs = config?.retrievalTimeoutMs ?? DEFAULT_KEY_RETRIEVAL_TIMEOUT_MS;
     this.maxRetries = config?.maxRetries ?? RETRY_DELAYS_MS.length;
+    this.adaptiveTimeout = config?.adaptiveTimeout ?? true;
   }
 
   /**
@@ -191,7 +205,7 @@ export class KeyManager {
 
   /**
    * Retrieve the encryption key from expo-secure-store
-   * Implements 100ms timeout for key retrieval
+   * Implements adaptive capability-aware timeout for key retrieval
    */
   async getKey(): Promise<string | null> {
     if (!(await this.isSecureStoreAvailable())) {
@@ -205,12 +219,17 @@ export class KeyManager {
       );
     }
 
+    const effectiveTimeout = this.getEffectiveTimeoutMs();
+    const startTime = Date.now();
+
     try {
-      // Race between retrieval and timeout
+      // Race between retrieval and adaptive timeout
       const key = await this.withTimeout(
         SecureStore.getItemAsync(this.keyId),
-        this.retrievalTimeoutMs,
+        effectiveTimeout,
       );
+
+      this.recordRetrievalLatency(Date.now() - startTime);
 
       if (key) {
         // Validate key format (should be 64 hex characters for 256-bit key)
@@ -231,7 +250,7 @@ export class KeyManager {
 
       // If timeout occurred, switch to in-memory only mode
       if (error instanceof Error && error.message === "Timeout") {
-        console.warn("[KeyManager] Key retrieval timed out, switching to in-memory mode");
+        console.warn(`[KeyManager] Key retrieval timed out after ${effectiveTimeout}ms, switching to in-memory mode`);
 
         // If we have a memory fallback key, use it
         if (this.memoryFallbackKey) {
@@ -239,10 +258,13 @@ export class KeyManager {
         }
 
         throw new KeyManagerError(
-          `Key retrieval timed out after ${this.retrievalTimeoutMs}ms`,
+          `Key retrieval timed out after ${effectiveTimeout}ms`,
           KeyManagerErrorCode.RETRIEVAL_TIMEOUT,
         );
       }
+
+      // Invalidate cached availability on unexpected operation failure
+      this.invalidateAvailabilityCache();
 
       throw new KeyManagerError(
         "Failed to retrieve encryption key",
@@ -366,22 +388,58 @@ export class KeyManager {
   }
 
   /**
-   * Check if secure store is available on this platform
+   * Check if secure store is available on this platform.
+   * Caches the result after the initial probe to eliminate redundant per-call round trips.
    */
-  async isSecureStoreAvailable(): Promise<boolean> {
+  async isSecureStoreAvailable(forceCheck: boolean = false): Promise<boolean> {
+    if (!forceCheck && this.secureStoreAvailableCache !== null) {
+      return this.secureStoreAvailableCache;
+    }
+
     // SecureStore is available on iOS and Android
     // On web, it falls back to localStorage (not secure)
     if (Platform.OS === "web") {
       console.warn("[KeyManager] Secure store not available on web platform");
+      this.secureStoreAvailableCache = false;
       return false;
     }
 
     try {
       // Try to check if SecureStore is available by testing a simple operation
       await SecureStore.getItemAsync("__test_availability__");
+      this.secureStoreAvailableCache = true;
       return true;
     } catch {
+      this.secureStoreAvailableCache = false;
       return false;
+    }
+  }
+
+  /**
+   * Invalidate cached availability on explicit operational failures
+   */
+  invalidateAvailabilityCache(): void {
+    this.secureStoreAvailableCache = null;
+  }
+
+  /**
+   * Calculate effective timeout based on baseline and observed latencies
+   */
+  getEffectiveTimeoutMs(): number {
+    if (!this.adaptiveTimeout || this.observedLatencies.length === 0) {
+      return this.retrievalTimeoutMs;
+    }
+    const recent = this.observedLatencies.slice(-5);
+    const avg = recent.reduce((sum, v) => sum + v, 0) / recent.length;
+    // Safety headroom: 2.5x observed average + 150ms buffer, bounded by MAX_KEY_RETRIEVAL_TIMEOUT_MS
+    const adapted = Math.round(avg * 2.5 + 150);
+    return Math.max(this.retrievalTimeoutMs, Math.min(MAX_KEY_RETRIEVAL_TIMEOUT_MS, adapted));
+  }
+
+  private recordRetrievalLatency(durationMs: number): void {
+    this.observedLatencies.push(durationMs);
+    if (this.observedLatencies.length > 20) {
+      this.observedLatencies.shift();
     }
   }
 
